@@ -1138,6 +1138,7 @@ async def visible_provinces(
     return
 
 
+@commands.command(brief="publicize void for chaos")
 async def publicize(ctx: commands.Context, manager: Manager) -> None:
     if not is_gm(ctx.message.author):
         raise PermissionError(f"You cannot publicize a void because you are not a GM.")
@@ -1383,7 +1384,6 @@ async def publish_fow_order_logs(ctx: commands.Context, manager: Manager):
 
 
 async def ping_players(ctx: commands.Context, manager: Manager) -> None:
-
     player_categories: list[CategoryChannel] = []
 
     timestamp = re.match(

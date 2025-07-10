@@ -18,6 +18,7 @@ from diplomacy.persistence.manager import Manager
 from diplomacy.persistence.player import Player
 from diplomacy.persistence.unit import UnitType
 from logging import getLogger
+
 logger = getLogger(__name__)
 
 whitespace_dict = {
@@ -49,14 +50,15 @@ discord_file_limit = 10 * (2**20)
 discord_embed_description_limit = 4096
 discord_embed_total_limit = 6000
 
+
 def is_admin(author: commands.Context.author) -> bool:
     return author.id in [
-        1217203346511761428,    # eebop
-        332252245259190274,     # Icecream Guy
-        169995316680982528,     # Bumble
-        450636420558618625,     # Flare
-        490633966974533640,     # Elle
-        1352388421003251833,    # Chloe
+        1217203346511761428,  # eebop
+        332252245259190274,  # Icecream Guy
+        169995316680982528,  # Bumble
+        450636420558618625,  # Flare
+        490633966974533640,  # Elle
+        1352388421003251833,  # Chloe
     ]
 
 
@@ -68,15 +70,20 @@ def is_gm(author: commands.Context.author) -> bool:
 
 
 def is_gm_channel(channel: commands.Context.channel) -> bool:
-    return config.is_gm_channel(channel.name) and config.is_gm_category(channel.category.name)
+    return config.is_gm_channel(channel.name) and config.is_gm_category(
+        channel.category.name
+    )
 
 
-def get_player_by_role(author: commands.Context.author, manager: Manager, server_id: int) -> Player | None:
+def get_player_by_role(
+    author: commands.Context.author, manager: Manager, server_id: int
+) -> Player | None:
     for role in author.roles:
         for player in manager.get_board(server_id).players:
             if player.name == role.name:
                 return player
     return None
+
 
 def get_role_by_player(player: Player, roles: Guild.roles) -> discord.Role | None:
     for role in roles:
@@ -85,33 +92,44 @@ def get_role_by_player(player: Player, roles: Guild.roles) -> discord.Role | Non
     return None
 
 
-def get_player_by_channel(channel: commands.Context.channel, manager: Manager, server_id: int, ignore_catagory=False) -> Player | None:
+def get_player_by_channel(
+    channel: commands.Context.channel,
+    manager: Manager,
+    server_id: int,
+    ignore_catagory=False,
+) -> Player | None:
     # thread -> main channel
     if isinstance(channel, Thread):
         channel = channel.parent
-    
+
     name = channel.name
     if (not ignore_catagory) and not config.is_player_category(channel.category.name):
         return None
-    
-    #TODO hacky, allow for renaming to void for chaos
+
+    # TODO hacky, allow for renaming to void for chaos
     if manager.get_board(server_id).is_chaos() and name.endswith("-void"):
-        name = name[: -5]
+        name = name[:-5]
     else:
         if not name.endswith(config.player_channel_suffix):
             return
-        
+
         name = name[: -(len(config.player_channel_suffix))]
 
     return manager.get_board(server_id).get_cleaned_player(name)
 
-#FIXME this is done pretty poorly
-async def get_channel_by_player(player: Player, ctx: commands.Context, manager: Manager) -> GuildChannel:
+
+# FIXME this is done pretty poorly
+async def get_channel_by_player(
+    player: Player, ctx: commands.Context, manager: Manager
+) -> GuildChannel:
     guild = ctx.guild
     guild_id = guild.id
     board = manager.get_board(guild_id)
 
-    channel_name = player.name.lower().replace(" ", "-").replace("\'", "").replace(".", "") + config.player_channel_suffix
+    channel_name = (
+        player.name.lower().replace(" ", "-").replace("'", "").replace(".", "")
+        + config.player_channel_suffix
+    )
 
     for category in guild.categories:
         if not config.is_player_category(category.name) and not board.is_chaos():
@@ -126,23 +144,30 @@ async def get_channel_by_player(player: Player, ctx: commands.Context, manager: 
 
 def get_player_by_name(name: str, manager: Manager, server_id: int) -> Player | None:
     for player in manager.get_board(server_id).players:
-        if player.name.lower().replace("-", " ").replace("\'", "").replace(".", "") == name.strip().lower().replace("-", " ").replace("\'", "").replace(".", ""):
+        if player.name.lower().replace("-", " ").replace("'", "").replace(
+            ".", ""
+        ) == name.strip().lower().replace("-", " ").replace("'", "").replace(".", ""):
             return player
     return None
+
 
 def get_orders_log(guild: Guild) -> GuildChannel | None:
     for channel in guild.channels:
         # FIXME move "orders" and "gm channels" to bot.config
-        if (channel.name.lower() == "orders-log"
-                and channel.category is not None
-                and channel.category.name.lower() == "gm channels"
+        if (
+            channel.name.lower() == "orders-log"
+            and channel.category is not None
+            and channel.category.name.lower() == "gm channels"
         ):
             return channel
     return None
 
+
 def is_player_channel(player_role: str, channel: commands.Context.channel) -> bool:
     player_channel = player_role.lower() + config.player_channel_suffix
-    return player_channel == channel.name and config.is_player_category(channel.category.name)
+    return player_channel == channel.name and config.is_player_category(
+        channel.category.name
+    )
 
 
 def get_keywords(command: str) -> list[str]:
@@ -181,12 +206,13 @@ def get_unit_type(command: str) -> UnitType | None:
         return UnitType.FLEET
     return None
 
+
 def log_command(
-        remote_logger: logging.Logger,
-        ctx: discord.ext.commands.Context,
-        message: str,
-        *,
-        level=logging.INFO
+    remote_logger: logging.Logger,
+    ctx: discord.ext.commands.Context,
+    message: str,
+    *,
+    level=logging.INFO,
 ) -> None:
     # FIXME Should probably delete this function and use a logging formatter instead
     _log_command(
@@ -196,18 +222,19 @@ def log_command(
         ctx.channel.name,
         ctx.author.name,
         message,
-        level=level
+        level=level,
     )
 
+
 def _log_command(
-        remote_logger: logging.Logger,
-        invoke_message: str,
-        guild: str,
-        channel: str,
-        invoker: str,
-        message: str,
-        *,
-        level=logging.INFO
+    remote_logger: logging.Logger,
+    invoke_message: str,
+    guild: str,
+    channel: str,
+    invoker: str,
+    message: str,
+    *,
+    level=logging.INFO,
 ) -> None:
     # FIXME Should probably delete this function and use a logging formatter instead
 
@@ -217,36 +244,36 @@ def _log_command(
         command_len_limit = 40
 
     # this might be too expensive?
-    command = invoke_message[:command_len_limit].encode('unicode_escape').decode('utf-8')
+    command = (
+        invoke_message[:command_len_limit].encode("unicode_escape").decode("utf-8")
+    )
     if len(invoke_message) > 40:
         command += "..."
 
     # temporary handling for bad error messages should be removed when we are nolonger passing
     # messages intended for Discord to this function. FIXME
-    message = message.encode('unicode_escape').decode('utf-8')
+    message = message.encode("unicode_escape").decode("utf-8")
 
     remote_logger.log(
-        level,
-        f"[{guild}][#{channel}]({invoker}) - "
-        f"'{command}' -> "
-        f"{message}"
+        level, f"[{guild}][#{channel}]({invoker}) - " f"'{command}' -> " f"{message}"
     )
 
+
 async def send_message_and_file(
-        *,
-        channel: commands.Context.channel,
-        title: str = None,
-        message: str = None,
-        messages: [str] = None,
-        embed_colour: str = None,
-        file: str = None,
-        file_name: str = None,
-        file_in_embed: bool = None,
-        footer_content: str = None,
-        footer_datetime: datetime.datetime = None,
-        fields: List[Tuple[str, str]] = None,
-        convert_svg: bool = False,
-        **_
+    *,
+    channel: commands.Context.channel,
+    title: str = None,
+    message: str = None,
+    messages: [str] = None,
+    embed_colour: str = None,
+    file: str = None,
+    file_name: str = None,
+    file_in_embed: bool = None,
+    footer_content: str = None,
+    footer_datetime: datetime.datetime = None,
+    fields: List[Tuple[str, str]] = None,
+    convert_svg: bool = False,
+    **_,
 ) -> Message:
 
     if not embed_colour:
@@ -262,9 +289,9 @@ async def send_message_and_file(
                 title, body = fields.pop(i)
                 if not message:
                     message = ""
-                message += (f"\n" 
-                            f"### {title}\n" if title.strip() else f"{title}\n" 
-                            f"{body}")
+                message += (
+                    f"\n" f"### {title}\n" if title.strip() else f"{title}\n" f"{body}"
+                )
 
     if message and messages:
         messages = [message] + messages
@@ -294,7 +321,10 @@ async def send_message_and_file(
                 title = None
 
                 # check that embed totals aren't over the total message embed character limit.
-                if sum(map(len, embeds)) + len(embed) > discord_embed_total_limit or len(embeds) == 10:
+                if (
+                    sum(map(len, embeds)) + len(embed) > discord_embed_total_limit
+                    or len(embeds) == 10
+                ):
                     await channel.send(embeds=embeds)
                     embeds = []
 
@@ -303,22 +333,24 @@ async def send_message_and_file(
                 message = message[cutoff:].strip()
 
     if not embeds:
-        embeds = [Embed(
-            title=title,
-            colour=Colour.from_str(embed_colour)
-        )]
+        embeds = [Embed(title=title, colour=Colour.from_str(embed_colour))]
         title = ""
 
     if fields:
         for field in fields:
-            if (len(embeds[-1].fields) == 25
-                    or sum(map(len, embeds)) + sum(map(len, field)) > discord_embed_total_limit
-                    or len(embeds) == 10):
+            if (
+                len(embeds[-1].fields) == 25
+                or sum(map(len, embeds)) + sum(map(len, field))
+                > discord_embed_total_limit
+                or len(embeds) == 10
+            ):
                 await channel.send(embeds=embeds)
-                embeds = [Embed(
-                    title=title,
-                    colour=Colour.from_str(embed_colour),
-                )]
+                embeds = [
+                    Embed(
+                        title=title,
+                        colour=Colour.from_str(embed_colour),
+                    )
+                ]
                 title = ""
 
             embeds[-1].add_field(name=field[0], value=field[1], inline=True)
@@ -332,10 +364,10 @@ async def send_message_and_file(
                 channel.guild.name,
                 channel.name,
                 "?",
-                f"png is too big ({len(file)}); converting to jpg"
+                f"png is too big ({len(file)}); converting to jpg",
             )
             file, file_name, error = await png_to_jpg(file, file_name)
-            error = re.sub('\\s+',' ', str(error)[2:-1])
+            error = re.sub("\\s+", " ", str(error)[2:-1])
             if len(error) > 0:
                 _log_command(
                     logger,
@@ -352,16 +384,14 @@ async def send_message_and_file(
                     channel.guild.name,
                     channel.name,
                     "?",
-                    f"jpg is too big ({len(file)})"
+                    f"jpg is too big ({len(file)})",
                 )
                 if is_gm_channel(channel):
                     message = "Try `.vm true` to get an svg"
                 else:
                     message = "Please contact your GM"
                 await send_message_and_file(
-                    channel=channel,
-                    title="File too larger",
-                    message=message
+                    channel=channel, title="File too larger", message=message
                 )
                 file = None
                 file_name = None
@@ -371,16 +401,28 @@ async def send_message_and_file(
         with io.BytesIO(file) as vfile:
             discord_file = discord.File(fp=vfile, filename=file_name)
 
-        if file_in_embed or (file_in_embed is None and any(map(lambda x: file_name.lower().endswith(x), (
-                        ".png", ".jpg", ".jpeg"#, ".gif", ".gifv", ".webm", ".mp4", "wav", ".mp3", ".ogg"
-        )))):
-            embeds[-1].set_image(url=f"attachment://{discord_file.filename.replace(' ', '_')}")
+        if file_in_embed or (
+            file_in_embed is None
+            and any(
+                map(
+                    lambda x: file_name.lower().endswith(x),
+                    (
+                        ".png",
+                        ".jpg",
+                        ".jpeg",  # , ".gif", ".gifv", ".webm", ".mp4", "wav", ".mp3", ".ogg"
+                    ),
+                )
+            )
+        ):
+            embeds[-1].set_image(
+                url=f"attachment://{discord_file.filename.replace(' ', '_')}"
+            )
 
     if footer_datetime or footer_content:
         embeds[-1].set_footer(
             text=footer_content,
             icon_url="https://cdn.discordapp.com/icons/1201167737163104376/f78e67edebfdefad8f3ee057ad658acd.webp"
-                     "?size=96&quality=lossless"
+            "?size=96&quality=lossless",
         )
 
         embeds[-1].timestamp = footer_datetime
@@ -388,7 +430,13 @@ async def send_message_and_file(
     return await channel.send(embeds=embeds, file=discord_file)
 
 
-def get_orders(board: Board, player_restriction: Player | None, ctx: Context, fields: bool = False, subset: str | None = None) -> str | List[Tuple[str, str]]:
+def get_orders(
+    board: Board,
+    player_restriction: Player | None,
+    ctx: Context,
+    fields: bool = False,
+    subset: str | None = None,
+) -> str | List[Tuple[str, str]]:
     if fields:
         response = []
     else:
@@ -397,12 +445,16 @@ def get_orders(board: Board, player_restriction: Player | None, ctx: Context, fi
         for player in sorted(board.players, key=lambda sort_player: sort_player.name):
             if not player_restriction or player == player_restriction:
 
-                if (player_role := get_role_by_player(player, ctx.guild.roles)) is not None:
+                if (
+                    player_role := get_role_by_player(player, ctx.guild.roles)
+                ) is not None:
                     player_name = player_role.mention
                 else:
                     player_name = player.name
-                
-                if subset == "missing" and abs(len(player.centers) - len(player.units)) == len(player.build_orders):
+
+                if subset == "missing" and abs(
+                    len(player.centers) - len(player.units)
+                ) == len(player.build_orders):
                     continue
                 if subset == "submitted" and len(player.build_orders) == 0:
                     continue
@@ -432,7 +484,7 @@ def get_orders(board: Board, player_restriction: Player | None, ctx: Context, fi
             moving_units = [unit for unit in player.units if in_moves(unit)]
             ordered = [unit for unit in moving_units if unit.order is not None]
             missing = [unit for unit in moving_units if unit.order is None]
-            
+
             if subset == "missing" and not missing:
                 continue
             if subset == "submitted" and not ordered:
@@ -468,7 +520,11 @@ def get_filtered_orders(board: Board, player_restriction: Player) -> str:
         response = ""
         for player in sorted(board.players, key=lambda sort_player: sort_player.name):
             if not player_restriction or player == player_restriction:
-                visible = [order for order in player.build_orders if order.location.as_province() in visible]
+                visible = [
+                    order
+                    for order in player.build_orders
+                    if order.location.as_province() in visible
+                ]
 
                 if len(visible) > 0:
                     response += f"\n**{player.name}**: ({len(player.centers)}) ({'+' if len(player.centers) - len(player.units) >= 0 else ''}{len(player.centers) - len(player.units)})"
@@ -483,7 +539,11 @@ def get_filtered_orders(board: Board, player_restriction: Player) -> str:
                 in_moves = lambda u: u == u.province.dislodged_unit
             else:
                 in_moves = lambda _: True
-            moving_units = [unit for unit in player.units if in_moves(unit) and unit.province in visible]
+            moving_units = [
+                unit
+                for unit in player.units
+                if in_moves(unit) and unit.province in visible
+            ]
 
             if len(moving_units) > 0:
                 ordered = [unit for unit in moving_units if unit.order is not None]
@@ -503,5 +563,5 @@ def get_filtered_orders(board: Board, player_restriction: Player) -> str:
 
 
 def fish_pop_model(Fish, t, growth_rate, carrying_capacity):
-    dFishdt = growth_rate * Fish * (1 - Fish/carrying_capacity)
+    dFishdt = growth_rate * Fish * (1 - Fish / carrying_capacity)
     return dFishdt
