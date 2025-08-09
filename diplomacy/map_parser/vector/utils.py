@@ -13,11 +13,13 @@ from diplomacy.persistence.province import Province
 
 logger = logging.getLogger(__name__)
 
+
 def get_svg_element(svg_root: ElementTree, element_id: str) -> Element:
     try:
         return svg_root.find(f'*[@id="{element_id}"]')
     except:
         logger.error(f"{element_id} isn't contained in svg_root")
+
 
 def get_element_color(element: Element, prefix="fill:") -> str:
     style_string = element.get("style")
@@ -29,10 +31,11 @@ def get_element_color(element: Element, prefix="fill:") -> str:
             if value == "none" and prefix == "fill:":
                 return get_element_color(element, "stroke:")
             else:
-                value = value[len(prefix):]
+                value = value[len(prefix) :]
                 if value.startswith("#"):
                     value = value[1:]
                 return value
+
 
 def get_unit_coordinates(
     unit_data: Element,
@@ -47,7 +50,7 @@ def get_unit_coordinates(
         for path in unit_data.findall("{http://www.w3.org/2000/svg}path"):
             pathstr = path.get("d")
             coordinates = parse_path(pathstr, TransGL3(path))
-            coordinates = np.array(sum(coordinates, start = []))
+            coordinates = np.array(sum(coordinates, start=[]))
             minp = np.min(coordinates, axis=0)
             maxp = np.max(coordinates, axis=0)
             return ((minp + maxp) / 2).tolist()
@@ -63,7 +66,6 @@ def move_coordinate(
     coordinate: tuple[float, float],
 ) -> tuple[float, float]:
     return (former_coordinate[0] + coordinate[0], former_coordinate[1] + coordinate[1])
-
 
 
 # returns:
@@ -94,6 +96,7 @@ def _parse_path_command(
     else:
         raise RuntimeError(f"Unknown SVG path command: {command}")
 
+
 def parse_path(path_string: str, translation: TransGL3):
     province_coordinates = [[]]
     command = None
@@ -113,7 +116,9 @@ def parse_path(path_string: str, translation: TransGL3):
             command = path[current_index]
             if command.lower() == "z":
                 if start == None:
-                    raise Exception("Invalid geometry: got 'z' on first element in a subgeometry")
+                    raise Exception(
+                        "Invalid geometry: got 'z' on first element in a subgeometry"
+                    )
                 province_coordinates[-1].append(translation.transform(start))
                 start = None
                 current_index += 1
@@ -148,9 +153,7 @@ def parse_path(path_string: str, translation: TransGL3):
             for coord_string in path[current_index : current_index + expected_arguments]
         ]
 
-        coordinate = _parse_path_command(
-            command, args, coordinate
-        )
+        coordinate = _parse_path_command(command, args, coordinate)
 
         if start == None:
             start = coordinate
@@ -158,6 +161,7 @@ def parse_path(path_string: str, translation: TransGL3):
         province_coordinates[-1].append(translation.transform(coordinate))
         current_index += expected_arguments
     return province_coordinates
+
 
 # Initializes relevant province data
 # resident_dataset: SVG element whose children each live in some province

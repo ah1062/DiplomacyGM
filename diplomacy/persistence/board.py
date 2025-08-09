@@ -2,10 +2,17 @@ import re
 import logging
 import time
 
+from bot.config import ServerConfig
 from bot.sanitize import sanitize_name
 from diplomacy.persistence.phase import Phase
 from diplomacy.persistence.player import Player
-from diplomacy.persistence.province import Province, ProvinceType, Coast, Location, get_adjacent_provinces
+from diplomacy.persistence.province import (
+    Province,
+    ProvinceType,
+    Coast,
+    Location,
+    get_adjacent_provinces,
+)
 from diplomacy.persistence.unit import Unit, UnitType
 
 logger = logging.getLogger(__name__)
@@ -13,7 +20,15 @@ logger = logging.getLogger(__name__)
 
 class Board:
     def __init__(
-        self, players: set[Player], provinces: set[Province], units: set[Unit], phase: Phase, data, datafile: str, fow: bool, year_offset: int = 1642
+        self,
+        players: set[Player],
+        provinces: set[Province],
+        units: set[Unit],
+        phase: Phase,
+        data,
+        datafile: str,
+        fow: bool,
+        year_offset: int = 1642,
     ):
         self.players: set[Player] = players
         self.provinces: set[Province] = provinces
@@ -23,19 +38,22 @@ class Board:
         self.year_offset = year_offset
         self.board_id = 0
         self.fish = 0
-        self.fish_pop = {
-            "fish_pop": float(700),
-            "time": time.time()
-        }
+        self.fish_pop = {"fish_pop": float(700), "time": time.time()}
         self.orders_enabled: bool = True
         self.data: dict = data
         self.datafile = datafile
         self.fow = fow
 
+        self.config = ServerConfig()
+
         # store as lower case for user input purposes
-        self.name_to_player: dict[str, Player] = {player.name.lower(): player for player in self.players}
+        self.name_to_player: dict[str, Player] = {
+            player.name.lower(): player for player in self.players
+        }
         # remove periods and apostrophes
-        self.cleaned_name_to_player: dict[str, Player] = {sanitize_name(player.name.lower()): player for player in self.players}
+        self.cleaned_name_to_player: dict[str, Player] = {
+            sanitize_name(player.name.lower()): player for player in self.players
+        }
         self.name_to_province: dict[str, Province] = {}
         self.name_to_coast: dict[str, Coast] = {}
         for location in self.provinces:
@@ -49,13 +67,22 @@ class Board:
     def get_cleaned_player(self, name: str) -> Player:
         return self.cleaned_name_to_player.get(sanitize_name(name.lower()))
 
-
     # TODO: break ties in a fixed manner
     def get_players_by_score(self) -> list[Player]:
-        return sorted(self.players, key=lambda sort_player: (-sort_player.score(), sort_player.name.lower()))
+        return sorted(
+            self.players,
+            key=lambda sort_player: (-sort_player.score(), sort_player.name.lower()),
+        )
 
     def get_players_by_points(self) -> list[Player]:
-        return sorted(self.players, key=lambda sort_player: (-sort_player.points, -len(sort_player.centers), sort_player.name.lower()))
+        return sorted(
+            self.players,
+            key=lambda sort_player: (
+                -sort_player.points,
+                -len(sort_player.centers),
+                sort_player.name.lower(),
+            ),
+        )
 
     # TODO: this can be made faster if necessary
     def get_province(self, name: str) -> Province:
@@ -78,7 +105,9 @@ class Board:
         # failed to match, try to get possible locations
         potential_locations = self.get_possible_locations(name)
         if len(potential_locations) > 5:
-            raise Exception(f"The location {name} is ambiguous. Please type out the full name.")
+            raise Exception(
+                f"The location {name} is ambiguous. Please type out the full name."
+            )
         elif len(potential_locations) > 1:
             raise Exception(
                 f'The location {name} is ambiguous. Possible matches: {", ".join([loc.name for loc in potential_locations])}.'
@@ -92,17 +121,27 @@ class Board:
             elif isinstance(location, Province):
                 return location, None
             else:
-                raise Exception(f"Unknown issue occurred when attempting to find the location {name}.")
+                raise Exception(
+                    f"Unknown issue occurred when attempting to find the location {name}."
+                )
 
     def get_visible_provinces(self, player: Player) -> set[Province]:
         visible: set[Province] = set()
         for province in self.provinces:
             for unit in player.units:
                 if unit.unit_type == UnitType.ARMY:
-                    if province in get_adjacent_provinces(unit.province) and province.type != ProvinceType.SEA:
+                    if (
+                        province in get_adjacent_provinces(unit.province)
+                        and province.type != ProvinceType.SEA
+                    ):
                         visible.add(province)
                 if unit.unit_type == UnitType.FLEET:
-                    if (unit.coast and province in get_adjacent_provinces(unit.coast)) or (not unit.coast and province in get_adjacent_provinces(unit.province)):
+                    if (
+                        unit.coast and province in get_adjacent_provinces(unit.coast)
+                    ) or (
+                        not unit.coast
+                        and province in get_adjacent_provinces(unit.province)
+                    ):
                         visible.add(province)
 
         for unit in player.units:
@@ -122,7 +161,11 @@ class Board:
             if re.search(pattern, province.name.lower()):
                 matches.append(province)
             else:
-                matches += [coast for coast in province.coasts if re.search(pattern, coast.name.lower())]
+                matches += [
+                    coast
+                    for coast in province.coasts
+                    if re.search(pattern, coast.name.lower())
+                ]
         return matches
 
     def get_location(self, name: str) -> Location:
@@ -230,6 +273,6 @@ class Board:
             return f"{str(1-year)} BC"
         else:
             return str(year)
-        
+
     def is_chaos(self) -> bool:
         return self.data["players"] == "chaos"
