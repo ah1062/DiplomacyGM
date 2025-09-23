@@ -1,8 +1,10 @@
 import asyncio
 import copy
+import datetime
 import logging
 import os
 import random
+import time
 from typing import Callable
 from scipy.integrate import odeint
 
@@ -33,6 +35,7 @@ from bot.utils import (
     get_orders_log,
     get_player_by_channel,
     get_player_by_name,
+    get_value_from_timestamp,
     is_gm,
     is_moderator,
     send_message_and_file,
@@ -313,8 +316,7 @@ async def advice(ctx: commands.Context, _: Manager) -> None:
             ]
         )
     elif chance == 1:
-        index = random.randrange(0, len(WOC_ADVICE))
-        message = f"{index}. {WOC_ADVICE[index]}"
+        message = random.choice(WOC_ADVICE)
 
     await send_message_and_file(channel=ctx.channel, title=message)
 
@@ -449,6 +451,20 @@ async def bulk_allocate_role(ctx: commands.Context, manager: Manager) -> None:
     # .bulk_allocate_role <@B1.4 Player> <@B1.4 GM Team> ...
     roles = ctx.message.role_mentions
     role_names = list(map(lambda r: r.name, roles))
+
+    for role in roles.copy():
+        name = role.name.lower()
+        if config.is_gm_role(name) or config.is_mod_role(name):
+            await send_message_and_file(
+                channel=ctx.channel,
+                title="Error",
+                embed_colour=ERROR_COLOUR,
+                message=f"Not allowed to allocate this role '{role.name}' using DiploGM."
+            )
+
+            roles.remove(role)
+
+
     if len(roles) == 0:
         await send_message_and_file(
             channel=ctx.channel,
@@ -1897,8 +1913,9 @@ Number of Mutual Servers: {len(user.mutual_guilds)}
 ----
 """
 
-    for shared in user.mutual_guilds:
-        out += f"{shared.name}\n"
+    mutuals = sorted(map(lambda s: s.name, user.mutual_guilds))
+    for name in mutuals:
+        out += f"{name}\n"
 
     await send_message_and_file(
         channel=ctx.channel, title=f"User Membership Results", message=out
@@ -2162,6 +2179,80 @@ async def substitute(
         out += f"[ERROR] Failed to swap roles for outgoing player: {out_user.name}"
 
     await send_message_and_file(channel=ctx.channel, title="Substitution results", message=out)
+
+
+async def schedule(ctx: commands.Context,
+                   manager: Manager,
+                   timestamp: str,
+                   command: str,
+                   content: str) -> dict | None:
+    guild = ctx.guild
+    if not guild:
+        return
+
+    channel = ctx.channel
+
+    # fetch timevalue (for converting timestamp to datetime object)
+    timevalue: int|None = get_value_from_timestamp(timestamp)
+    if timevalue is None:
+        await send_message_and_file(
+            channel=ctx.channel,
+            title="Error",
+            message="Did not mention a nation.",
+            embed_colour=ERROR_COLOUR,
+        )
+        return
+
+    # check schedule for the future
+    time_now = datetime.datetime.now(datetime.timezone.utc)
+    scheduled_time = datetime.datetime.fromtimestamp(timevalue, tz=datetime.timezone.utc)
+
+    if scheduled_time <= time_now:
+        await send_message_and_file(
+            channel=ctx.channel,
+            title="Error",
+            message="Don't schedule a command to occur in the past.",
+            embed_colour=ERROR_COLOUR,
+        )
+        return
+
+    # check comman is real
+    cmd: commands.Command = ctx.bot.get_command(command)
+    if cmd is None:
+        await send_message_and_file(
+            channel=ctx.channel,
+            title="Error",
+            message=f"Command '{command}' is not understood.",
+            embed_colour=ERROR_COLOUR,
+        )
+        return
+    elif command == "schedule":
+        await send_message_and_file(
+            channel=ctx.channel,
+            title="Error",
+            message=f"Command '{command}' can't be scheduled.",
+            embed_colour=ERROR_COLOUR,
+        )
+        return
+
+    scheduled_command = {
+        "invoking_user": ctx.author.id,
+        "invoking_msg_id": ctx.message.id,
+        "guild_id": guild.id,
+        "channel_id": channel.id,
+        "creation_time": time_now,
+        "scheduled_time": scheduled_time,
+        "command": command,
+        "args": content,
+    }
+        
+    await send_message_and_file(
+        channel=ctx.channel,
+        title="Schedule successful!",
+        message=f"Scheduled command '{command}' to occur at {timestamp} with arguments: {content}"
+    )
+
+    return scheduled_command
 
 
 class ContainedPrinter:

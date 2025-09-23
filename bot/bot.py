@@ -19,7 +19,7 @@ from bot.utils import send_message_and_file
 load_dotenv()
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from bot import command
 from diplomacy.persistence.manager import Manager
@@ -33,6 +33,7 @@ bot = commands.Bot(
 logger = logging.getLogger(__name__)
 
 manager = Manager()
+scheduled_commands = []
 
 # List of funny, sarcastic messages
 MESSAGES = [
@@ -76,6 +77,8 @@ async def on_ready():
 
     # Set bot's presence (optional)
     await bot.change_presence(activity=discord.Game(name="Impdip 🔪"))
+
+    process_scheduled_tasks.start()
 
 
 @bot.before_invoke
@@ -185,6 +188,48 @@ async def on_command_error(ctx, error):
             await send_message_and_file(
                 channel=ctx.channel, message=str(original), embed_colour=ERROR_COLOUR
             )
+
+
+@tasks.loop(seconds=10)
+async def process_scheduled_tasks():
+    now = datetime.datetime.now(datetime.timezone.utc)
+    due = [job for job in scheduled_commands if job["scheduled_time"] <= now]
+
+    for job in due:
+        channel_id = job["channel_id"]
+        channel = bot.get_channel(channel_id)
+        if not channel:
+            continue
+
+        # reconstruct the intended command
+        full_command = f"{bot.command_prefix}{job['command']} {job['args']}"
+
+        # fetch context for
+        fake_message = await channel.send(
+            f"Executing scheduled command: `{full_command}`"
+        )
+
+        ctx = await bot.get_context(fake_message)
+        ctx.prefix = str(bot.command_prefix)
+        ctx.invoked_with = job["command"]
+        ctx.message.content = full_command
+
+        command_name = job["command"]
+        cmd = bot.get_command(command_name)
+        if cmd:
+            try:
+                await cmd.invoke(ctx)
+            except TypeError as e:
+                logger.error(e)
+                await send_message_and_file(
+                    channel=channel, message=f"Failure to invoke scheduled command: {e}"
+                )
+
+                user = bot.get_user(job["invoking_user"])
+                if user:
+                    await channel.send(f"Alert: {user.mention}")
+
+        scheduled_commands.remove(job)
 
 
 class SpecView(discord.ui.View):
@@ -529,6 +574,32 @@ async def substitute(
         Why the substitution is occuring
     """
     await command.substitute(ctx, manager, out_user, in_user, power_role, reason)
+
+
+@bot.command(help="Schedule a command to be executed")
+@gm_only("schedule a command")
+async def schedule(
+    ctx: commands.Context, timestamp: str, command_name: str, *, content: str = ""
+) -> None:
+    """
+    Usage:
+        .schedule <timestamp> <command> <args>
+    Examples:
+        .schedule <t:1757286000:F> adjudicate
+        .schedule <t:1757113200:R> ping_players <t:1757286000:F>
+
+    Parameters
+    ----------
+    timestamp : str
+        discord compatible timestamp of similar format to <t:UNIX_TIME:F>
+    command_name : str
+        name of command to schedule IGNORE command_prefix e.g. adjudicate > .adjudicate
+    content : str
+        the arguments for the scheduled command e.g. [view_map] "spring moves 1642 dark"
+    """
+    cmd = await command.schedule(ctx, manager, timestamp, command_name, content)
+    if cmd:
+        scheduled_commands.append(cmd)
 
 
 @bot.command(help="Returns all shared guilds between DiploGM and user.")
