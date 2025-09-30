@@ -1,18 +1,19 @@
 import logging
 import random
 import time
+from diplomacy.persistence.manager import Manager
 from scipy.integrate import odeint
 
 from discord.ext import commands
 
-from bot.config import is_bumble, temporary_bumbles, ERROR_COLOUR
-from bot.diplo_bot import DiploBot
-from bot.perms import gm_only
+from bot import perms
+from bot.config import ERROR_COLOUR, is_bumble, temporary_bumbles
 from bot.utils import fish_pop_model, log_command, send_message_and_file
 
 from diplomacy.persistence.db.database import get_connection
 
 logger = logging.getLogger(__name__)
+manager = Manager()
 
 ping_text_choices = [
     "proudly states",
@@ -20,15 +21,24 @@ ping_text_choices = [
     "is being mind controlled by",
 ]
 
+# Fetch the 115 philosophical advice points created by Hobbit for the World of Chaos event
+# Intended use: to extend the possibilities within .advice
+WOC_ADVICE = ["Maybe the real friends were the dots we claimed along the way."]
+try:
+    with open("bot/assets/advice.txt", "r") as f:
+        WOC_ADVICE.extend(f.readlines())
+except FileNotFoundError:
+    pass
+
 
 class PartyCog(commands.Cog):
-    def __init__(self, bot: DiploBot):
+    def __init__(self, bot):
         self.bot = bot
-        self.manager = bot.manager
 
     @commands.command(hidden=True)
-    @gm_only("botsay")
+    @perms.gm_only("botsay")
     async def botsay(self, ctx: commands.Context) -> None:
+        # noinspection PyTypeChecker
         if len(ctx.message.channel_mentions) == 0:
             await send_message_and_file(
                 channel=ctx.channel,
@@ -57,6 +67,20 @@ class PartyCog(commands.Cog):
             message=message.jump_url,
         )
 
+    @commands.command(help="Checks bot listens and responds.")
+    async def ping(self, ctx: commands.Context):
+        response = "Beep Boop"
+        if random.random() < 0.1:
+            author = ctx.message.author
+            content = ctx.message.content.removeprefix(ctx.prefix + ctx.invoked_with)
+            if content == "":
+                content = " nothing"
+            name = author.nick
+            if not name:
+                name = author.name
+            response = name + " " + random.choice(ping_text_choices) + content
+        await send_message_and_file(channel=ctx.channel, title=response)
+
     @commands.command(hidden=True)
     async def bumble(self, ctx: commands.Context) -> None:
         list_of_bumble = list("bumble")
@@ -75,7 +99,7 @@ class PartyCog(commands.Cog):
         if word_of_bumble == "elbmub":
             word_of_bumble = "elbmub nesohc eht era uoY"
 
-        board = self.bot.manager.get_board(ctx.guild.id)
+        board = manager.get_board(ctx.guild.id)
         board.fish -= 1
         await send_message_and_file(channel=ctx.channel, title=word_of_bumble)
 
@@ -98,7 +122,6 @@ class PartyCog(commands.Cog):
             "the Teletubbies’ homeland": 0.9,
             "Summoners’ Rift": 0.1,
         }
-
         chosen_place = random.choices(
             list(pelican_places.keys()), weights=list(pelican_places.values()), k=1
         )[0]
@@ -106,12 +129,69 @@ class PartyCog(commands.Cog):
         await send_message_and_file(channel=ctx.channel, title=message)
 
     @commands.command(hidden=True)
-    async def fish(self, ctx: commands.Context):
-        guild = ctx.guild
-        if not guild:
-            return
+    async def cheat(self, ctx: commands.Context) -> None:
+        message = "Cheating is disabled for this user."
+        author = ctx.message.author.name
+        board = manager.get_board(ctx.guild.id)
+        if is_bumble(author):
+            sample = random.choice(
+                [
+                    f"It looks like {author} is getting coalitioned this turn :cry:",
+                    f"{author} is talking about stabbing {random.choice(list(board.players)).name} again",
+                    f"looks like he's throwing to {author}... shame",
+                    "yeah",
+                    "People in this game are not voiding enough",
+                    f"I can't believe {author} is moving to {random.choice(list(board.provinces)).name}",
+                    f"{author} has a bunch of invalid orders",
+                    f"No one noticed that {author} overbuilt?",
+                    f"{random.choice(list(board.players)).name} is in a perfect position to stab {author}",
+                    ".bumble",
+                ]
+            )
+            message = f'Here\'s a helpful message I stole from the spectator chat: \n"{sample}"'
+        await send_message_and_file(channel=ctx.channel, title=message)
 
-        board = self.bot.manager.get_board(guild.id)
+    @commands.command(hidden=True)
+    async def phish(self, ctx: commands.Context) -> None:
+        await ctx.message.add_reaction("🐟")
+
+        message = "No! Phishing is bad!"
+        if is_bumble(ctx.author.name):
+            message = "Please provide your firstborn pet and your soul for a chance at winning your next game!"
+        await send_message_and_file(channel=ctx.channel, title=message)
+
+    @commands.command(hidden=True)
+    async def advice(self, ctx: commands.Context) -> None:
+        message = "You are not worthy of advice."
+        chance = random.randrange(0, 5)
+
+        if is_bumble(ctx.author.name):
+            message = "Bumble suggests that you go fishing, although typically blasphemous, today is your lucky day!"
+        elif chance == 0:
+            message = random.choice(
+                [
+                    "Bumble was surprised you asked him for advice and wasn't ready to give you any, maybe if you were a true follower...",
+                    "Icecream demands that you void more and will not be giving any advice until sated.",
+                    "Salt suggests that stabbing all of your neighbors is a good play in this particular situation.",
+                    "Ezio points you to an ancient proverb: see dot take dot.",
+                    "CaptainMeme advises balance of power play at this instance.",
+                    "Ash Lael deems you a sufficiently apt liar, go use those skills!",
+                    "Kwiksand suggests winning.",
+                    "Ambrosius advises taking the opportunity you've been considering, for more will ensue.",
+                    "The GMs suggest you input your orders so they don't need to hound you for them at the deadline.",
+                ]
+            )
+        elif chance == 1:
+            index = random.randrange(0, len(WOC_ADVICE))
+            message = f"{index}. {WOC_ADVICE[index]}"
+
+        await send_message_and_file(channel=ctx.channel, title=message)
+
+    @commands.command(hidden=True)
+    async def fish(self, ctx: commands.Context) -> None:
+        await ctx.message.add_reaction("🐟")
+
+        board = manager.get_board(ctx.guild.id)
         fish_num = random.randrange(0, 20)
 
         # overfishing model
@@ -210,19 +290,15 @@ class PartyCog(commands.Cog):
 
         await send_message_and_file(channel=ctx.channel, title=fish_message)
 
-    @commands.command(brief="Shows global fish leaderboard")
+    @commands.command(brief="Show global fishing leaderboard")
     async def global_leaderboard(self, ctx: commands.Context) -> None:
-        guild = ctx.guild
-        if not guild:
-            return
-
         sorted_boards = sorted(
-            self.manager._boards.items(), key=lambda board: board[1].fish, reverse=True
+            manager._boards.items(), key=lambda board: board[1].fish, reverse=True
         )
         raw_boards = tuple(map(lambda b: b[1], sorted_boards))
         try:
-            this_board = self.manager.get_board(guild.id)
-        except:
+            this_board = manager.get_board(ctx.guild.id)
+        except Exception:
             this_board = None
         sorted_boards = sorted_boards[:9]
         text = ""
@@ -239,97 +315,15 @@ class PartyCog(commands.Cog):
             if guild:
                 text += f"\\#{i + 1: >{len(index)}} | {board[1].fish: <{max_fishes}} | {bold}{guild.name}{bold}\n"
         if this_board is not None and this_board not in raw_boards[:9]:
-            text += f"\n\\#{index} | {this_board.fish: <{max_fishes}} | {guild.name}"
+            text += (
+                f"\n\\#{index} | {this_board.fish: <{max_fishes}} | {ctx.guild.name}"
+            )
 
         await send_message_and_file(
             channel=ctx.channel, title="Global Fishing Leaderboard", message=text
         )
 
-    @commands.command(hidden=True)
-    async def phish(self, ctx: commands.Context) -> None:
-        message = "No! Phishing is bad!"
-        if is_bumble(ctx.author.name):
-            message = "Please provide your firstborn pet and your soul for a chance at winning your next game!"
-        await send_message_and_file(channel=ctx.channel, title=message)
 
-    @commands.command(hidden=True)
-    async def advice(self, ctx: commands.Context) -> None:
-        message = "You are not worthy of advice."
-        if is_bumble(ctx.author.name):
-            message = "Bumble suggests that you go fishing, although typically blasphemous, today is your lucky day!"
-        elif random.randrange(0, 5) == 0:
-            message = random.choice(
-                [
-                    "Bumble was surprised you asked him for advice and wasn't ready to give you any, maybe if you were a true follower...",
-                    "Icecream demands that you void more and will not be giving any advice until sated.",
-                    "Salt suggests that stabbing all of your neighbors is a good play in this particular situation.",
-                    "Ezio points you to an ancient proverb: see dot take dot.",
-                    "CaptainMeme advises balance of power play at this instance.",
-                    "Ash Lael deems you a sufficiently apt liar, go use those skills!",
-                    "Kwiksand suggests winning.",
-                    "Ambrosius advises taking the opportunity you've been considering, for more will ensue.",
-                    "The GMs suggest you input your orders so they don't need to hound you for them at the deadline.",
-                ]
-            )
-        await send_message_and_file(channel=ctx.channel, title=message)
-
-    @commands.command(hidden=True)
-    async def cheat(self, ctx: commands.Context) -> None:
-        guild = ctx.guild
-        if not guild:
-            return
-
-        message = "Cheating is disabled for this user."
-        author = ctx.message.author.name
-        board = self.manager.get_board(guild.id)
-        if is_bumble(author):
-            sample = random.choice(
-                [
-                    f"It looks like {author} is getting coalitioned this turn :cry:",
-                    f"{author} is talking about stabbing {random.choice(list(board.players)).name} again",
-                    f"looks like he's throwing to {author}... shame",
-                    "yeah",
-                    "People in this game are not voiding enough",
-                    f"I can't believe {author} is moving to {random.choice(list(board.provinces)).name}",
-                    f"{author} has a bunch of invalid orders",
-                    f"No one noticed that {author} overbuilt?",
-                    f"{random.choice(list(board.players)).name} is in a perfect position to stab {author}",
-                    ".bumble",
-                ]
-            )
-            message = f'Here\'s a helpful message I stole from the spectator chat: \n"{sample}"'
-        await send_message_and_file(channel=ctx.channel, title=message)
-
-    @commands.command(brief="Changes your nickname")
-    async def nick(self, ctx: commands.Context) -> None:
-        name = ctx.author.nick
-        if name is None:
-            name = ctx.author.name
-        if "]" in name:
-            prefix = name.split("] ", 1)[0]
-            prefix = prefix + "] "
-        else:
-            prefix = ""
-        name = ctx.message.content.removeprefix(ctx.prefix + ctx.invoked_with).strip()
-        if name == "":
-            await send_message_and_file(
-                channel=ctx.channel,
-                embed_colour=ERROR_COLOUR,
-                message=f"A nickname must be at least 1 character",
-            )
-            return
-        if len(prefix + name) > 32:
-            await send_message_and_file(
-                channel=ctx.channel,
-                embed_colour=ERROR_COLOUR,
-                message=f"A nickname must be at less than 32 total characters.\n Yours is {len(prefix + name)}",
-            )
-            return
-        await ctx.author.edit(nick=prefix + name)
-        await send_message_and_file(
-            channel=ctx.channel, message=f"Nickname updated to `{prefix + name}`"
-        )
-
-
-async def setup(bot: DiploBot):
-    await bot.add_cog(PartyCog(bot))
+async def setup(bot):
+    cog = PartyCog(bot)
+    await bot.add_cog(cog)

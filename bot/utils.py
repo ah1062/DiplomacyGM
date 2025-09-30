@@ -2,24 +2,24 @@ import datetime
 import io
 import re
 import logging
-import discord
 from typing import List, Tuple
+
+
+import discord
 from discord import Embed, Colour, Guild, Message, Thread
 from discord.abc import GuildChannel
 from discord.ext import commands
 from discord.ext.commands import Context
 
 from bot import config
-
 from diplomacy.adjudicator.utils import svg_to_png, png_to_jpg
 from diplomacy.persistence import phase
 from diplomacy.persistence.board import Board
 from diplomacy.persistence.manager import Manager
 from diplomacy.persistence.player import Player
 from diplomacy.persistence.unit import UnitType
-from logging import getLogger
 
-logger = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 whitespace_dict = {
     "_",
@@ -58,8 +58,18 @@ def is_admin(author: commands.Context.author) -> bool:
         169995316680982528,  # Bumble
         450636420558618625,  # Flare
         490633966974533640,  # Elle
+        200279271380353025,  # KingOfPrussia
         1352388421003251833,  # Chloe
+        285108244714881024,  # aahoughton (elle-approved)
     ]
+
+
+def is_moderator(author: commands.Context.author) -> bool:
+    for role in author.roles:
+        if config.is_mod_role(role.name):
+            return True
+
+    return False
 
 
 def is_gm(author: commands.Context.author) -> bool:
@@ -80,14 +90,14 @@ def get_player_by_role(
 ) -> Player | None:
     for role in author.roles:
         for player in manager.get_board(server_id).players:
-            if player.name == role.name:
+            if simple_player_name(player.name) == simple_player_name(role.name):
                 return player
     return None
 
 
 def get_role_by_player(player: Player, roles: Guild.roles) -> discord.Role | None:
     for role in roles:
-        if role.name == player.name:
+        if simple_player_name(role.name) == simple_player_name(player.name):
             return role
     return None
 
@@ -102,20 +112,29 @@ def get_player_by_channel(
     if isinstance(channel, Thread):
         channel = channel.parent
 
+    board = manager.get_board(server_id)
     name = channel.name
     if (not ignore_catagory) and not config.is_player_category(channel.category.name):
         return None
 
-    # TODO hacky, allow for renaming to void for chaos
-    if manager.get_board(server_id).is_chaos() and name.endswith("-void"):
-        name = name[:-5]
+    if board.is_chaos() and name.endswith("-void"):
+        name = name[: -5]
     else:
         if not name.endswith(config.player_channel_suffix):
-            return
-
+            return None
+        
         name = name[: -(len(config.player_channel_suffix))]
 
-    return manager.get_board(server_id).get_cleaned_player(name)
+    try:
+        return board.get_cleaned_player(name)
+    except ValueError:
+        pass
+    try:
+        return board.get_cleaned_player(simple_player_name(name))
+    except ValueError:
+        return None
+
+    return None
 
 
 # FIXME this is done pretty poorly
@@ -126,10 +145,7 @@ async def get_channel_by_player(
     guild_id = guild.id
     board = manager.get_board(guild_id)
 
-    channel_name = (
-        player.name.lower().replace(" ", "-").replace("'", "").replace(".", "")
-        + config.player_channel_suffix
-    )
+    channel_name = simple_player_name(player.name) + config.player_channel_suffix
 
     for category in guild.categories:
         if not config.is_player_category(category.name) and not board.is_chaos():
@@ -142,11 +158,14 @@ async def get_channel_by_player(
     return None
 
 
+# I'm sorry this is a bad function name. I couldn't think of anything better and I'm in a rush
+def simple_player_name(name: str):
+    return name.lower().replace("-", " ").replace("'", "").replace(".", "")
+
+
 def get_player_by_name(name: str, manager: Manager, server_id: int) -> Player | None:
     for player in manager.get_board(server_id).players:
-        if player.name.lower().replace("-", " ").replace("'", "").replace(
-            ".", ""
-        ) == name.strip().lower().replace("-", " ").replace("'", "").replace(".", ""):
+        if simple_player_name(player.name) == simple_player_name(name):
             return player
     return None
 
@@ -164,10 +183,10 @@ def get_orders_log(guild: Guild) -> GuildChannel | None:
 
 
 def is_player_channel(player_role: str, channel: commands.Context.channel) -> bool:
-    player_channel = player_role.lower() + config.player_channel_suffix
-    return player_channel == channel.name and config.is_player_category(
-        channel.category.name
-    )
+    player_channel = player_role + config.player_channel_suffix
+    return simple_player_name(player_channel) == simple_player_name(
+        channel.name
+    ) and config.is_player_category(channel.category.name)
 
 
 def get_keywords(command: str) -> list[str]:
@@ -262,16 +281,16 @@ def _log_command(
 async def send_message_and_file(
     *,
     channel: commands.Context.channel,
-    title: str = None,
-    message: str = None,
-    messages: [str] = None,
-    embed_colour: str = None,
-    file: str = None,
-    file_name: str = None,
-    file_in_embed: bool = None,
-    footer_content: str = None,
-    footer_datetime: datetime.datetime = None,
-    fields: List[Tuple[str, str]] = None,
+    title: str | None = None,
+    message: str | None = None,
+    messages: list[str] | None = None,
+    embed_colour: str | None = None,
+    file: str | None = None,
+    file_name: str | None = None,
+    file_in_embed: bool | None = None,
+    footer_content: str | None = None,
+    footer_datetime: datetime.datetime | None = None,
+    fields: List[Tuple[str, str]] | None = None,
     convert_svg: bool = False,
     **_,
 ) -> Message:
@@ -286,11 +305,13 @@ async def send_message_and_file(
     if fields:
         for i, field in reversed(list(enumerate(fields))):
             if len(field[0]) > 256 or len(field[1]) > 1024:
-                title, body = fields.pop(i)
+                field_title, field_body = fields.pop(i)
                 if not message:
                     message = ""
                 message += (
-                    f"\n" f"### {title}\n" if title.strip() else f"{title}\n" f"{body}"
+                    f"\n" f"### {field_title}\n"
+                    if field_title.strip()
+                    else f"{field_title}\n" f"{field_body}"
                 )
 
     if message and messages:
@@ -453,18 +474,24 @@ def get_orders(
                     player_name = player.name
 
                 if subset == "missing" and abs(
-                    len(player.centers) - len(player.units)
+                    len(player.centers) - len(player.units) - player.waived_orders
                 ) == len(player.build_orders):
                     continue
-                if subset == "submitted" and len(player.build_orders) == 0:
+                if (
+                    subset == "submitted"
+                    and len(player.build_orders) == 0
+                    and player.waived_orders == 0
+                ):
                     continue
 
                 title = f"**{player_name}**: ({len(player.centers)}) ({'+' if len(player.centers) - len(player.units) >= 0 else ''}{len(player.centers) - len(player.units)})"
                 body = ""
                 for unit in player.build_orders | set(player.vassal_orders.values()):
                     body += f"\n{unit}"
+                if player.waived_orders > 0:
+                    body += f"\nWaive {player.waived_orders}"
 
-                if fields:
+                if isinstance(fields, list):
                     response.append((f"", f"{title}{body}"))
                 else:
                     response += f"\n{title}{body}"
@@ -506,7 +533,7 @@ def get_orders(
                 for unit in sorted(ordered, key=lambda _unit: _unit.province.name):
                     body += f"{unit} {unit.order}\n"
 
-            if fields:
+            if isinstance(fields, list):
                 response.append((f"", f"{title}\n{body}"))
             else:
                 response += f"{title}\n{body}"
@@ -565,3 +592,30 @@ def get_filtered_orders(board: Board, player_restriction: Player) -> str:
 def fish_pop_model(Fish, t, growth_rate, carrying_capacity):
     dFishdt = growth_rate * Fish * (1 - Fish / carrying_capacity)
     return dFishdt
+
+
+def parse_season(
+    arguments: list[str], default_year: str
+) -> tuple[str, phase.Phase] | None:
+    year, season, retreat = default_year, None, False
+    for s in arguments:
+        if s.isnumeric() and int(s) > 1640:
+            year = s
+
+        if s.lower() in ["spring", "s", "sm", "sr"]:
+            season = "Spring"
+        elif s.lower() in ["fall", "f", "fm", "fr"]:
+            season = "Fall"
+        elif s.lower() in ["winter", "w", "wa"]:
+            season = "Winter"
+
+        if s.lower() in ["retreat", "retreats", "r", "sr", "fr"]:
+            retreat = True
+
+    if season is None:
+        return None
+    if season == "Winter":
+        parsed_phase = phase.get("Winter Builds")
+    else:
+        parsed_phase = phase.get(season + " " + ("Retreats" if retreat else "Moves"))
+    return (year, parsed_phase)

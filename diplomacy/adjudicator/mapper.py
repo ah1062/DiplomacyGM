@@ -114,7 +114,7 @@ class Mapper:
     def is_moveable(self, unit: Unit):
         if unit.province not in self.adjacent_provinces:
             return False
-        if self.player_restriction and unit.player != self.player_restriction:
+        if self.player_restriction and unit.player.name != self.player_restriction.name:
             return False
         if phase.is_retreats(self.current_phase) and unit.province.dislodged_unit != unit:
             return False
@@ -130,7 +130,8 @@ class Mapper:
         t = self._moves_svg.getroot()
         arrow_layer = get_svg_element(t, self.board.data["svg config"]["arrow_output"])
         if not phase.is_builds(current_phase):
-            for unit in self.board.units:
+            units = sorted(self.board.units, key=lambda unit: 0 if unit.order is None else unit.order.display_priority)
+            for unit in units:
                 if not self.is_moveable(unit):
                     continue
                 if phase.is_retreats(current_phase):
@@ -289,7 +290,6 @@ class Mapper:
                 color = player.render_color
             self.player_colors[player.name] = color
         
-        print(color_mode)
         if color_mode in ["kingdoms", "empires"]:
             #TODO: draw dual monarchies as stripes
             if color_mode == "empires":
@@ -381,7 +381,9 @@ class Mapper:
         else:
             players = self.board.get_players_by_score()
 
-        if not "no coring" in self.board.data.get("adju flags", []):
+        sc_index = self.board.data["svg config"]["power_sc_index"] if "power_sc_index" in self.board.data["svg config"] else 5
+
+        if not "vassal system" in self.board.data.get("adju flags", []):
             for power_element in all_power_banners_element:
                 for i, player in enumerate(players):
                     # match the correct svg element based on the color of the rectangle
@@ -389,9 +391,9 @@ class Mapper:
                         self.color_element(power_element[0], self.player_colors[player.name])
                         power_element.set("transform", self.scoreboard_power_locations[i])
                         if player == self.restriction or self.restriction == None:
-                            power_element[5][0].text = str(len(player.centers))
+                            power_element[sc_index][0].text = str(len(player.centers))
                         else:
-                            power_element[5][0].text = "???"
+                            power_element[sc_index][0].text = "???"
                         break
         else:
             #FIXME only sorts by points right now
@@ -410,8 +412,10 @@ class Mapper:
 
     def _draw_side_panel_date(self, svg: ElementTree) -> None:
         date = get_svg_element(svg.getroot(), self.board.data["svg config"]["season"])
+        game_name = self.board.name
+        name_text = "" if game_name is None else f"{game_name} — "
         # TODO: this is hacky; I don't know a better way
-        date[0][0].text = self.get_pretty_date()
+        date[0][0].text = name_text + self.get_pretty_date()
 
     def _reset_moves_map(self):
         self._moves_svg = copy.deepcopy(self.board_svg)
@@ -419,26 +423,26 @@ class Mapper:
     def _draw_order(self, unit: Unit, coordinate: tuple[float, float], current_phase: phase.Phase) -> None:
         order = unit.order
         if isinstance(order, Hold):
-            self._draw_hold(coordinate)
+            self._draw_hold(coordinate, order.hasFailed)
         elif isinstance(order, Core):
-            self._draw_core(coordinate)
+            self._draw_core(coordinate, order.hasFailed)
         elif isinstance(order, Move):
             # moves are just convoyed moves that have no convoys
-            return self._draw_convoyed_move(unit, coordinate)
+            return self._draw_convoyed_move(unit, coordinate, order.hasFailed)
         elif isinstance(order, ConvoyMove):
             logger.warning("Convoy move is depricated; use move instead")
-            return self._draw_convoyed_move(unit, coordinate)
+            return self._draw_convoyed_move(unit, coordinate, order.hasFailed)
         elif isinstance(order, Support):
-            return self._draw_support(unit, coordinate)
+            return self._draw_support(unit, coordinate, order.hasFailed)
         elif isinstance(order, ConvoyTransport):
-            self._draw_convoy(order, coordinate)
+            self._draw_convoy(order, coordinate, order.hasFailed)
         elif isinstance(order, RetreatMove):
             return self._draw_retreat_move(order, coordinate)
         elif isinstance(order, RetreatDisband):
             self._draw_force_disband(coordinate, self._moves_svg)
         else:
             if phase.is_moves(current_phase):
-                self._draw_hold(coordinate)
+                self._draw_hold(coordinate, False)
             else:
                 self._draw_force_disband(coordinate, self._moves_svg)
             logger.debug(f"None order found: hold drawn. Coordinates: {coordinate}")
@@ -455,7 +459,7 @@ class Mapper:
         else:
             logger.error(f"Could not draw player order {order}")
 
-    def _draw_hold(self, coordinate: tuple[float, float]) -> None:
+    def _draw_hold(self, coordinate: tuple[float, float], hasFailed: bool) -> None:
         element = self._moves_svg.getroot()
         drawn_order = self.create_element(
             "circle",
@@ -464,13 +468,13 @@ class Mapper:
                 "cy": coordinate[1],
                 "r": self.board.data["svg config"]["unit_radius"],
                 "fill": "none",
-                "stroke": "black",
+                "stroke": "red" if hasFailed else "black",
                 "stroke-width": self.board.data["svg config"]["order_stroke_width"],
             },
         )
         element.append(drawn_order)
 
-    def _draw_core(self, coordinate: tuple[float, float]) -> None:
+    def _draw_core(self, coordinate: tuple[float, float], hasFailed: bool) -> None:
         element = self._moves_svg.getroot()
         drawn_order = self.create_element(
             "rect",
@@ -480,7 +484,7 @@ class Mapper:
                 "width": self.board.data["svg config"]["unit_radius"] * 2,
                 "height": self.board.data["svg config"]["unit_radius"] * 2,
                 "fill": "none",
-                "stroke": "black",
+                "stroke": "red" if hasFailed else "black",
                 "stroke-width": self.board.data["svg config"]["order_stroke_width"],
                 "transform": f"rotate(45 {coordinate[0]} {coordinate[1]})",
             },
@@ -563,7 +567,7 @@ class Mapper:
 
         return min_subsets
 
-    def _draw_convoyed_move(self, unit: Unit, coordinate: tuple[float, float]):
+    def _draw_convoyed_move(self, unit: Unit, coordinate: tuple[float, float], hasFailed: bool):
         valid_convoys = self._get_all_paths(unit)
         # TODO: make this a setting
         if False:
@@ -603,9 +607,11 @@ class Mapper:
                 s += f"{f(g(p[x-1:x+2]))}, {f(p[x])} S "
 
             s += f"{f(p[-2])}, {f(p[-1])}"
-            return self._draw_path(s)
+            stroke_color = "red" if hasFailed else "black"
+            marker_color = "redarrow" if hasFailed else "arrow"
+            return self._draw_path(s, marker_end = marker_color, stroke_color = stroke_color)
 
-    def _draw_support(self, unit: Unit, coordinate: tuple[float, float]) -> None:
+    def _draw_support(self, unit: Unit, coordinate: tuple[float, float], hasFailed: bool) -> None:
         order: Support = unit.order
         x1 = coordinate[0]
         y1 = coordinate[1]
@@ -614,6 +620,8 @@ class Mapper:
         v3 = self.loc_to_point(order.destination, v2)
         x3, y3 = v3
         marker_start = ""
+        ball_type = "redball" if hasFailed else "ball"
+        arrow_type = "redarrow" if hasFailed else "arrow"
         if order.destination.get_unit():
             if order.source == order.destination:
                 (x3, y3) = self.pull_coordinate((x1, y1), (x3, y3), self.board.data["svg config"]["unit_radius"])
@@ -626,7 +634,7 @@ class Mapper:
                     if destloc.get_unit() and destloc.get_unit().coast:
                         destloc = destloc.get_unit().coast
                     for coord in destloc.all_locs:
-                        self._draw_hold(coord)
+                        self._draw_hold(coord, False)
 
             # if two units are support-holding each other
             destorder = order.destination.get_unit().order
@@ -639,7 +647,7 @@ class Mapper:
                 # This check is so we only do it once, so it doesn't overlay
                 # it doesn't matter which one is the origin & which is the dest
                 if id(order.destination.get_unit()) > id(unit):
-                    marker_start = "url(#ball)"
+                    marker_start = f"url(#{ball_type})"
                     # doesn't matter that v3 has been pulled, as it's still collinear
                     (x1, y1) = (x2, y2) = self.pull_coordinate(
                         (x3, y3), (x1, y1), self.board.data["svg config"]["unit_radius"]
@@ -653,17 +661,17 @@ class Mapper:
             {
                 "d": f"M {x1},{y1} Q {x2},{y2} {x3},{y3}",
                 "fill": "none",
-                "stroke": "black",
+                "stroke": "red" if hasFailed else "black",
                 "stroke-dasharray": f"{dasharray_size} {dasharray_size}",
                 "stroke-width": self.board.data["svg config"]["order_stroke_width"],
                 "stroke-linecap": "round",
                 "marker-start": marker_start,
-                "marker-end": f"url(#{'ball' if order.source == order.destination else 'arrow'})",
+                "marker-end": f"url(#{ball_type if order.source == order.destination else arrow_type})",
             },
         )
         return drawn_order
 
-    def _draw_convoy(self, order: ConvoyTransport, coordinate: tuple[float, float]) -> None:
+    def _draw_convoy(self, order: ConvoyTransport, coordinate: tuple[float, float], hasFailed: bool) -> None:
         element = self._moves_svg.getroot()
         drawn_order = self.create_element(
             "circle",
@@ -672,7 +680,7 @@ class Mapper:
                 "cy": coordinate[1],
                 "r": self.board.data["svg config"]["unit_radius"] / 2,
                 "fill": "none",
-                "stroke": "black",
+                "stroke": "red" if hasFailed else "black",
                 "stroke-width": self.board.data["svg config"]["order_stroke_width"] * 2 / 3,
             },
         )
@@ -954,7 +962,7 @@ class Mapper:
         # each power is placed in the right spot based on the transform field which has value of "tranlate($x,$y)" where x,y
         # are floating point numbers; we parse these via regex and sort by y-value
         self.scoreboard_power_locations.sort(
-            key=lambda loc: float(re.match(r"translate\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)", loc).groups()[1])
+            key=lambda loc: float(re.match(r".*translate\((-?\d+(?:\.\d+)?(?:e-?\d+)?),\s*(-?\d+(?:\.\d+)?(?:e-?\d+)?)\)", loc).groups()[1])
         )
 
     def add_arrow_definition_to_svg(self, svg: ElementTree) -> None:
@@ -1020,6 +1028,27 @@ class Mapper:
         )
         ball_marker.append(ball_def)
         defs.append(ball_marker)
+        
+        red_ball_marker: Element = self.create_element(
+            "marker",
+            {
+                "id": "redball",
+                "viewbox": "0 0 3 3",
+                # "refX": "1.5",
+                # "refY": "1.5",
+                "markerWidth": "3",
+                "markerHeight": "3",
+                "orient": "auto-start-reverse",
+                "shape-rendering": "geometricPrecision", # Needed bc firefox is wierd
+                "overflow": "visible"
+            },
+        )
+        red_ball_def: Element = self.create_element(
+            "circle",
+            {"r": "2", "fill": "red"},
+        )
+        red_ball_marker.append(red_ball_def)
+        defs.append(red_ball_marker)
 
         if not "no coring" in self.board.data.get("adju flags", []):
             created_defs = set()

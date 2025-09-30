@@ -86,9 +86,14 @@ class Parser:
         if not self.autodetect_players:
             for name, data in self.data["players"].items():
                 color = data["color"]
-                vscc = data["vscc"]
-                iscc = data["iscc"]
-                player = Player(name, color, vscc, iscc, set(), set())
+                win_type = self.data["victory_conditions"]
+                if win_type == "classic":
+                    sc_goal = self.data["victory_count"]
+                    starting_scs = data["starting_scs"]
+                else:
+                    sc_goal = data["vscc"]
+                    starting_scs = data["iscc"]
+                player = Player(name, color, win_type, sc_goal, starting_scs, set(), set())
                 self.players.add(player)
                 if isinstance(color, dict):
                     color = color["standard"]
@@ -241,6 +246,8 @@ class Parser:
                     province.adjacent.update(self.names_to_provinces(data["adjacencies"]))
                 if "remove_adjacencies" in data:
                     province.adjacent.difference_update(self.names_to_provinces(data["remove_adjacencies"]))
+                if "remove_adjacent_coasts" in data:
+                    province.nonadjacent_coasts.update(data["remove_adjacent_coasts"])
                 if "coasts" in data:
                     province.coasts = set()
                     for coast_name, coast_adjacent in data["coasts"].items():
@@ -272,6 +279,10 @@ class Parser:
         # set coasts
         for province in provinces:
             province.set_coasts()
+
+        for province in provinces:
+            for coast in province.coasts:
+                coast.set_adjacent_coasts()
 
         # impassible provinces aren't in the list; they're "ghost" and only show up
         # when explicitly asked for in costal topology algorithms
@@ -514,7 +525,7 @@ class Parser:
                         continue
 
                 coordinate = get_unit_coordinates(unit_data)
-                translated_coordinate = unit_translation.transform(layer_translation.transform(coordinate))
+                translated_coordinate = layer_translation.transform(unit_translation.transform(coordinate))
                 if coast:
                     setattr(coast, province_key, translated_coordinate)
                 else:
@@ -572,7 +583,7 @@ class Parser:
                 neutral_color = neutral_color["standard"]
             if color == neutral_color:
                 return None
-            player = Player(province_name, color, 101, 1, set(), set())
+            player = Player(province_name, color, "chaos", 101, 1, set(), set())
             self.players.add(player)
             self.color_to_player[color] = player
             return player

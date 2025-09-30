@@ -1,5 +1,7 @@
 import logging
+from threading import Lock
 import time
+import os
 
 from diplomacy.adjudicator.adjudicator import make_adjudicator
 from diplomacy.adjudicator.mapper import Mapper
@@ -13,7 +15,22 @@ from diplomacy.persistence.spec_request import SpecRequest
 logger = logging.getLogger(__name__)
 
 
-class Manager:
+class ManagerMeta(type):
+    """Metaclass to provide Singleton creational logic to Manager"""
+
+    _instances = {}
+    _lock = Lock()
+
+    def __call__(cls):
+        with cls._lock:
+            if cls not in cls._instances:
+                instance = super().__call__()
+                cls._instances[cls] = instance
+
+        return cls._instances[cls]
+
+
+class Manager(metaclass=ManagerMeta):
     """Manager acts as an intermediary between Bot (the Discord API), Board (the board state), the database."""
 
     def __init__(self):
@@ -28,12 +45,14 @@ class Manager:
     def list_servers(self) -> set[int]:
         return set(self._boards.keys())
 
-    def create_game(self, server_id: int, gametype: str = "impdip.json") -> str:
+    def create_game(self, server_id: int, gametype: str = "impdip") -> str:
         if self._boards.get(server_id):
-            raise RuntimeError("A game already exists in this server.")
+            return "A game already exists in this server."
+        if not os.path.isfile(f"config/{gametype}.json"):
+            return f"Game {gametype} does not exist."
 
         logger.info(f"Creating new game in server {server_id}")
-        self._boards[server_id] = get_parser(gametype).parse()
+        self._boards[server_id] = get_parser(gametype + ".json").parse()
         self._boards[server_id].board_id = server_id
         self._database.save_board(server_id, self._boards[server_id])
 
@@ -49,14 +68,16 @@ class Manager:
 
         return None
 
-    def save_spec_request(self, server_id: int, user_id: int, role_id: int) -> str:
+    def save_spec_request(
+        self, server_id: int, user_id: int, role_id: int, override=False
+    ) -> str:
         # create new list if first time in server
         if server_id not in self._spec_requests:
             self._spec_requests[server_id] = []
 
         obj = SpecRequest(server_id, user_id, role_id)
 
-        if self.get_spec_request(server_id, user_id):
+        if self.get_spec_request(server_id, user_id) and not override:
             return "User has already been accepted for a request in this Server."
 
         self._spec_requests[server_id].append(obj)
@@ -79,12 +100,37 @@ class Manager:
         server_id: int,
         player_restriction: Player | None,
         color_mode: str | None = None,
+        turn: tuple[str, phase] | None = None,
     ) -> tuple[str, str]:
         start = time.time()
 
-        svg, file_name = Mapper(
-            self._boards[server_id], color_mode=color_mode
-        ).draw_moves_map(self._boards[server_id].phase, player_restriction)
+        cur_board = self._boards[server_id]
+        if turn is None:
+            board = cur_board
+            season = board.phase
+        else:
+            board = self._database.get_board(
+                cur_board.board_id,
+                turn[1],
+                int(turn[0]) - cur_board.year_offset,
+                cur_board.fish,
+                cur_board.name,
+                cur_board.datafile,
+            )
+            if board is None:
+                raise RuntimeError(
+                    f"There is no {turn[1].name} {turn[0]} board for this server"
+                )
+            season = turn[1]
+            if (
+                board.year < cur_board.year
+                or board.year == cur_board.year
+                and season.index < cur_board.phase.index
+            ):
+                player_restriction = None
+        svg, file_name = Mapper(board, color_mode=color_mode).draw_moves_map(
+            season, player_restriction=player_restriction
+        )
 
         elapsed = time.time() - start
         logger.info(f"manager.draw_moves_map.{server_id}.{elapsed}s")
@@ -125,13 +171,32 @@ class Manager:
         return svg, file_name
 
     def draw_current_map(
-        self, server_id: int, color_mode: str | None = None
+        self,
+        server_id: int,
+        color_mode: str | None = None,
+        turn: tuple[str, phase] | None = None,
     ) -> tuple[str, str]:
         start = time.time()
 
-        svg, file_name = Mapper(
-            self._boards[server_id], color_mode=color_mode
-        ).draw_current_map()
+        cur_board = self._boards[server_id]
+        if turn is None:
+            board = cur_board
+            season = board.phase
+        else:
+            board = self._database.get_board(
+                cur_board.board_id,
+                turn[1],
+                int(turn[0]) - 1642,
+                cur_board.fish,
+                cur_board.name,
+                cur_board.datafile,
+            )
+            if board is None:
+                raise RuntimeError(
+                    f"There is no {turn[1].name} {turn[0]} board for this server"
+                )
+            season = turn[1]
+        svg, file_name = Mapper(board, color_mode=color_mode).draw_current_map()
 
         elapsed = time.time() - start
         logger.info(f"manager.draw_current_map.{server_id}.{elapsed}s")
@@ -174,7 +239,7 @@ class Manager:
     def draw_fow_gui_map(
         self,
         server_id: int,
-        player_restriction: Player | None,
+        player_restriction: Player | None = None,
         color_mode: str | None = None,
     ) -> tuple[str, str]:
         start = time.time()
@@ -190,7 +255,7 @@ class Manager:
     def draw_gui_map(
         self,
         server_id: int,
-        player_restriction: Player | None,
+        player_restriction: Player | None = None,
         color_mode: str | None = None,
     ) -> tuple[str, str]:
         start = time.time()
@@ -213,7 +278,13 @@ class Manager:
             last_phase_year -= 1
 
         old_board = self._database.get_board(
-            board.board_id, last_phase, last_phase_year, board.fish, board.datafile
+            board.board_id,
+            last_phase,
+            last_phase_year,
+            board.fish,
+            board.name,
+            board.datafile,
+            clear_status=True,
         )
         if old_board is None:
             raise ValueError(
@@ -236,7 +307,12 @@ class Manager:
         if board.phase.name == "Spring Moves":
             last_phase_year -= 1
         old_board = self._database.get_board(
-            board.board_id, last_phase, last_phase_year, board.fish, board.datafile
+            board.board_id,
+            last_phase,
+            last_phase_year,
+            board.fish,
+            board.name,
+            board.datafile,
         )
         return old_board
 
@@ -245,7 +321,7 @@ class Manager:
         board = self._boards[server_id]
 
         loaded_board = self._database.get_board(
-            server_id, board.phase, board.year, board.fish, board.datafile
+            server_id, board.phase, board.year, board.fish, board.name, board.datafile
         )
         if loaded_board is None:
             raise ValueError(

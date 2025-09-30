@@ -1,62 +1,41 @@
 import logging
+from typing import Any
 
 from discord.ext import commands
 
-from bot.command import color_options
-from bot.config import ERROR_COLOUR
-from bot.diplo_bot import DiploBot
+from bot import config
+from bot import perms
 from bot.parse_order import parse_order, parse_remove_order
-from bot.utils import get_orders, log_command, send_message_and_file
-
+from bot.utils import get_orders, log_command, parse_season, send_message_and_file
+from diplomacy.persistence.manager import Manager
 from diplomacy.persistence.player import Player
 
-
 logger = logging.getLogger(__name__)
-
-#
-from functools import wraps
-from typing import Callable, Awaitable
-from bot.perms import require_player_by_context
-
-
-# FIXME: Replace with bot.perms decorator after fixes
-def player(description: str = "run this command"):
-    def decorator(
-        func: Callable[..., Awaitable[None]],
-    ) -> Callable[..., Awaitable[None]]:
-        @wraps(func)
-        async def wrapper(self, ctx: commands.Context, *args, **kwargs):
-            player_obj = require_player_by_context(ctx, self.manager, description)
-            return await func(self, player_obj, ctx, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
+manager = Manager()
 
 
 class PlayerCog(commands.Cog):
-    def __init__(self, bot: DiploBot) -> None:
+    def __init__(self, bot):
         self.bot = bot
-        self.manager = bot.manager
 
     @commands.command(
         brief="Submits orders; there must be one and only one order per line.",
         description="""Submits orders: 
-        There must be one and only one order per line.
-        A variety of keywords are supported: e.g. '-', '->', 'move', and 'm' are all supported for a move command.
-        Supplying the unit type is fine but not required: e.g. 'A Ghent -> Normandy' and 'Ghent -> Normandy' are the same
-        If anything in the command errors, we recommend resubmitting the whole order message.
-        *During Build phases only*, you have to specify multi-word provinces with underscores; e.g. Somali Basin would be Somali_Basin (we use a different parser during build phases)
-        If you would like to use something that is not currently supported please inform your GM and we can add it.""",
+    There must be one and only one order per line.
+    A variety of keywords are supported: e.g. '-', '->', 'move', and 'm' are all supported for a move command.
+    Supplying the unit type is fine but not required: e.g. 'A Ghent -> Normandy' and 'Ghent -> Normandy' are the same
+    If anything in the command errors, we recommend resubmitting the whole order message.
+    *During Build phases only*, you have to specify multi-word provinces with underscores; e.g. Somali Basin would be Somali_Basin (we use a different parser during build phases)
+    If you would like to use something that is not currently supported please inform your GM and we can add it.""",
         aliases=["o", "orders"],
-    )  # type: ignore
-    @player("order")
-    async def order(self, player: Player | None, ctx: commands.Context) -> None:
-        guild = ctx.guild
-        if not guild:
-            return
-
-        board = self.manager.get_board(guild.id)
+    )
+    @perms.player("order")
+    async def order(
+        self,
+        ctx: commands.Context,
+        player: Player | None,
+    ) -> None:
+        board = manager.get_board(ctx.guild.id)
 
         if player and not board.orders_enabled:
             log_command(logger, ctx, f"Orders locked - not processing")
@@ -64,17 +43,21 @@ class PlayerCog(commands.Cog):
                 channel=ctx.channel,
                 title="Orders locked!",
                 message="If you think this is an error, contact a GM.",
-                embed_colour=ERROR_COLOUR,
+                embed_colour=config.ERROR_COLOUR,
             )
             return
 
         message = parse_order(ctx.message.content, player, board)
         if "title" in message:
-            log_command(logger, ctx, message=message["title"])
+            log_command(logger, ctx, message=message["title"], level=logging.DEBUG)
         elif "message" in message:
-            log_command(logger, ctx, message=message["message"][:100])
+            log_command(
+                logger, ctx, message=message["message"][:100], level=logging.DEBUG
+            )
         elif "messages" in message and len(message["messages"]) > 0:
-            log_command(logger, ctx, message=message["messages"][0][:100])
+            log_command(
+                logger, ctx, message=message["messages"][0][:100], level=logging.DEBUG
+            )
         await send_message_and_file(channel=ctx.channel, **message)
 
     @commands.command(
@@ -82,14 +65,10 @@ class PlayerCog(commands.Cog):
         description="Removes orders for given units (required for removing builds/disbands). "
         "There must be one and only one order per line.",
         aliases=["remove", "rm", "removeorders"],
-    )  # type: ignore
-    @player("remove orders")
-    async def remove_order(self, player: Player | None, ctx: commands.Context) -> None:
-        guild = ctx.guild
-        if not guild:
-            return
-
-        board = self.manager.get_board(guild.id)
+    )
+    @perms.player("remove orders")
+    async def remove_order(self, ctx: commands.Context, player: Player | None) -> None:
+        board = manager.get_board(ctx.guild.id)
 
         if player and not board.orders_enabled:
             log_command(logger, ctx, f"Orders locked - not processing")
@@ -97,7 +76,7 @@ class PlayerCog(commands.Cog):
                 channel=ctx.channel,
                 title="Orders locked!",
                 message="If you think this is an error, contact a GM.",
-                embed_colour=ERROR_COLOUR,
+                embed_colour=config.ERROR_COLOUR,
             )
             return
 
@@ -113,13 +92,9 @@ class PlayerCog(commands.Cog):
         "Use .view_map to view a sample moves map of your orders. "
         "Use the 'missing' or 'submitted' argument to view only units without orders or only submitted orders.",
         aliases=["v", "view", "vieworders", "view-orders"],
-    )  # type: ignore
-    @player("view orders")
-    async def view_orders(self, player: Player | None, ctx: commands.Context) -> None:
-        guild = ctx.guild
-        if not guild:
-            return
-
+    )
+    @perms.player("view orders")
+    async def view_orders(self, ctx: commands.Context, player: Player | None) -> None:
         arguments = (
             ctx.message.content.removeprefix(ctx.prefix + ctx.invoked_with)
             .strip()
@@ -134,7 +109,7 @@ class PlayerCog(commands.Cog):
         )
 
         try:
-            board = self.manager.get_board(guild.id)
+            board = manager.get_board(ctx.guild.id)
             order_text = get_orders(board, player, ctx, subset=subset)
         except RuntimeError as err:
             logger.error(err, exc_info=True)
@@ -147,7 +122,7 @@ class PlayerCog(commands.Cog):
             await send_message_and_file(
                 channel=ctx.channel,
                 title="Unknown Error: Please contact your local bot dev",
-                embed_colour=ERROR_COLOUR,
+                embed_colour=config.ERROR_COLOUR,
             )
             return
         log_command(
@@ -163,36 +138,35 @@ class PlayerCog(commands.Cog):
 
     @commands.command(
         brief="Outputs the current map with submitted orders.",
-        description=(
-            "For GMs, all submitted orders are displayed. For a player, only their own orders are displayed."
-            "GMs may append true as an argument to this to instead get the svg."
-            "* view_map {arguments}"
-            "Arguments:"
-            "* pass true|t|svg|s to return an svg"
-            "* pass standard, dark, blue, or pink for different color modes if present"
-        ),
+        description="""
+        For GMs, all submitted orders are displayed. For a player, only their own orders are displayed.
+        GMs may append true as an argument to this to instead get the svg.
+        * view_map {arguments}
+        Arguments: 
+        * pass true|t|svg|s to return an svg
+        * pass standard, dark, blue, or pink for different color modes if present
+        * pass season and optionally year for older maps
+        """,
         aliases=["viewmap", "vm"],
-    )  # type: ignore
-    @player("view map")
-    async def view_map(
-        self,
-        player: Player | None,
-        ctx: commands.Context,
-    ) -> None:
-        guild = ctx.guild
-        if not guild:
-            return None
-
+    )
+    @perms.player("view map")
+    async def view_map(self, ctx: commands.Context, player: Player | None):
         arguments = (
             ctx.message.content.removeprefix(ctx.prefix + ctx.invoked_with)
             .strip()
             .lower()
             .split()
         )
-        convert_svg = player or not ({"true", "t", "svg", "s"} & set(arguments))
-        color_arguments = list(color_options & set(arguments))
+        convert_svg = (player is not None) or not (
+            {"true", "t", "svg", "s"} & set(arguments)
+        )
+        color_arguments = list(config.color_options & set(arguments))
         color_mode = color_arguments[0] if color_arguments else None
-        board = self.manager.get_board(guild.id)
+        board = manager.get_board(ctx.guild.id)
+        season = parse_season(arguments, board.get_year_str())
+
+        year = board.get_year_str() if season is None else season[0]
+        phase_str = board.phase.name if season is None else season[1].name
 
         if player and not board.orders_enabled:
             log_command(logger, ctx, f"Orders locked - not processing")
@@ -200,18 +174,18 @@ class PlayerCog(commands.Cog):
                 channel=ctx.channel,
                 title="Orders locked!",
                 message="If you think this is an error, contact a GM.",
-                embed_colour=ERROR_COLOUR,
+                embed_colour=config.ERROR_COLOUR,
             )
             return
 
         try:
             if not board.fow:
-                file, file_name = self.manager.draw_moves_map(
-                    guild.id, player, color_mode
+                file, file_name = manager.draw_moves_map(
+                    ctx.guild.id, player, color_mode, season
                 )
             else:
-                file, file_name = self.manager.draw_fow_players_moves_map(
-                    guild.id, player, color_mode
+                file, file_name = manager.draw_fow_players_moves_map(
+                    ctx.guild.id, player, color_mode
                 )
         except Exception as err:
             logger.error(err, exc_info=True)
@@ -224,18 +198,18 @@ class PlayerCog(commands.Cog):
             await send_message_and_file(
                 channel=ctx.channel,
                 title="Unknown Error: Please contact your local bot dev",
-                embed_colour=ERROR_COLOUR,
+                embed_colour=config.ERROR_COLOUR,
             )
             return
 
         log_command(
             logger,
             ctx,
-            message=f"Generated moves map for {board.phase.name} {board.get_year_str()}",
+            message=f"Generated moves map for {phase_str} {year}",
         )
         await send_message_and_file(
             channel=ctx.channel,
-            title=f"{board.phase.name} {board.get_year_str()}",
+            title=f"{phase_str} {year}",
             file=file,
             file_name=file_name,
             convert_svg=convert_svg,
@@ -251,13 +225,9 @@ class PlayerCog(commands.Cog):
         * pass standard, dark, blue, or pink for different color modes if present
         """,
         aliases=["viewcurrent", "vc"],
-    )  # type: ignore
-    @player("view current")
-    async def view_current(self, player: Player | None, ctx: commands.Context) -> None:
-        guild = ctx.guild
-        if not guild:
-            return
-
+    )
+    @perms.player("view current")
+    async def view_current(self, ctx: commands.Context, player: Player | None) -> None:
         arguments = (
             ctx.message.content.removeprefix(ctx.prefix + ctx.invoked_with)
             .strip()
@@ -265,9 +235,13 @@ class PlayerCog(commands.Cog):
             .split()
         )
         convert_svg = not ({"true", "t", "svg", "s"} & set(arguments))
-        color_arguments = list(color_options & set(arguments))
+        color_arguments = list(config.color_options & set(arguments))
         color_mode = color_arguments[0] if color_arguments else None
-        board = self.manager.get_board(guild.id)
+        board = manager.get_board(ctx.guild.id)
+        season = parse_season(arguments, board.get_year_str())
+
+        year = board.get_year_str() if season is None else season[0]
+        phase_str = board.phase.name if season is None else season[1].name
 
         if player and not board.orders_enabled:
             log_command(logger, ctx, f"Orders locked - not processing")
@@ -275,16 +249,18 @@ class PlayerCog(commands.Cog):
                 channel=ctx.channel,
                 title="Orders locked!",
                 message="If you think this is an error, contact a GM.",
-                embed_colour=ERROR_COLOUR,
+                embed_colour=config.ERROR_COLOUR,
             )
             return
 
         try:
             if not board.fow:
-                file, file_name = self.manager.draw_current_map(guild.id, color_mode)
+                file, file_name = manager.draw_current_map(
+                    ctx.guild.id, color_mode, season
+                )
             else:
-                file, file_name = self.manager.draw_fow_current_map(
-                    guild.id, player, color_mode
+                file, file_name = manager.draw_fow_current_map(
+                    ctx.guild.id, player, color_mode
                 )
         except Exception as err:
             logger.error(err, exc_info=True)
@@ -297,17 +273,17 @@ class PlayerCog(commands.Cog):
             await send_message_and_file(
                 channel=ctx.channel,
                 title="Unknown Error: Please contact your local bot dev",
-                embed_colour=ERROR_COLOUR,
+                embed_colour=config.ERROR_COLOUR,
             )
             return
         log_command(
             logger,
             ctx,
-            message=f"Generated current map for {board.phase.name} {board.get_year_str()}",
+            message=f"Generated current map for {phase_str} {year}",
         )
         await send_message_and_file(
             channel=ctx.channel,
-            title=f"{board.phase.name} {board.get_year_str()}",
+            title=f"{phase_str} {year}",
             file=file,
             file_name=file_name,
             convert_svg=convert_svg,
@@ -317,22 +293,18 @@ class PlayerCog(commands.Cog):
     @commands.command(
         brief="Outputs a interactive svg that you can issue orders in",
         aliases=["g"],
-    )  # type: ignore
-    @player("view gui")
-    async def view_gui(self, player: Player | None, ctx: commands.Context) -> None:
-        guild = ctx.guild
-        if not guild:
-            return
-
+    )
+    @perms.player("view gui")
+    async def view_gui(self, ctx: commands.Context, player: Player | None) -> None:
         arguments = (
             ctx.message.content.removeprefix(ctx.prefix + ctx.invoked_with)
             .strip()
             .lower()
             .split()
         )
-        color_arguments = list(color_options & set(arguments))
+        color_arguments = list(config.color_options & set(arguments))
         color_mode = color_arguments[0] if color_arguments else None
-        board = self.manager.get_board(guild.id)
+        board = manager.get_board(ctx.guild.id)
 
         if player and not board.orders_enabled:
             log_command(logger, ctx, f"Orders locked - not processing")
@@ -340,16 +312,18 @@ class PlayerCog(commands.Cog):
                 channel=ctx.channel,
                 title="Orders locked!",
                 message="If you think this is an error, contact a GM.",
-                embed_colour=ERROR_COLOUR,
+                embed_colour=config.ERROR_COLOUR,
             )
             return
 
         try:
             if not board.fow:
-                file, file_name = self.manager.draw_gui_map(guild.id, color_mode)
+                file, file_name = manager.draw_gui_map(
+                    ctx.guild.id, color_mode=color_mode
+                )
             else:
-                file, file_name = self.manager.draw_fow_gui_map(
-                    guild.id, player, color_mode
+                file, file_name = manager.draw_fow_gui_map(
+                    ctx.guild.id, player_restriction=player, color_mode=color_mode
                 )
         except Exception as err:
             log_command(
@@ -361,10 +335,10 @@ class PlayerCog(commands.Cog):
             await send_message_and_file(
                 channel=ctx.channel,
                 title="Unknown Error: Please contact your local bot dev",
-                embed_colour=ERROR_COLOUR,
+                embed_colour=config.ERROR_COLOUR,
             )
             raise err
-
+            return
         log_command(
             logger,
             ctx,
@@ -379,6 +353,32 @@ class PlayerCog(commands.Cog):
             file_in_embed=False,
         )
 
+    @commands.command(brief="outputs the provinces you can see")
+    @perms.player("view visible provinces")
+    async def visible_provinces(
+        self, ctx: commands.Context, player: Player | None
+    ) -> None:
+        board = manager.get_board(ctx.guild.id)
 
-async def setup(bot: DiploBot):
-    await bot.add_cog(PlayerCog(bot))
+        if not player or not board.fow:
+            log_command(logger, ctx, message=f"No fog of war game")
+            await send_message_and_file(
+                channel=ctx.channel,
+                message="This command only works for players in fog of war games.",
+                embed_colour=config.ERROR_COLOUR,
+            )
+            return
+
+        visible_provinces = board.get_visible_provinces(player)
+        log_command(
+            logger, ctx, message=f"There are {len(visible_provinces)} visible provinces"
+        )
+        await send_message_and_file(
+            channel=ctx.channel, message=", ".join([x.name for x in visible_provinces])
+        )
+        return
+
+
+async def setup(bot):
+    cog = PlayerCog(bot)
+    await bot.add_cog(cog)

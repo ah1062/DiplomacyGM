@@ -1,6 +1,6 @@
 {
-    "name": "Imp Dip",
-    "file": "assets/imperial_diplomacy.svg",
+    "name": "Imperial Diplomacy B1.6",
+    "file": "assets/impdip.1.6.svg",
     "svg config": {
         "land_layer": "layer6",
         "island_ring_layer": "layer9",
@@ -10,11 +10,17 @@
         "province_names": "layer1",
         "supply_center_icons": "layer3",
         "season": "layer4",
-        "power_banners": "layer13",
         "starting_units": "layer10",
-        "unit_output": "layer17",
-        "arrow_output": "layer16",
+        "unit_output": "layer16",
+        "arrow_output": "layer17",
+		"other_fills": "layer14",
+        "coast_markers": "layer18",
+		"background": "g407997",
+        "sidebar": "layer7",
 
+        "power_banners": "layer13",
+		"power_sc_index": 5,
+		
         "army": "g652",
         "retreat_army": "g2176",
         "fleet": "layer15",
@@ -23,78 +29,37 @@
         "detect_starting_units": true,
         "unit_type_labeled": false,
 
-        "default_sea_color": "d4dae1",
-
         "unit_labels": true,
         "province_labels": true,
         "center_labels": true,
 
-        "unowned_color": "c6b7ab",
+        "default_sea_color": "d4dae1",
+
+		"color replacements": {
+			"c6b7ab": {"dark": "B7AB80", "blue": "FFF3F3"},
+			"b2bdd1": {"dark": "325B68", "blue": "D2BDAE"},
+			"b99a82": {"dark": "8a836b", "blue": "EFDFDF"},
+			"333333": {"dark": "0A3542"},
+			"d4dae1": {"dark": "396B70", "blue": "E4D1C5"}
+		},
 
         "border_margin_hint": 1,
 
         "map_width": 4375,
         "unit_radius": 10,
         "order_stroke_width": 2,
-        "neutral": "c6b7ab",
+        "neutral": {"standard": "c6b7ab", "dark": "B7AB80", "pink": "c6b7ab", "blue": "FFF3F3"},
         "neutral_sc": "ffffff",
         "loc_x_offset": 7.7655,
         "loc_y_offset": 7.033,
         "delete_layer": ["army", "retreat_army", "fleet", "retreat_fleet"]
     },
 	"victory_conditions": "vscc",
+	"abbreviations": {
+		"nec": "North Equatorial Current"
+	},
     "overrides": {
-        "high provinces": {
-            "SAH": {
-                "num": 3,
-                "type": "LAND",
-                "adjacencies": ["Ghadames", "Fezzan", "Zaghawa", "Darfur", "Kanem", "Hausa States", "Gurma", "Mossi", "Jenne", "Timbuktu", "Aswanik", "Regeibat"]
-            },
-            "NAO": {
-                "num": 5,
-                "type": "SEA",
-                "adjacencies": ["Robertstorg", "Brattahlid", "Greenland Sea", "Rockall Rise", "Iberian Current", "Seewarte Seamounts", "SAO1", "SAO2", "SAO3", "SAO4", "SAO5", "Saragasso Sea", "Bermuda", "Massachusetts Bay", "St. Marguerite Baie", "Strait of Belle Isle", "Labrador Sea", "Azores"]
-            },
-            "SAO": {
-                "num": 5,
-                "type": "SEA",
-                "adjacencies": ["NAO1", "NAO2", "NAO3", "NAO4", "NAO5", "Seewarte Seamounts", "Serra Leoa Rise", "Manden", "Gold Coast", "Guinea Rise", "Angola Basin", "St. Helena", "Cape Basin", "Southern Sea", "Argentine Basin", "Guanabara Bay", "Todos os Santos Bay", "Mauritsstad", "St. Marcos Bay", "Guiana Current", "Saragasso Sea"]
-            },
-            "NPO": {
-                "num": 5,
-                "type": "SEA",
-                "adjacencies": ["Chukchi Sea", "North Equatorial Current", "Hawai'i", "Berlanga Ridge", "Guatemala Basin", "SPO1", "SPO2", "SPO3", "SPO4", "SPO5", "Solomon Islands", "Halmahera Sea", "Philippine Sea", "Kuroshio Current", "Edo", "Tsugaru Strait", "Kuril Sea", "Sea of Okhotsk", "Koryaks"]
-            },
-            "SPO": {
-                "num": 5,
-                "type": "SEA",
-                "adjacencies": ["NPO1", "NPO2", "NPO3", "NPO4", "NPO5", "Guatemala Basin", "Galapagos", "Peru Basin", "Roggeveen Basin", "Chiloe", "Mar de Hoces", "Antarctic Basin", "Aotearoa", "Gunai", "Coral Sea", "Solomon Islands"]
-            },
-            "INO": {
-                "num": 5,
-                "type": "SEA",
-                "adjacencies": ["Laccadive Plateau", "Maldives", "Gulf of Mannar", "Ceylon", "Gulf of Ceylon", "Cocos Basin", "Sumatra", "Mentawai Strait", "Timor Sea", "Kimberley", "Great Australian Bight", "Antarctic Basin", "Crozet Basin", "Reunion", "Mascarene Sea", "Somali Basin"]
-            }
-        },
         "provinces": {
-            "Iqaluit": {
-                "adjacencies": ["Nunavut"]
-            },
-            "Nunavut": {
-                "adjacencies": ["Iqaluit"]
-            },
-            "Yokuts": {
-                "adjacencies": ["Washo"]
-            },
-            "Washo": {
-                "adjacencies": ["Yokuts"]
-            },
-            "Edinburgh": {
-                "remove_adjacencies": ["Greenland Sea"]
-            },
-            "Greenland Sea": {
-                "remove_adjacencies": ["Edinburgh"]
-            },
             "Panama": {
                 "coasts": {
                    "nc": [
@@ -155,7 +120,7 @@
                 "coasts": {
                     "ec": [
                         "Oriental Sea",
-                        "Tsushima"
+                        "Oki Sea"
                     ],
                     "wc": [
                         "Beizhili Sea",
@@ -163,10 +128,10 @@
                     ]
                 }
             },
-            "Chukchis": {
+            "Kereks": {
                 "coasts": {
                     "ec": [
-                        "Chukchi Sea"
+                        "Karaginskiy Gulf"
                     ],
                     "wc": [
                         "Sea of Okhotsk"
@@ -216,144 +181,140 @@
                 "unit_loc": [[4215.260, 1510.000]],
                 "retreat_unit_loc": [[4227.260, 1522.000]]
             },
-            "SPO4": {
-                "unit_loc": [[4099.759, 1577.737]],
-                "retreat_unit_loc": [[4111.759, 1589.737]]
-            },
-            "SPO5": {
-                "unit_loc": [[4176.760, 1577.678]],
-                "retreat_unit_loc": [[4188.760, 1589.678]]
-            },
             "Chukchi Sea": {
-                "unit_loc": [[28.000, 241.000]],
+                "unit_loc": [[26.000, 268.000]],
                 "retreat_unit_loc": [[72.908, 186.392]]
+            },
+            "Gulf of Anadyr": {
+                "unit_loc": [[29.000, 421.000]],
+                "retreat_unit_loc": [[14.500, 391.000]]
             }
 
         }
     },
     "players": {
         "Abyssinia": {
-            "color": "a88080",
+            "color": {"standard": "a88080", "dark": "9D6767", "pink": "FFC0CB", "blue": "4AB5A9"},
             "vscc": 32,
             "iscc": 4
         },
         "Ajuuraan": {
-            "color": "587ba7",
-            "vscc": 32,
-            "iscc": 4
+            "color": {"standard": "587ba7", "dark": "4A688D", "pink": "FF6AB9", "blue": "924EEF"},
+            "vscc": 36,
+            "iscc": 5
         },
         "Athapasca": {
-            "color": "e95a94",
+            "color": {"standard": "e95a94", "dark": "BB4C79", "pink": "FF69B4", "blue": "63E8DD"},
             "vscc": 32,
             "iscc": 4
         },
         "Austria": {
-            "color": "a17555",
+            "color": {"standard": "a17555", "dark": "82644D", "pink": "FF1493", "blue": "8768E2"},
             "vscc": 32,
             "iscc": 4
         },
         "Aymara": {
-            "color": "9a2f56",
+            "color": {"standard": "9a2f56", "dark": "AD295D", "pink": "DB7093", "blue": "A0DCD9"},
             "vscc": 32,
             "iscc": 4
         },
         "Ayutthaya": {
-            "color": "9d84ae",
+            "color": {"standard": "9d84ae", "dark": "B875CE", "pink": "FF007F", "blue": "5782EC"},
             "vscc": 32,
             "iscc": 4
         },
         "England": {
-            "color": "f94455",
+            "color": {"standard": "f94455", "dark": "E33544", "pink": "E75480", "blue": "467A70"},
             "vscc": 56,
             "iscc": 14
         },
         "France": {
-            "color": "66a2e3",
+            "color": {"standard": "66a2e3", "dark": "24A57B", "pink": "FF6FFF", "blue": "9F79CF"},
             "vscc": 56,
             "iscc": 14
         },
+        "Guarani": {
+            "color": {"standard": "078690", "dark": "078690", "pink": "FFB3C6", "blue": "078690"},
+            "vscc": 32,
+            "iscc": 4
+        },
         "Inuit": {
-            "color": "afc5d8",
-            "vscc": 36,
-            "iscc": 5
+            "color": {"standard": "afc5d8", "dark": "95ADC2", "pink": "F22952", "blue": "2C837F"},
+            "vscc": 42,
+            "iscc": 7
         },
         "Kongo": {
-            "color": "9f52c4",
+            "color": {"standard": "924cb3", "dark": "944FA5", "pink": "FF91A4", "blue": "C7A9E7"},
             "vscc": 32,
             "iscc": 4
         },
-        "Mali": {
-            "color": "7a9025",
-            "vscc": 32,
-            "iscc": 4
-        },
-        "Mapuche-Tehuelche": {
-            "color": "81889d",
+        "Mapuche": {
+            "color": {"standard": "81889d", "dark": "696E7F", "pink": "FF85A1", "blue": "5A72C2"},
             "vscc": 32,
             "iscc": 4
         },
         "Ming": {
-            "color": "cadd7e",
+            "color": {"standard": "cadd7e", "dark": "B8DC5C", "pink": "D98A96", "blue": "74D2EF"},
             "vscc": 36,
             "iscc": 5
         },
         "Mughal": {
-            "color": "ab9f26",
+            "color": {"standard": "ab9f26", "dark": "999941", "pink": "FDD7E4", "blue": "8779AB"},
             "vscc": 36,
             "iscc": 5
         },
         "Netherlands": {
-            "color": "fc9c23",
+            "color": {"standard": "fc9c23", "dark": "DB7745", "pink": "C44263", "blue": "58AEC4"},
             "vscc": 56,
             "iscc": 14
         },
         "Ottoman": {
-            "color": "a03838",
+            "color": {"standard": "a03838", "dark": "AB2136", "pink": "F4A7B9", "blue": "649AE8"},
             "vscc": 48,
             "iscc": 10
         },
         "Poland-Lithuania": {
-            "color": "e390b3",
+            "color": {"standard": "e390b3", "dark": "E57BA8", "pink": "F9A7B0", "blue": "43859F"},
             "vscc": 42,
             "iscc": 7
         },
         "Portugal": {
-            "color": "3c9553",
+            "color": {"standard": "3c9553", "dark": "23763F", "pink": "F5B7C6", "blue": "A9B6E3"},
             "vscc": 64,
             "iscc": 16
         },
         "Qing": {
-            "color": "f36678",
-            "vscc": 36,
-            "iscc": 5
+            "color": {"standard": "f36678", "dark": "E04A5D", "pink": "F5A9BC", "blue": "15729C"},
+            "vscc": 32,
+            "iscc": 4
         },
         "Russia": {
-            "color": "556854",
-            "vscc": 48,
-            "iscc": 10
+            "color": {"standard": "547352", "dark": "547352", "pink": "E672A3", "blue": "4BAADB"},
+            "vscc": 44,
+            "iscc": 8
         },
         "Safavid": {
-            "color": "5a887f",
+            "color": {"standard": "5a887f", "dark": "407167", "pink": "FFAEB9", "blue": "5E6C9B"},
             "vscc": 36,
             "iscc": 5
         },
         "Spain": {
-            "color": "f0ce48",
+            "color": {"standard": "f0ce48", "dark": "DBB045", "pink": "65000B", "blue": "3585B0"},
             "vscc": 64,
             "iscc": 16
         },
         "Sweden": {
-            "color": "4e51ba",
+            "color": {"standard": "4e51ba", "dark": "534884", "pink": "F497BF", "blue": "367BBB"},
             "vscc": 32,
             "iscc": 4
         },
         "Tokugawa": {
-            "color": "7cdbc3",
+            "color": {"standard": "7cdbc3", "dark": "4AB79B", "pink": "FFAACC", "blue": "687F9F"},
             "vscc": 32,
             "iscc": 4
         },
         "Ute-Shoshone": {
-            "color": "ca7a59",
+            "color": {"standard": "ca7a59", "dark": "B87052", "pink": "EDBFC3", "blue": "658DBE"},
             "vscc": 36,
             "iscc": 5
         }

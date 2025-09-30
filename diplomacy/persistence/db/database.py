@@ -64,7 +64,7 @@ class _DatabaseConnection:
         logger.info(f"Loading {len(board_data)} boards from DB")
         boards = dict()
         for board_row in board_data:
-            board_id, phase_string, data_file, fish = board_row
+            board_id, phase_string, data_file, fish, name = board_row
 
             split_index = phase_string.index(" ")
             year = int(phase_string[:split_index])
@@ -81,7 +81,7 @@ class _DatabaseConnection:
                 fish = 0
 
             board = self._get_board(
-                board_id, current_phase, year, fish, data_file, cursor
+                board_id, current_phase, year, fish, name, data_file, cursor
             )
 
             boards[board_id] = board
@@ -96,7 +96,9 @@ class _DatabaseConnection:
         board_phase: phase.Phase,
         year: int,
         fish: int,
+        name: str | None,
         data_file: str,
+        clear_status: bool = False,
     ) -> Board | None:
         cursor = self._connection.cursor()
 
@@ -108,7 +110,7 @@ class _DatabaseConnection:
             cursor.close()
             return None
 
-        board = self._get_board(board_id, board_phase, year, fish, data_file, cursor)
+        board = self._get_board(board_id, board_phase, year, fish, name, data_file, cursor, clear_status)
         cursor.close()
         return board
 
@@ -118,8 +120,10 @@ class _DatabaseConnection:
         board_phase: phase.Phase,
         year: int,
         fish: int,
+        name: str | None,
         data_file: str,
         cursor,
+        clear_status: bool = False,
     ) -> Board:
         logger.info(f"Loading board with ID {board_id}")
         # TODO - we should eventually store things like coords, adjacencies, etc
@@ -128,6 +132,7 @@ class _DatabaseConnection:
         board.phase = board_phase
         board.year = year
         board.fish = fish
+        board.name = name
         board.board_id = board_id
 
         player_data = cursor.execute(
@@ -173,7 +178,6 @@ class _DatabaseConnection:
                 return player_by_name[player_name]
 
             for player_name, location, is_build, is_army in builds_data:
-
                 player = get_player_by_name(player_name)
 
                 if player is None:
@@ -224,8 +228,13 @@ class _DatabaseConnection:
             province_name: (owner, core, half_core)
             for province_name, owner, core, half_core in province_data
         }
+        
+        if clear_status:
+            cursor.execute("UPDATE units SET failed_order=False WHERE board_id=? and phase=?",
+                (board_id, board.get_phase_and_year_string()))
+        
         unit_data = cursor.execute(
-            "SELECT location, is_dislodged, owner, is_army, order_type, order_destination, order_source FROM units WHERE board_id=? and phase=?",
+            "SELECT location, is_dislodged, owner, is_army, order_type, order_destination, order_source, failed_order FROM units WHERE board_id=? and phase=?",
             (board_id, board.get_phase_and_year_string()),
         ).fetchall()
         for province in board.provinces:
@@ -270,6 +279,7 @@ class _DatabaseConnection:
                 order_type,
                 order_destination,
                 order_source,
+                hasFailed,
             ) = unit_info
             province, coast = board.get_province_and_coast(location)
             owner_player = board.get_player(owner)
@@ -308,6 +318,7 @@ class _DatabaseConnection:
                     order_type,
                     order_destination,
                     order_source,
+                    hasFailed,
                 ) = unit_info
                 if order_type is not None:
                     order_classes = [
@@ -348,6 +359,8 @@ class _DatabaseConnection:
                         )
                     else:
                         raise ValueError(f"Could not parse {order_class}")
+                    
+                    order.hasFailed = hasFailed
 
                     province, coast = board.get_province_and_coast(location)
                     if is_dislodged:
@@ -363,8 +376,8 @@ class _DatabaseConnection:
         # TODO: Check if board already exists
         cursor = self._connection.cursor()
         cursor.execute(
-            "INSERT INTO boards (board_id, phase, data_file, fish) VALUES (?, ?, ?, ?)",
-            (board_id, board.get_phase_and_year_string(), board.datafile, board.fish),
+            "INSERT INTO boards (board_id, phase, data_file, fish, name) VALUES (?, ?, ?, ?, ?)",
+            (board_id, board.get_phase_and_year_string(), board.datafile, board.fish, board.name),
         )
         cursor.executemany(
             "INSERT INTO players (board_id, player_name, color, liege, points) VALUES (?, ?, ?, ?, ?) ON CONFLICT "
@@ -438,7 +451,7 @@ class _DatabaseConnection:
         )
         # TODO - this is hacky
         cursor.executemany(
-            "INSERT INTO units (board_id, phase, location, is_dislodged, owner, is_army, order_type, order_destination, order_source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO units (board_id, phase, location, is_dislodged, owner, is_army, order_type, order_destination, order_source, failed_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     board_id,
@@ -464,6 +477,7 @@ class _DatabaseConnection:
                         if unit.order is not None
                         else None
                     ),
+                    unit.order.hasFailed if unit.order is not None else False
                 )
                 for unit in board.units
             ],
@@ -488,7 +502,7 @@ class _DatabaseConnection:
     def save_order_for_units(self, board: Board, units: Iterable[Unit]):
         cursor = self._connection.cursor()
         cursor.executemany(
-            "UPDATE units SET order_type=?, order_destination=?, order_source=? "
+            "UPDATE units SET order_type=?, order_destination=?, order_source=?, failed_order=? "
             "WHERE board_id=? and phase=? and location=? and is_dislodged=?",
             [
                 (
@@ -503,6 +517,7 @@ class _DatabaseConnection:
                         if unit.order is not None
                         else None
                     ),
+                    unit.order.hasFailed if unit.order is not None else False,
                     board.board_id,
                     board.get_phase_and_year_string(),
                     unit.location().name,
@@ -603,7 +618,7 @@ class _DatabaseConnection:
         cursor = self._connection.cursor()
 
         cursor.execute(
-            "INSERT INTO spec_requests (server_id, user_id, role_id) VALUES (?, ?, ?)",
+            "INSERT OR REPLACE INTO spec_requests (server_id, user_id, role_id) VALUES (?, ?, ?)",
             (request.server_id, request.user_id, request.role_id),
         )
 

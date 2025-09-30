@@ -18,9 +18,11 @@ class Order:
 # moves, holds, etc.
 class UnitOrder(Order):
     """Unit orders are orders that units execute themselves."""
-
+    display_priority: int = 0
+    
     def __init__(self):
         super().__init__()
+        self.hasFailed = False
 
 
 class ComplexOrder(UnitOrder):
@@ -32,6 +34,8 @@ class ComplexOrder(UnitOrder):
 
 
 class Hold(UnitOrder):
+    display_priority: int = 20
+
     def __init__(self):
         super().__init__()
 
@@ -40,6 +44,8 @@ class Hold(UnitOrder):
 
 
 class Core(UnitOrder):
+    display_priority: int = 20
+    
     def __init__(self):
         super().__init__()
 
@@ -48,6 +54,8 @@ class Core(UnitOrder):
 
 
 class Move(UnitOrder):
+    display_priority: int = 30
+    
     def __init__(self, destination: Location):
         super().__init__()
         self.destination: Location = destination
@@ -56,6 +64,8 @@ class Move(UnitOrder):
         return f"- {self.destination}"
 
 class ConvoyMove(UnitOrder):
+    display_priority: int = 30
+    
     def __init__(self, destination: Location):
         super().__init__()
         self.destination: Location = destination
@@ -74,6 +84,8 @@ class ConvoyTransport(ComplexOrder):
 
 
 class Support(ComplexOrder):
+    display_priority: int = 10
+    
     def __init__(self, source: Location, destination: Location):
         super().__init__(source)
         self.destination: Location = destination
@@ -141,6 +153,13 @@ class Disband(PlayerOrder):
     def __str__(self):
         return f"Disband {self.location}"
 
+class Waive(Order):
+    def __init__(self, quantity: int):
+        super().__init__()
+        self.quantity: int = quantity
+
+    def __str__(self):
+        return f"Waive {self.quantity}"
 
 class RelationshipOrder(Order):
     """Vassal, Dual Monarchy, etc"""

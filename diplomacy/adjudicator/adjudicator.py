@@ -34,6 +34,7 @@ from diplomacy.persistence.order import (
 from diplomacy.persistence.player import Player, PlayerClass
 from diplomacy.persistence.province import Location, Coast, Province, ProvinceType, get_adjacent_provinces
 from diplomacy.persistence.unit import UnitType, Unit
+from diplomacy.persistence.db import database
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +144,7 @@ def order_is_valid(location: Location, order: Order, strict_convoys_supports=Fal
             if strict_coast_movement:
                 if isinstance(source, Coast) and isinstance(destination, Coast):
                     # coast to coast
-                    check = destination in source.get_adjacent_coasts()
+                    check = destination in source.adjacent_coasts
                 elif isinstance(source, Coast) and isinstance(destination, Province):
                     # coast to sea / island
                     if destination.type == ProvinceType.LAND:
@@ -266,9 +267,9 @@ class BuildsAdjudicator(Adjudicator):
             scs = 0
             for vassal in player.vassals:
                 scs += len(vassal.centers)
+            player.new_vassals = player.vassals.copy()
             if scs > len(player.centers):
                 for order in player.vassal_orders.values():
-                    player.new_vassals = player.vassals
                     if isinstance(order, Disown) and order.player in player.vassals:
                         player.new_vassals.remove(order.player)
                     scs2 = 0
@@ -277,7 +278,6 @@ class BuildsAdjudicator(Adjudicator):
                     if scs2 > len(player.centers):
                         player.new_vassals = []
             else:
-                player.new_vassals = player.vassals
                 for order in player.vassal_orders.values():
                     if isinstance(order, Vassal):
                         vassal = order.player
@@ -306,7 +306,7 @@ class BuildsAdjudicator(Adjudicator):
                         new_liege = None
             player.new_liege = new_liege
             
-        for play in self._board.players:
+        for player in self._board.players:
             player.liege = player.new_liege
             player.vassals = player.new_vassals
         
@@ -384,6 +384,7 @@ class BuildsAdjudicator(Adjudicator):
 
         for player in self._board.players:
             player.build_orders = set()
+            player.waived_orders = 0
         return self._board
 
 
@@ -438,6 +439,7 @@ class RetreatsAdjudicator(Adjudicator):
 
         for unit in self._board.units:
             unit.order = None
+            unit.retreat_options = None
 
         if self._board.phase.name.startswith("Fall") and "vassal system" in self._board.data.get("adju flags", []):
             for player in self._board.players:
@@ -474,6 +476,9 @@ class MovesAdjudicator(Adjudicator):
             # Replace invalid orders with holds
             # Importantly, this includes supports for which the corresponding unit didn't make the same move
             # Same for convoys
+            
+            if unit.order is None:
+                unit.order = Hold()
 
             failed: bool = False
             # indicates that an illegal move / core can't be support held
@@ -489,8 +494,7 @@ class MovesAdjudicator(Adjudicator):
                     valid, reason = order_is_valid(
                         unit.location(), ConvoyMove(unit.order.destination), strict_convoys_supports=False
                     )
-                    if not valid:  # move is invalid in the first place, becomes hold
-                        unit.order = Hold()
+                    if not valid:  # move is invalid in the first place, so it is a failed move
                         not_supportable = True
                         failed = True
                     else:
@@ -499,21 +503,21 @@ class MovesAdjudicator(Adjudicator):
                         )
 
                         if not strict_valid:  # move is valid but no convoy, so it is a failed move
-                            unit.order = Hold()
                             not_supportable = True
+                            failed = True
                         else:
                             unit.order = ConvoyMove(unit.order.destination)
                 elif isinstance(unit.order, Core):
-                    unit.order = Hold()
                     not_supportable = True
                     failed = True
                 else:
-                    unit.order = Hold()
                     failed = True
 
+            order = AdjudicableOrder(unit)
             if failed:
                 self.failed_or_invalid_units.add(MapperInformation(unit))
-            order = AdjudicableOrder(unit)
+                order.is_valid = False
+                unit.order.hasFailed = True
             if not_supportable:
                 order.not_supportable = True
 
@@ -561,6 +565,8 @@ class MovesAdjudicator(Adjudicator):
             order.state = ResolutionState.UNRESOLVED
         for order in self.orders:
             self._resolve_order(order)
+            order.base_unit.order.hasFailed = (order.resolution == Resolution.FAILS)
+        database.get_connection().save_order_for_units(self._board, set(o.base_unit for o in self.orders))
         self._update_board()
         return self._board
 
@@ -581,8 +587,6 @@ class MovesAdjudicator(Adjudicator):
                     order.base_unit.retreat_options = None
                 # Dislodge whatever is there
                 order.destination_province.dislodged_unit = order.destination_province.unit
-                # TODO - remove provinces where a bounce occurred from retreat options
-                # TODO - remove sea provinces on the wrong coast too
                 # see DATC 4.A.5
                 if order.destination_province.dislodged_unit is not None:
                     order.destination_province.dislodged_unit.retreat_options = order.destination_province.adjacent.copy()
@@ -692,6 +696,8 @@ class MovesAdjudicator(Adjudicator):
                 # coring should fail even if the attack comes from the same nation
                 if move_here.country == order.country and order.type == OrderType.SUPPORT:
                     continue
+                if not move_here.is_valid:
+                    continue
                 if not move_here.is_convoy:
                     if move_here.current_province != order.destination_province:
                         return Resolution.FAILS
@@ -779,6 +785,8 @@ class MovesAdjudicator(Adjudicator):
                     }
 
         for opponent in orders_to_overcome:
+            if not opponent.is_valid:
+                continue
             # don't need to overcome failed convoys
             if opponent.is_convoy and self._adjudicate_convoys_for_order(opponent) == Resolution.FAILS:
                 continue
@@ -799,6 +807,11 @@ class MovesAdjudicator(Adjudicator):
         if order.state == ResolutionState.GUESSING:
             if order not in self._dependencies:
                 self._dependencies.append(order)
+            return order.resolution
+            
+        if not order.is_valid:
+            order.resolution = Resolution.FAILS
+            order.state = ResolutionState.RESOLVED
             return order.resolution
 
         old_dependency_count = len(self._dependencies)

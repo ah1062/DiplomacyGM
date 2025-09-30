@@ -30,6 +30,7 @@ class Board:
         self.orders_enabled: bool = True
         self.data: dict = data
         self.datafile = datafile
+        self.name = None
         self.fow = fow
 
         # store as lower case for user input purposes
@@ -44,9 +45,17 @@ class Board:
                 self.name_to_coast[coast.name.lower()] = coast
 
     def get_player(self, name: str) -> Player:
+        if name.lower() == "none":
+            return None
+        if name.lower() not in self.name_to_player:
+            raise ValueError(f"Player {name} not found")
         return self.name_to_player.get(name.lower())
 
     def get_cleaned_player(self, name: str) -> Player:
+        if name.lower() == "none":
+            return None
+        if name.lower() not in self.cleaned_name_to_player:
+            raise ValueError(f"Player {name} not found")
         return self.cleaned_name_to_player.get(sanitize_name(name.lower()))
 
 
@@ -69,6 +78,8 @@ class Board:
         # People input apostrophes that don't match what the province names are
         name = re.sub(r"[‘’`´′‛]", "'", name)
         name = name.lower()
+        if "abbreviations" in self.data and name in self.data["abbreviations"]:
+            name = self.data["abbreviations"][name].lower()
         coast = self.name_to_coast.get(name)
         if coast:
             return coast.province, coast
@@ -221,6 +232,15 @@ class Board:
             unit.province.dislodged_unit = None
             unit.player.units.remove(unit)
             self.units.remove(unit)
+
+    def clear_failed_orders(self) -> None:
+        for unit in self.units:
+            unit.province.unit = None
+
+        for player in self.players:
+            player.units = set()
+
+        self.units = set()
 
     def get_year_str(self) -> str:
         # No 0 AD / BC

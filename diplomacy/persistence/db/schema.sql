@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS boards (
     phase text,
     data_file text,
     fish int,
+	name text,
     PRIMARY KEY (board_id, phase));
 CREATE TABLE IF NOT EXISTS players (
     board_id int,
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS units (
     order_type text,
     order_destination text,
     order_source text,
+    failed_order boolean,
     PRIMARY KEY (board_id, phase, location, is_dislodged),
     FOREIGN KEY (board_id, phase) REFERENCES boards (board_id, phase),
     FOREIGN KEY (board_id, phase, location) REFERENCES provinces (board_id, phase, province_name),
