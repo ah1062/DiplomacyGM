@@ -13,7 +13,13 @@ from bot.config import (
     IMPDIP_SERVER_ID,
     IMPDIP_SERVER_BOT_STATUS_CHANNEL_ID,
 )
+<<<<<<< Updated upstream
 from bot.perms import admin_only, CommandPermissionError, gm_only, mod_only
+=======
+from bot.core.eventbus import EventBus
+from bot.listeners import loader
+from bot.perms import CommandPermissionError
+>>>>>>> Stashed changes
 from bot.utils import send_message_and_file
 
 load_dotenv()
@@ -52,6 +58,7 @@ MESSAGES = [
 ]
 
 
+<<<<<<< Updated upstream
 @bot.event
 async def on_ready():
     try:
@@ -68,6 +75,74 @@ async def on_ready():
         )  # Get the specific channel
         if channel:
             message = random.choice(MESSAGES)  # Select a random message
+=======
+class DiploGM(commands.Bot):
+    def __init__(self, command_prefix, intents):
+        super().__init__(command_prefix=command_prefix, intents=intents)
+        # self.manager = Manager()
+
+    async def setup_hook(self) -> None:
+        self.bus = EventBus()
+        listeners = loader.load_listeners("bot.listeners", self)
+
+        for ln in listeners:
+            logger.info(f"Attached listener: {ln}")
+            ln.setup(self.bus)
+
+        # bind command invocation handling methods
+        self.before_invoke(self.before_any_command)
+        self.after_invoke(self.after_any_command)
+
+        # modularly load command modules
+        await self.load_all_cogs()
+
+        # sync app_commands (slash) commands with all servers
+        try:
+            synced = await self.tree.sync()
+            logger.info(f"Successfully synched {len(synced)} slash commands.")
+            logger.info(
+                f"Loaded app commands: {[cmd.name for cmd in self.tree.get_commands()]}"
+            )
+        except discord.app_commands.CommandAlreadyRegistered as e:
+            logger.warning(f"Command already registered: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to sync commands: {e}", exc_info=True)
+
+    async def load_all_cogs(self):
+        COG_DIR = "./bot/cogs/"
+
+        for filename in os.listdir(COG_DIR):
+            # ignore non py files
+            # ignore private files e.g. '_private.py'
+            if not filename.endswith(".py") or filename.startswith("_"):
+                continue
+
+            extension = f"bot.cogs.{filename[:-3]}"
+            try:
+                await self.load_extension(extension)
+                logger.info(f"Successfully loaded Cog: {extension}")
+            except Exception as e:
+                logger.info(f"Failed to load Cog {extension}: {e}")
+
+    async def on_ready(self):
+        logger.info(f"Logged in as {self.user}")
+
+        # Ensure bot is connected to the correct server
+        guild = self.get_guild(IMPDIP_SERVER_ID)
+        if not guild:
+            logger.warning(
+                f"Cannot find Imperial Diplomacy Server [id={IMPDIP_SERVER_ID}]"
+            )
+
+        # Get the specific channel
+        channel = self.get_channel(IMPDIP_SERVER_BOT_STATUS_CHANNEL_ID)
+        if not channel:
+            logger.warning(
+                f"Cannot find Bot Status Channel [id={IMPDIP_SERVER_BOT_STATUS_CHANNEL_ID}]"
+            )
+        else:
+            message = random.choice(WELCOME_MESSAGES)
+>>>>>>> Stashed changes
             await channel.send(message)
         else:
             print(f"Channel with ID {IMPDIP_SERVER_BOT_STATUS_CHANNEL_ID} not found.")
