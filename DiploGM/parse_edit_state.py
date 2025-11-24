@@ -252,7 +252,7 @@ def _create_unit(keywords: list[str], board: Board) -> None:
         (
             board.board_id,
             board.turn.get_indexed_name(),
-            unit.location().name,
+            unit.province.get_name(coast),
             False,
             player.name,
             unit_type == UnitType.ARMY,
@@ -282,7 +282,7 @@ def _create_dislodged_unit(keywords: list[str], board: Board) -> None:
             (
                 board.board_id,
                 board.turn.get_indexed_name(),
-                unit.location().name,
+                unit.province.get_name(coast),
                 True,
                 player.name,
                 unit_type == UnitType.ARMY,
@@ -296,7 +296,7 @@ def _create_dislodged_unit(keywords: list[str], board: Board) -> None:
                 (
                     board.board_id,
                     board.turn.get_indexed_name(),
-                    unit.location().name,
+                    unit.province.get_name(coast),
                     option.name,
                 )
                 for option in retreat_options
@@ -314,7 +314,7 @@ def _delete_unit(keywords: list[str], board: Board) -> None:
         (
             board.board_id,
             board.turn.get_indexed_name(),
-            unit.location().name,
+            unit.province.get_name(unit.coast),
             False,
         ),
     )
@@ -325,30 +325,29 @@ def _delete_dislodged_unit(keywords: list[str], board: Board) -> None:
     unit = board.delete_dislodged_unit(province)
     get_connection().execute_arbitrary_sql(
         "DELETE FROM units WHERE board_id=? and phase=? and location=? and is_dislodged=?",
-        (board.board_id, board.turn.get_indexed_name(), unit.location().name, True),
+        (board.board_id, board.turn.get_indexed_name(), unit.province.get_name(unit.coast), True),
     )
     get_connection().execute_arbitrary_sql(
         "DELETE FROM retreat_options WHERE board_id=? and phase=? and origin=?",
-        (board.board_id, board.turn.get_indexed_name(), unit.location().name),
+        (board.board_id, board.turn.get_indexed_name(), unit.province.get_name(unit.coast).name),
     )
 
 
 def _move_unit(keywords: list[str], board: Board) -> None:
     old_province = board.get_province(keywords[0])
     unit = old_province.unit
-    old_location = unit.location()
-    new_location = board.get_location(keywords[1])
-    board.move_unit(unit, new_location)
+    new_province, new_coast = board.get_province_and_coast(keywords[1])
+    board.move_unit(unit, new_province, new_coast)
     get_connection().execute_arbitrary_sql(
         "DELETE FROM units WHERE board_id=? and phase=? and location=? and is_dislodged=?",
-        (board.board_id, board.turn.get_indexed_name(), old_location.name, False),
+        (board.board_id, board.turn.get_indexed_name(), old_province.get_name(unit.coast), False),
     )
     get_connection().execute_arbitrary_sql(
         "INSERT INTO units (board_id, phase, location, is_dislodged, owner, is_army) VALUES (?, ?, ?, ?, ?, ?)",
         (
             board.board_id,
             board.turn.get_indexed_name(),
-            unit.location().name,
+            new_province.get_name(new_coast),
             False,
             unit.player.name,
             unit.unit_type == UnitType.ARMY,
@@ -365,7 +364,7 @@ def _dislodge_unit(keywords: list[str], board: Board) -> None:
         if unit == None:
             raise RuntimeError("No unit to dislodge in province")
         retreat_options = set(
-            [board.get_province(province_name) for province_name in keywords[1:]]
+            [board.get_province_and_coast(province_name) for province_name in keywords[1:]]
         )
         if not all(retreat_options):
             raise ValueError(

@@ -11,24 +11,10 @@ from DiploGM.models import order
 from DiploGM.models.board import Board
 from DiploGM.db.database import get_connection
 from DiploGM.models.player import Player
-from DiploGM.models.province import Province, Location, Coast
+from DiploGM.models.province import Province
 from DiploGM.models.unit import Unit, UnitType
 
 logger = logging.getLogger(__name__)
-
-def normalize_location(unit_type: UnitType, location: Location):
-    if unit_type == UnitType.FLEET:
-        if isinstance(location, Province):
-            if len(location.coasts) > 1:
-                raise ValueError(f"You cannot order a fleet to {location} without specifying the coast to go to")
-            if len(location.coasts) == 1:
-                return location.coast()
-        return location
-    else:
-        if isinstance(location, Coast):
-            return location.province
-        return location
-
 
 class TreeToOrder(Transformer):
     def set_state(self, board: Board, player_restriction: Player | None):
@@ -36,13 +22,13 @@ class TreeToOrder(Transformer):
         self.flags = board.data.get("adju flags", [])
         self.player_restriction = player_restriction
         
-    def province(self, s) -> Location:
+    def province(self, s) -> tuple[Province, str | None]:
         name = " ".join(s[::2]).replace("_", " ").strip()
         name = _manage_coast_signature(name)
-        return self.board.get_location(name)
+        return self.board.get_province_and_coast(name)
 
     # used for supports, specifically FoW
-    def l_unit(self, s) -> Location:
+    def l_unit(self, s) -> Province:
         # ignore the fleet/army signifier, if exists
         loc = s[-1]
         if loc is not None and not self.board.fow:
@@ -83,39 +69,31 @@ class TreeToOrder(Transformer):
         return s[0], order.Core()
     
     def build_unit(self, s):
-        if isinstance(s[2], Location):
-            location = s[2]
+        if isinstance(s[2], tuple):
+            province, coast = s[2]
             unit_type = s[3]
-        elif isinstance(s[3], Location):
-            location = s[3]
+        elif isinstance(s[3], tuple):
+            province, coast = s[3]
             unit_type = s[2]
-        
-        if isinstance(location, Coast):
-            province = location.province
-        else:
-            province = location
 
         unit_type = get_unit_type(unit_type)
 
-        location = normalize_location(unit_type, location)
-
-        province = location.as_province()
         if not province.has_supply_center:
-                raise ValueError(f"{location} does not have a supply center.")  
+                raise ValueError(f"{province} does not have a supply center.")  
         elif self.player_restriction:
             if province.owner != self.player_restriction:
-                raise ValueError(f"You do not own {location}.")
+                raise ValueError(f"You do not own {province}.")
             if province.core != self.player_restriction and not "build anywhere" in self.board.data.get("adju flags", []):
-                raise ValueError(f"You haven't cored {location}.")
+                raise ValueError(f"You haven't cored {province}.")
 
-        return location, province.owner, order.Build(location, unit_type)
+        return province, province.owner, order.Build(province, unit_type, coast)
     
     def disband_unit(self, s):
         if isinstance(s[0], Unit):
             u = s[0]
         else:
             u = s[2]
-        return u.location(), u.player, order.Disband(u.location())
+        return u.location(), u.player, order.Disband(u.province)
     
     def waive_order(self, s):
         if self.player_restriction is None:
@@ -123,7 +101,7 @@ class TreeToOrder(Transformer):
         return None, self.player_restriction, order.Waive(int(s[2]))
         
     def vassal_order(self, s):
-        if isinstance(s[0], Location):
+        if isinstance(s[0], Province):
             l = s[0]
         else:
             l = s[2]
@@ -138,7 +116,7 @@ class TreeToOrder(Transformer):
         return referenced_player, self.player_restriction, order.Vassal(referenced_player)
 
     def liege_order(self, s):
-        if isinstance(s[0], Location):
+        if isinstance(s[0], Province):
             l = s[0]
         else:
             l = s[2]
@@ -153,7 +131,7 @@ class TreeToOrder(Transformer):
         return referenced_player, self.player_restriction, order.Liege(referenced_player)
 
     def monarchy_order(self, s):
-        if isinstance(s[0], Location):
+        if isinstance(s[0], Province):
             l = s[0]
         else:
             l = s[2]
@@ -168,7 +146,7 @@ class TreeToOrder(Transformer):
         return referenced_player, self.player_restriction, order.DualMonarchy(referenced_player)
 
     def disown_order(self, s):
-        if isinstance(s[0], Location):
+        if isinstance(s[0], Province):
             l = s[0]
         else:
             l = s[2]
@@ -209,25 +187,16 @@ class TreeToOrder(Transformer):
         return s[0], order.Hold()
     
     def l_move_order(self, s):
-        # normalize position for non fow
-        if not self.board.fow:
-            unit_type = s[0].get_unit().unit_type
-            loc = normalize_location(unit_type, s[-1])
-        else:
-            loc = s[-1]
-
-        return s[0], order.Move(loc)
+        return s[0], order.Move(s[-1])
 
     def move_order(self, s):
-        loc = normalize_location(s[0].unit_type, s[-1])
-
-        return s[0], order.Move(loc)
+        return s[0], order.Move(s[-1])
 
     def convoy_order(self, s):
         return s[0], order.ConvoyTransport(s[-1][0], s[-1][1].destination)
 
     def support_order(self, s):
-        if isinstance(s[-1], Location):
+        if isinstance(s[-1], tuple):
             loc = s[-1]
             unit_order = order.Hold()
         else:
@@ -242,9 +211,7 @@ class TreeToOrder(Transformer):
             raise ValueError("Unknown type of support. Something has broken in the bot. Please report this")
 
     def retreat_order(self, s):
-        loc = normalize_location(s[0].unit_type, s[-1])
-
-        return s[0], order.RetreatMove(loc)
+        return s[0], order.RetreatMove(s[-1])
 
     def disband_order(self, s):
         return s[0], order.RetreatDisband()
@@ -437,14 +404,9 @@ def _parse_remove_order(command: str, player_restriction: Player, board: Board) 
                 f"{player_restriction.name} does not control the unit in {command} which belongs to {player.name}"
             )
 
-        remove_player_order_for_location(board, player, province)
+        remove_player_order_for_province(board, player, province)
 
-        if coast is None:
-            if province.coasts:
-                return str(province.coast())
-            return province.name
-        else:
-            return province.name + " " + coast.name
+        return province.get_name(coast)
     else:
         # remove unit's order
         # assert that the command user is authorized to order this unit
@@ -463,19 +425,18 @@ def _parse_remove_order(command: str, player_restriction: Player, board: Board) 
         raise Exception(f"You control neither a unit nor a dislodged unit in {province.name}")
 
 
-def remove_player_order_for_location(board: Board, player: Player, location: Location) -> bool:
-    if location is None:
+def remove_player_order_for_province(board: Board, player: Player, province: Province) -> bool:
+    if province is None:
         return False
-    base_province = location.as_province()
     for player_order in player.build_orders:
         if not isinstance(player_order, order.PlayerOrder):
             continue
-        if player_order.location.as_province() == base_province:
+        if player_order.province == province:
             player.build_orders.remove(player_order)
             database = get_connection()
             database.execute_arbitrary_sql(
                 "DELETE FROM builds WHERE board_id=? and phase=? and location=?",
-                (board.board_id, board.turn.get_indexed_name(), player_order.location.name),
+                (board.board_id, board.turn.get_indexed_name(), player_order.province.name),
             )
             return True
     return False

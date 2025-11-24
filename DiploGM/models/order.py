@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from DiploGM.models.province import Location, Coast
+from DiploGM.models.province import Province
 
 if TYPE_CHECKING:
     from DiploGM.models.unit import UnitType
@@ -28,9 +28,9 @@ class UnitOrder(Order):
 class ComplexOrder(UnitOrder):
     """Complex orders are orders that operate on other orders (supports and convoys)."""
 
-    def __init__(self, source: Location):
+    def __init__(self, source: Province):
         super().__init__()
-        self.source: Location = source
+        self.source: Province = source
 
 class NMR(UnitOrder):
     display_priority: int = 20
@@ -64,28 +64,32 @@ class Core(UnitOrder):
 class Move(UnitOrder):
     display_priority: int = 30
     
-    def __init__(self, destination: Location):
+    def __init__(self, destination: Province, destination_coast: str | None = None):
         super().__init__()
-        self.destination: Location = destination
+        self.destination: Province = destination
+        self.destination_coast: str | None = destination_coast
 
     def __str__(self):
-        return f"- {self.destination}"
+        return f"- {self.destination}" + (f" {self.destination_coast}" if self.destination_coast else "")
+    
+    def get_destination_and_coast(self) -> tuple[Province, str | None]:
+        return (self.destination, self.destination_coast)
 
 class ConvoyMove(UnitOrder):
     display_priority: int = 30
     
-    def __init__(self, destination: Location):
+    def __init__(self, destination: Province):
         super().__init__()
-        self.destination: Location = destination
+        self.destination: Province = destination
 
     def __str__(self):
         return f"Convoys - {self.destination}"
 
 
 class ConvoyTransport(ComplexOrder):
-    def __init__(self, source: Location, destination: Location):
+    def __init__(self, source: Province, destination: Province):
         super().__init__(source)
-        self.destination: Location = destination
+        self.destination: Province = destination
 
     def __str__(self):
         return f"Convoys {self.source} - {self.destination}"
@@ -94,29 +98,32 @@ class ConvoyTransport(ComplexOrder):
 class Support(ComplexOrder):
     display_priority: int = 10
     
-    def __init__(self, source: Location, destination: Location):
+    def __init__(self, source: Province, destination: Province, destination_coast: str | None = None):
         super().__init__(source)
-        self.destination: Location = destination
+        self.destination: Province = destination
+        self.destination_coast: str | None = destination_coast
 
     def __str__(self):
         suffix = "Hold"
 
-        destination_province = self.destination
-        if isinstance(self.destination, Coast):
-            destination_province = self.destination.province
-
-        if self.source != destination_province:
+        if self.source != self.destination:
             suffix = f"- {self.destination}"
+            if self.destination_coast:
+                suffix += f" {self.destination_coast}"
         return f"Supports {self.source} {suffix}"
 
 
 class RetreatMove(UnitOrder):
-    def __init__(self, destination: Location):
+    def __init__(self, destination: Province, destination_coast: str | None = None):
         super().__init__()
-        self.destination: Location = destination
+        self.destination: Province = destination
+        self.destination_coast: str | None = destination_coast
 
     def __str__(self):
-        return f"- {self.destination}"
+        return f"- {self.destination}" + (f" {self.destination_coast}" if self.destination_coast else "")
+        
+    def get_destination_and_coast(self) -> tuple[Province, str | None]:
+        return (self.destination, self.destination_coast)
 
 
 class RetreatDisband(UnitOrder):
@@ -130,36 +137,37 @@ class RetreatDisband(UnitOrder):
 class PlayerOrder(Order):
     """Player orders are orders that belong to a player rather than a unit e.g. builds."""
 
-    def __init__(self, location: Location):
+    def __init__(self, province: Province):
         super().__init__()
-        self.location: Location = location
+        self.province: Province = province
 
     def __hash__(self):
-        return hash(self.location.name)
+        return hash(self.province.name)
 
     def __eq__(self, other):
-        return isinstance(other, type(self)) and self.location.name == other.location.name
+        return isinstance(other, type(self)) and self.province.name == other.province.name
 
 
 class Build(PlayerOrder):
     """Builds are player orders because the unit does not yet exist."""
 
-    def __init__(self, location: Location, unit_type: UnitType):
-        super().__init__(location)
+    def __init__(self, province: Province, unit_type: UnitType, coast: str | None = None):
+        super().__init__(province)
         self.unit_type: UnitType = unit_type
+        self.coast = coast
 
     def __str__(self):
-        return f"Build {self.unit_type.value} {self.location}"
+        return f"Build {self.unit_type.value} {self.province}" + (f" {self.coast}" if self.coast else "")
 
 
 class Disband(PlayerOrder):
     """Disbands are player order because builds are."""
 
-    def __init__(self, location: Location):
-        super().__init__(location)
+    def __init__(self, province: Province):
+        super().__init__(province)
 
     def __str__(self):
-        return f"Disband {self.location}"
+        return f"Disband {self.province}"
 
 class Waive(Order):
     def __init__(self, quantity: int):

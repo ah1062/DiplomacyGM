@@ -13,43 +13,6 @@ if TYPE_CHECKING:
     from DiploGM.models import player
     from DiploGM.models import unit
 
-
-class Location:
-    def __init__(
-        self,
-        name: str,
-        primary_unit_coordinate: tuple[float, float],
-        retreat_unit_coordinate: tuple[float, float],
-    ):
-        self.all_locs = set()
-        self.all_rets = set()
-        self.name: str = name
-        self.primary_unit_coordinate: tuple[float, float] = primary_unit_coordinate
-        self.retreat_unit_coordinate: tuple[float, float] = retreat_unit_coordinate
-        if primary_unit_coordinate:
-            self.all_locs: set[tuple[float, float]] = {primary_unit_coordinate}
-        if retreat_unit_coordinate:
-            self.all_rets: set[float[float, float]] = {retreat_unit_coordinate}
-
-    @abstractmethod
-    def get_owner(self) -> player.Player | None:
-        pass
-
-    @abstractmethod
-    def get_unit(self) -> unit.Unit | None:
-        pass
-
-    @abstractmethod
-    def as_province(self) -> Province:
-        pass
-
-    def __str__(self):
-        return self.name
-    
-    def __repr__(self):
-        return f"Location {self.name}"
-
-
 class ProvinceType(Enum):
     LAND = 1
     ISLAND = 2
@@ -57,28 +20,30 @@ class ProvinceType(Enum):
     IMPASSIBLE = 4
 
 
-class Province(Location):
+class Province():
     def __init__(
         self,
         name: str,
         coordinates: Polygon | MultiPolygon,
-        primary_unit_coordinate: tuple[float, float],
-        retreat_unit_coordinate: tuple[float, float],
+        primary_unit_coordinates: dict,
+        retreat_unit_coordinates: dict,
         province_type: ProvinceType,
         has_supply_center: bool,
         adjacent: set[Province],
-        coasts: set[Coast],
+        fleet_adjacent: set[Province | dict[str, Province]],
         core: player.Player | None,
         owner: player.Player | None,
         local_unit: unit.Unit | None,  # TODO: probably doesn't make sense to init with a unit
     ):
-        super().__init__(name, primary_unit_coordinate, retreat_unit_coordinate)
+        self.name: str = name
         self.geometry: Polygon = coordinates
+        self.primary_unit_coordinates: dict = primary_unit_coordinates
+        self.retreat_unit_coordinates: dict = retreat_unit_coordinates
         self.type: ProvinceType = province_type
         self.has_supply_center: bool = has_supply_center
         self.adjacent: set[Province] = adjacent
+        self.fleet_adjacent: set[Province] | dict[str, Province] = fleet_adjacent
         self.impassible_adjacent: set[Province] = set()
-        self.coasts: set[Coast] = coasts
         self.corer: player.Player | None = None
         self.core: player.Player | None = core
         self.half_core: player.Player | None = None
@@ -92,6 +57,33 @@ class Province(Location):
 
     def __repr__(self):
         return f"Province {self.name}"
+    
+    def get_name(self, coast: str = None):
+        if coast in self.fleet_adjacent:
+            return f"{self.name} {coast}"
+        return self.name
+    
+    def get_primary_unit_coordinates(self, unit_type, coast = None):
+        try:
+            unit_coords = self.primary_unit_coordinates[unit_type]
+            if coast:
+                return unit_coords[coast]
+            elif isinstance(unit_coords, tuple):
+                return unit_coords
+        except:
+            return None
+        return None
+
+    def get_retreat_unit_coordinates(self, unit_type, coast = None):
+        try:
+            unit_coords = self.retreat_unit_coordinates[unit_type]
+            if coast:
+                return unit_coords[coast]
+            elif isinstance(unit_coords, tuple):
+                return unit_coords
+        except:
+            return None
+        return None
 
     def get_owner(self) -> player.Player | None:
         return self.owner
@@ -99,13 +91,19 @@ class Province(Location):
     def get_unit(self) -> unit.Unit | None:
         return self.unit
     
-    def as_province(self) -> Province:
-        return self
-
-    def coast(self) -> Coast:
-        if len(self.coasts) != 1:
-            raise RuntimeError(f"Cannot get coast of a province with num coasts {len(self.coasts)} != 1")
-        return next(coast for coast in self.coasts)
+    def get_multiple_coasts(self) -> bool:
+        return self.fleet_adjacent and isinstance(self.fleet_adjacent, dict)
+    
+    def get_coastal_adjacent(self, coast: str | None = None) -> set[Province]:
+        if coast:
+            if not self.get_multiple_coasts():
+                raise ValueError(f"Province {self.name} does not have multiple coasts.")
+            if coast not in self.fleet_adjacent:
+                raise ValueError(f"Province {self.name} does not have a coast {coast}.")
+            return self.fleet_adjacent[coast]
+        if self.get_multiple_coasts():
+            raise ValueError(f"Province {self.name} has multiple coasts.")
+        return self.fleet_adjacent
 
     def set_adjacent(self, other: Province):
         if other.type == ProvinceType.IMPASSIBLE:
@@ -117,88 +115,47 @@ class Province(Location):
         """This should only be called once all province adjacencies have been set."""
 
         # Externally set, i. e. by json_cheats()
-        if self.coasts:
+        if self.fleet_adjacent:
             return
 
-        if self.type == ProvinceType.SEA:
-            # seas don't have coasts
-            return set()
-
-        sea_provinces: set[Province] = set()
+        if self.type == ProvinceType.SEA or self.type == ProvinceType.ISLAND:
+            self.fleet_adjacent = self.adjacent
+            return
+        
+        self.fleet_adjacent = set()
         for province in self.adjacent:
-            # Islands do not break coasts
             if province.type == ProvinceType.SEA or province.type == ProvinceType.ISLAND:
-                sea_provinces.add(province)
+                self.fleet_adjacent.add(province)
 
-        if len(sea_provinces) == 0:
+        if not self.fleet_adjacent:
             # this is not a coastal province
-            return set()
+            return
 
-        # TODO: (BETA) don't hardcode coasts
-        coast_sets: list[set[Province]] = []
-        if True:
-            coast_sets.append(sea_provinces)
-        else:
-            while sea_provinces:
-                coast_set: set[Province] = set()
-                to_parse: list[Province] = [next(iter(sea_provinces))]
-                while to_parse:
-                    province = to_parse.pop()
-                    sea_provinces.remove(province)
-                    coast_set.add(province)
-                    for adjacent in province.adjacent:
-                        if (
-                            adjacent in self.adjacent
-                            and adjacent.type is not ProvinceType.LAND
-                            and adjacent not in coast_set
-                            and adjacent not in to_parse
-                        ):
-                            to_parse.append(adjacent)
-                coast_sets.append(coast_set)
-
-        for i, coast_set in enumerate(coast_sets):
-            name = f"{self.name} coast"
-            self.coasts.add(Coast(name, None, None, coast_set, self))
-
-class Coast(Location):
-    def __init__(
-        self,
-        name: str,
-        primary_unit_coordinate: tuple[float, float],
-        retreat_unit_coordinate: tuple[float, float],
-        adjacent_seas: set[Province],
-        province: Province,
-    ):
-        super().__init__(name, primary_unit_coordinate, retreat_unit_coordinate)
-        self.adjacent_seas: set[Province] = adjacent_seas
-        self.province: Province = province
-        self.adjacent_coasts: set[Coast] = set()
-
-    def __str__(self):
-        return self.name
-
-    def __repr__(self):
-        return f"Coast {self.name}"
-
-    def get_owner(self) -> player.Player | None:
-        return self.province.get_owner()
-
-    def get_unit(self) -> unit.Unit | None:
-        return self.province.get_unit()
-    
-    def as_province(self) -> Province:
-        return self.province
+    def set_adjacent_coasts(self):
+        # TODO: (BETA) this will generate false positives (e.g. mini province keeping 2 big province coasts apart)
+        for province2 in self.adjacent:
+            if province2.get_multiple_coasts():
+                for coast2 in province2.get_multiple_coasts():
+                    if (province2.get_name(coast2) not in self.nonadjacent_coasts
+                        and Province.detect_coastal_connection(self, province2, coast2)):
+                        self.fleet_adjacent.add(province2)
+            elif province2.fleet_adjacent:
+                if (province2.get_name() not in self.nonadjacent_coasts
+                    and Province.detect_coastal_connection(self, province2)):
+                    self.fleet_adjacent.add(province2)
 
     @staticmethod
-    def detect_costal_connection(c1: Coast, c2: Coast):
+    def detect_costal_connection(p1: Province, p2: Province, coast: str | None = None):
         # multiple possible tripoints could happen if there was a scenario
         # where two canals were blocked from connecting on one side by a land province but not the other
         # or by multiple rainbow-shaped seas
-        possible_tripoints = c1.adjacent_seas & c2.adjacent_seas
+        possible_tripoints = p1.get_coastal_adjacent() & p2.get_coastal_adjacent(coast)
         for possible_tripoint in possible_tripoints:
+            if possible_tripoint.type == ProvinceType.LAND:
+                continue
             # check for situations where one of the provinces is situated in the other two
 
-            if len(possible_tripoint.adjacent) == 2 or len(c1.province.adjacent) == 2 or len(c2.province.adjacent) == 2:
+            if min(len(possible_tripoint.adjacent), len(p1.adjacent), len(p2.adjacent)) == 2:
                 return True
 
             # the algorithm is as follows
@@ -210,10 +167,10 @@ class Coast(Location):
             procqueue: list[Province] = []
             connected_sets: set[frozenset[Province]] = set()
 
-            for adjacent in c1.province.adjacent | c1.province.impassible_adjacent | \
-                            c2.province.adjacent | c2.province.impassible_adjacent | \
+            for adjacent in p1.adjacent | p1.impassible_adjacent | \
+                            p2.adjacent | p2.impassible_adjacent | \
                             possible_tripoint.adjacent | possible_tripoint.impassible_adjacent:
-                if adjacent not in (c1.province, c2.province, possible_tripoint):
+                if adjacent not in (p1, p2, possible_tripoint):
                     procqueue.append(adjacent)
                     connected_sets.add(frozenset({adjacent}))
             
@@ -242,7 +199,7 @@ class Coast(Location):
             # find connected sets which are adjacent to tripoint and two provinces (so portugal is eliminated from contention if MAO, Gascony, and Spain nc are the locations being tested)
             # FIXME: this leads to false positives
             for candidate in connected_sets:
-                needed_neighbors = set([c1.province, c2.province, possible_tripoint])
+                needed_neighbors = set([p1, p2, possible_tripoint])
 
                 for province in candidate:
                     needed_neighbors.difference_update(province.adjacent)
@@ -257,39 +214,8 @@ class Coast(Location):
                 return True
             elif l != 2:
                 logger.error(f"WARNING: len(connected_sets) should've been 1 or 2, but got {l}.\n"
-                            f"hint: between coasts {c1} and {c2}, when looking at mutual sea {possible_tripoint}\n"
+                            f"hint: between coasts {p1} and {p2}, when looking at mutual sea {possible_tripoint}\n"
                             f"Final state: {connected_sets}")
 
         # no connection worked
         return False
-
-
-    def set_adjacent_coasts(self):
-        # TODO: (BETA) this will generate false positives (e.g. mini province keeping 2 big province coasts apart)
-        adjacent_coasts: set[Coast] = set()
-        if self.province.type == ProvinceType.ISLAND:
-            for province2 in self.province.adjacent:
-                for coast in province2.coasts:
-                    if self.province in coast.adjacent_seas:
-                        adjacent_coasts.add(coast)
-            self.adjacent_coasts = adjacent_coasts
-            return
-      
-        for province2 in self.province.adjacent:
-            for coast2 in province2.coasts:
-                if coast2.name in self.province.nonadjacent_coasts:
-                    continue
-                if Coast.detect_costal_connection(self, coast2):
-                    adjacent_coasts.add(coast2)
-        self.adjacent_coasts = adjacent_coasts
-
-    def get_adjacent_locations(self) -> set[Location]:
-        return self.adjacent_seas.union(self.adjacent_coasts)
-
-
-def get_adjacent_provinces(location: Location) -> set[Province] | set[Coast]:
-    if isinstance(location, Coast):
-        return location.adjacent_seas | {coast.province for coast in location.adjacent_coasts}
-    if isinstance(location, Province):
-        return location.adjacent
-    raise ValueError(f"Location {location} should be Coast or Province")

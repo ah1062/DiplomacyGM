@@ -44,11 +44,11 @@ class Board:
         self.cleaned_name_to_player: Dict[str, Player] = {sanitise_name(player.name.lower()): player for player in self.players}
         self.simple_player_name_to_player: Dict[str, Player] = {simple_player_name(player.name): player for player in self.players}
         self.name_to_province: Dict[str, Province] = {}
-        self.name_to_coast: Dict[str, Coast] = {}
+        self.name_to_coast: Dict[str, (Province,  str)] = {}
         for location in self.provinces:
             self.name_to_province[location.name.lower()] = location
-            for coast in location.coasts:
-                self.name_to_coast[coast.name.lower()] = coast
+            for coast in location.get_multiple_coasts():
+                self.name_to_coast[location.get_name(coast)] = (location, coast)
 
         for player in self.players:
             player.board = self
@@ -88,7 +88,7 @@ class Board:
         province, _ = self.get_province_and_coast(name)
         return province
 
-    def get_province_and_coast(self, name: str) -> tuple[Province, Coast | None]:
+    def get_province_and_coast(self, name: str) -> tuple[Province, str | None]:
         # FIXME: This should not be raising exceptions many places already assume it returns None on failure.
         # TODO: (BETA) we build this everywhere, let's just have one live on the Board on init
         # we ignore capitalization because this is primarily used for user input
@@ -97,9 +97,9 @@ class Board:
         name = name.lower()
         if "abbreviations" in self.data and name in self.data["abbreviations"]:
             name = self.data["abbreviations"][name].lower()
-        coast = self.name_to_coast.get(name)
+        province, coast = self.name_to_coast.get(name)
         if coast:
-            return coast.province, coast
+            return province, coast
         elif name in self.name_to_province:
             return self.name_to_province[name], None
 
@@ -109,28 +109,22 @@ class Board:
             raise Exception(f"The location {name} is ambiguous. Please type out the full name.")
         elif len(potential_locations) > 1:
             raise Exception(
-                f'The location {name} is ambiguous. Possible matches: {", ".join([loc.name for loc in potential_locations])}.'
+                f'The location {name} is ambiguous. Possible matches: {", ".join([loc[0].name for loc in potential_locations])}.'
             )
         elif len(potential_locations) == 0:
             raise Exception(f"The location {name} does not match any known provinces.")
         else:
-            location = potential_locations[0]
-            if isinstance(location, Coast):
-                return location.province, location
-            elif isinstance(location, Province):
-                return location, None
-            else:
-                raise Exception(f"Unknown issue occurred when attempting to find the location {name}.")
+            return potential_locations[0]
 
     def get_visible_provinces(self, player: Player) -> set[Province]:
         visible: set[Province] = set()
         for province in self.provinces:
             for unit in player.units:
                 if unit.unit_type == UnitType.ARMY:
-                    if province in get_adjacent_provinces(unit.province) and province.type != ProvinceType.SEA:
+                    if province in unit.province.adjacent and province.type != ProvinceType.SEA:
                         visible.add(province)
                 if unit.unit_type == UnitType.FLEET:
-                    if (unit.coast and province in get_adjacent_provinces(unit.coast)) or (not unit.coast and province in get_adjacent_provinces(unit.province)):
+                    if (province in unit.province.get_coastal_adjacent(unit.coast)):
                         visible.add(province)
 
         for unit in player.units:
@@ -143,24 +137,16 @@ class Board:
 
         return visible
 
-    def get_possible_locations(self, name: str) -> list[Province]:
+    def get_possible_locations(self, name: str) -> list[(Province, str | None)]:
         pattern = r"^{}.*$".format(re.escape(name.strip()).replace("\\ ", r"\S*\s*"))
         matches = []
         for province in self.provinces:
             if re.search(pattern, province.name.lower()):
-                matches.append(province)
+                matches.append((province, None))
             else:
-                matches += [coast for coast in province.coasts if re.search(pattern, coast.name.lower())]
+                matches += [(province, coast) for coast in province.get_multiple_coasts()
+                            if re.search(pattern, province.get_name(coast).lower())]
         return matches
-
-    def get_location(self, name: str) -> Location:
-        # People input apostrophes that don't match what the province names are
-        name = re.sub(r"[‘’`´′‛]", "'", name)
-        province, coast = self.get_province_and_coast(name)
-
-        if coast:
-            return coast
-        return province
 
     def get_build_counts(self) -> list[tuple[str, int]]:
         build_counts = []
@@ -182,7 +168,7 @@ class Board:
         unit_type: UnitType,
         player: Player,
         province: Province,
-        coast: Coast | None,
+        coast: str | None,
         retreat_options: set[Province] | None,
     ) -> Unit:
         unit = Unit(unit_type, player, province, coast, retreat_options)
@@ -198,13 +184,7 @@ class Board:
         self.units.add(unit)
         return unit
 
-    def move_unit(self, unit: Unit, new_location: Location) -> Unit:
-        new_province = new_location
-        new_coast = None
-        if isinstance(new_location, Coast):
-            new_province = new_location.province
-            new_coast = new_location
-
+    def move_unit(self, unit: Unit, new_province: Province, new_coast: str | None = None) -> Unit:
         if new_province.unit:
             raise RuntimeError(f"{new_province.name} already has a unit")
         new_province.unit = unit

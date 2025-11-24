@@ -30,7 +30,7 @@ from DiploGM.models.order import (
     PlayerOrder,
 )
 from DiploGM.models.player import Player
-from DiploGM.models.province import ProvinceType, Province, Coast, Location
+from DiploGM.models.province import ProvinceType, Province
 from DiploGM.models.unit import Unit, UnitType
 
 from DiploGM.map_parser.vector.transform import TransGL3
@@ -141,14 +141,14 @@ class Mapper:
                     continue
                     
                 if current_turn.is_retreats():
-                    unit_locs = unit.location().all_rets
+                    unit_locs = unit.province.get_primary_unit_coordinates(unit.unit_type, unit.coast)
                 else:
-                    unit_locs = unit.location().all_locs
+                    unit_locs = unit.province.get_retreat_unit_coordinates(unit.unit_type, unit.coast)
 
                 # TODO: Maybe there's a better way to handle convoys?
                 if isinstance(unit.order, (RetreatMove, Move, Support)):
                     new_locs = []
-                    for endpoint in unit.order.destination.all_locs:
+                    for endpoint in unit.order.destination.get_primary_unit_coordinates(unit.unit_type, unit.order.destination_coast):
                         new_locs += [self.normalize(self.get_closest_loc(unit_locs, endpoint))]
                     unit_locs = new_locs
                 try:
@@ -176,7 +176,7 @@ class Mapper:
             for player in players:
                 for build_order in player.build_orders:
                     if isinstance(build_order, PlayerOrder):
-                        if build_order.location.as_province() in self.adjacent_provinces:
+                        if build_order.province in self.adjacent_provinces:
                             self._draw_player_order(player, build_order)
 
         self.draw_side_panel(self._moves_svg)
@@ -201,18 +201,18 @@ class Mapper:
         
         for province in self.board.provinces:
             if province.unit:
-                locdict[province.name] = list(province.unit.location().primary_unit_coordinate)
+                locdict[province.name] = list(province.get_primary_unit_coordinates(province.unit.unit_type, province.unit.coast))
             else:
-                locdict[province.name] = list(province.primary_unit_coordinate)
-            for coast in province.coasts:
-                locdict[coast.name] = list(coast.primary_unit_coordinate)
+                locdict[province.name] = list(province.get_primary_unit_coordinates(UnitType.ARMY))
+            for coast in province.get_multiple_coasts():
+                locdict[province.get_name(coast)] = list(province.get_primary_unit_coordinates(UnitType.FLEET, coast))
 
         script = etree.Element("script")
 
         coast_to_province = {}
         for province in self.board.provinces:
-            for coast in province.coasts:
-                coast_to_province[coast.name] = province.name
+            for coast in province.get_multiple_coasts:
+                coast_to_province[province.get_name(coast)] = province.name
 
         province_to_unit_type = {}
         for province in self.board.provinces:
@@ -239,11 +239,7 @@ class Mapper:
         immediate = []
         for unit in self.board.units:
             if self.is_moveable(unit):
-                p = unit.location()
-                # p coast is unreachable by clicking
-                if len(unit.province.coasts) == 1:
-                    p = unit.province
-                immediate.append(p.name)
+                immediate.append(unit.province.get_name(unit.coast))
 
         script.text = js % (str(locdict), self.board.data["svg config"], coast_to_province, province_to_unit_type, province_to_province_type, immediate)
         self._moves_svg.getroot().append(script)
@@ -442,7 +438,7 @@ class Mapper:
         elif isinstance(order, ConvoyTransport):
             self._draw_convoy(order, coordinate, order.hasFailed)
         elif isinstance(order, RetreatMove):
-            return self._draw_retreat_move(order, coordinate)
+            return self._draw_retreat_move(order, unit.unit_type, coordinate)
         elif isinstance(order, RetreatDisband):
             self._draw_force_disband(coordinate, self._moves_svg)
         else:
@@ -453,13 +449,10 @@ class Mapper:
             logger.debug(f"None order found: hold drawn. Coordinates: {coordinate}")
 
     def _draw_player_order(self, player: Player, order: PlayerOrder):
-        if order.location.primary_unit_coordinate is None:
-            logger.error(f"Coordinate for {order} is invalid!")
-            return
         if isinstance(order, Build):
             self._draw_build(player, order)
         elif isinstance(order, Disband):
-            for coord in order.location.all_locs:
+            for coord in order.province.get_primary_unit_coordinates(order.province.unit.unit_type, order.province.unit.coast):
                 self._draw_force_disband(coord, self._moves_svg)
         else:
             logger.error(f"Could not draw player order {order}")
@@ -496,8 +489,8 @@ class Mapper:
         )
         element.append(drawn_order)
 
-    def _draw_retreat_move(self, order: RetreatMove, coordinate: tuple[float, float], use_moves_svg=True) -> None:
-        destination = self.loc_to_point(order.destination, coordinate)
+    def _draw_retreat_move(self, order: RetreatMove, unit_type: UnitType, coordinate: tuple[float, float], use_moves_svg=True) -> None:
+        destination = self.loc_to_point(order.destination, unit_type, order.destination_coast, coordinate)
         if order.destination.get_unit():
             destination = self.pull_coordinate(coordinate, destination)
         order_path = self.create_element(
@@ -527,7 +520,7 @@ class Mapper:
             if possibility == destination:
                 return [
                     (
-                        current.get_unit().location(),
+                        current.get_unit().province,
                         destination,
                     )
                 ]
@@ -541,7 +534,7 @@ class Mapper:
                 and possibility.unit.order.destination is destination
             ):
                 options += self._path_helper(source, destination, possibility, new_checked)
-        return list(map((lambda t: (current.get_unit().location(),) + t), options))
+        return list(map((lambda t: (current.get_unit().province,) + t), options))
 
     def _draw_path(self, d: str, marker_end="arrow", stroke_color="black"):
         order_path = self.create_element(
@@ -563,7 +556,7 @@ class Mapper:
         return paths
 
     # removes unnesseary convoys, for instance [A->B->C & A->C] -> [A->C]
-    def get_shortest_paths(self, args: list[tuple[Province]]) -> list[tuple[Location]]:
+    def get_shortest_paths(self, args: list[tuple[Province]]) -> list[tuple[Province]]:
         args.sort(key=len)
         min_subsets = []
         for s in args:
@@ -583,7 +576,7 @@ class Mapper:
             p = [coordinate]
             start = coordinate
             for loc in path[1:]:
-                p += [self.loc_to_point(loc, start)]
+                p += [self.loc_to_point(loc, unit.unit_type, unit.coast, start)]
                 start = p[-1]
 
             if path[-1].get_unit():
@@ -620,9 +613,9 @@ class Mapper:
         order: Support = unit.order
         x1 = coordinate[0]
         y1 = coordinate[1]
-        v2 = self.loc_to_point(order.source, coordinate)
+        v2 = self.loc_to_point(order.source, unit.unit_type, unit.coast, coordinate)
         x2, y2 = v2
-        v3 = self.loc_to_point(order.destination, v2)
+        v3 = self.loc_to_point(order.destination, order.source.unit.unit_type, order.destination_coast, order.source.unit.order.v2)
         x3, y3 = v3
         marker_start = ""
         ball_type = "redball" if hasFailed else "ball"
@@ -693,11 +686,12 @@ class Mapper:
 
     def _draw_build(self, player, order: Build) -> None:
         element = self._moves_svg.getroot()
+        build_location = order.province.get_primary_unit_coordinates(order.unit_type, order.coast)
         drawn_order = self.create_element(
             "circle",
             {
-                "cx": order.location.primary_unit_coordinate[0],
-                "cy": order.location.primary_unit_coordinate[1],
+                "cx": build_location[0],
+                "cy": build_location[1],
                 "r": 10,
                 "fill": "none",
                 "stroke": "green",
@@ -705,12 +699,7 @@ class Mapper:
             },
         )
 
-        coast = None
-        province = order.location
-        if isinstance(province, Coast):
-            coast = province
-            province = province.province
-        self._draw_unit(Unit(order.unit_type, player, province, coast, None), use_moves_svg=True)
+        self._draw_unit(Unit(order.unit_type, player, order.province, order.coast, None), use_moves_svg=True)
         element.append(drawn_order)
 
     def _draw_disband(self, coordinate: tuple[float, float], svg) -> None:
@@ -903,9 +892,9 @@ class Mapper:
         current_coords = TransGL3(unit_element).transform(current_coords)
 
         if unit == unit.province.dislodged_unit:
-            coord_list = unit.location().all_rets
+            coord_list = unit.province.get_retreat_unit_coordinates(unit.unit_type, unit.coast)
         else:
-            coord_list = unit.location().all_locs
+            coord_list = unit.province.get_primary_unit_coordinates(unit.unit_type, unit.coast)
         for desired_coords in coord_list:
             elem = copy.deepcopy(unit_element)
 
@@ -915,13 +904,10 @@ class Mapper:
             trans = TransGL3(elem) * TransGL3().init(x_c=dx, y_c=dy)
 
             elem.set("transform", str(trans))
-            p = unit.location()
-            # p coast is unreachable by clicking
-            if len(unit.province.coasts) == 1:
-                p = unit.province
+            p = unit.province.get_name(unit.coast)
 
-            elem.set("onclick", f'obj_clicked(event, "{p.name}", true)')
-            elem.set("oncontextmenu", f'obj_clicked(event, "{p.name}", true)')
+            elem.set("onclick", f'obj_clicked(event, "{p}", true)')
+            elem.set("oncontextmenu", f'obj_clicked(event, "{p}", true)')
 
             elem.set("id", unit.province.name)
             elem.set("{http://www.inkscape.org/namespaces/inkscape}label", unit.province.name)
@@ -945,12 +931,12 @@ class Mapper:
     def _draw_retreat_options(self, unit: Unit, svg):
         root = svg.getroot()
         if not unit.retreat_options:
-            self._draw_force_disband(unit.location().retreat_unit_coordinate, svg)
+            self._draw_force_disband(unit.province.get_retreat_unit_coordinates(unit.unit_type, unit.coast), svg)
 
         for retreat_province in unit.retreat_options:
             root.append(
                 self._draw_retreat_move(
-                    RetreatMove(retreat_province), unit.location().retreat_unit_coordinate, use_moves_svg=False
+                    RetreatMove(retreat_province), unit.province.get_retreat_unit_coordinates(unit.unit_type, unit.coast), use_moves_svg=False
                 )
             )
 
@@ -1125,15 +1111,18 @@ class Mapper:
         short_ind = np.argmin(np.linalg.norm(dists, axis=1) + 500 * crossed)
         return crossed_pos[short_ind].tolist()
 
-    def loc_to_point(self, loc: Location, current: tuple[float, float], use_retreats=False):
+    def loc_to_point(self, loc: Province, unit_type: UnitType, coast: str | None, current: tuple[float, float], use_retreats=False):
         # If we're moving to somewhere that's inhabitted, draw to the proper coast
-        if isinstance(loc, Province) and loc.get_unit() and loc.get_unit().coast:
-            loc = loc.get_unit().coast
+        if loc.get_unit():
+            unit_type = loc.get_unit().unit_type
+            coast = loc.get_unit().coast
 
-        if not use_retreats:
-            return self.get_closest_loc(loc.all_locs, current)
+        if use_retreats:
+            coords = loc.get_retreat_unit_coordinates(unit_type, coast)
         else:
-            return self.get_closest_loc(loc.all_rets, current)
+            coords = loc.get_primary_unit_coordinates(unit_type, coast)
+
+        return self.get_closest_loc(coords, current)
 
     def pull_coordinate(
         self, anchor: tuple[float, float], coordinate: tuple[float, float], pull=None, limit=0.25
