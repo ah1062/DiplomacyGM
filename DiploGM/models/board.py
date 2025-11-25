@@ -9,7 +9,7 @@ from discord.ext import commands
 from DiploGM.utils.sanitise import sanitise_name
 from DiploGM.models.turn import Turn
 from DiploGM.models.player import Player
-from DiploGM.models.province import Province, ProvinceType, Coast, Location, get_adjacent_provinces
+from DiploGM.models.province import Province, ProvinceType
 from DiploGM.models.unit import Unit, UnitType
 from DiploGM.config import player_channel_suffix, is_player_category
 from DiploGM.utils import simple_player_name

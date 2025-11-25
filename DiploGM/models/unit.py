@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from diplomacy.persistence.province import ProvinceType
+from DiploGM.models.province import ProvinceType
 
 if TYPE_CHECKING:
     from DiploGM.models import province, player, order
