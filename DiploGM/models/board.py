@@ -48,7 +48,7 @@ class Board:
         self.cleaned_name_to_player: Dict[str, Player] = {sanitise_name(player.name.lower()): player for player in self.players}
         self.simple_player_name_to_player: Dict[str, Player] = {simple_player_name(player.name): player for player in self.players}
         self.name_to_province: Dict[str, Province] = {}
-        self.name_to_coast: Dict[str, (Province,  str)] = {}
+        self.name_to_coast: Dict[str, tuple[Province, str | None]] = {}
         for location in self.provinces:
             self.name_to_province[location.name.lower()] = location
             for coast in location.get_multiple_coasts():
@@ -107,7 +107,7 @@ class Board:
             name = self.data["abbreviations"][name].lower()
         
         if name in self.name_to_coast:
-            return self.name_to_coast.get(name)
+            return self.name_to_coast[name]
         elif name in self.name_to_province:
             return self.name_to_province[name], None
 
@@ -145,7 +145,7 @@ class Board:
 
         return visible
 
-    def get_possible_locations(self, name: str) -> list[(Province, str | None)]:
+    def get_possible_locations(self, name: str) -> list[tuple[Province, str | None]]:
         pattern = r"^{}.*$".format(re.escape(name.strip()).replace("\\ ", r"\S*\s*"))
         matches = []
         for province in self.provinces:

@@ -34,7 +34,7 @@ class TreeToOrder(Transformer):
         if loc is not None and not self.board.fow:
             unit = loc.get_unit()
             if unit is None:
-                raise ValueError(f"No unit in {s[-1]}")
+                raise ValueError(f"No unit in {s[-1][0]}")
             if not isinstance(unit, Unit):
                 raise Exception(f"Didn't get a unit or None from get_unit(), please report this")
 
@@ -44,7 +44,7 @@ class TreeToOrder(Transformer):
         # ignore the fleet/army signifier, if exists
         unit = s[-1][0].get_unit()
         if unit is None:
-            raise ValueError(f"No unit in {s[-1]}")
+            raise ValueError(f"No unit in {s[-1][0]}")
         if not isinstance(unit, Unit):
             raise Exception(f"Didn't get a unit or None from get_unit(), please report this")
 
@@ -60,19 +60,19 @@ class TreeToOrder(Transformer):
 
         return unit
 
-    def hold_order(self, s):
+    def hold_order(self, s) -> tuple[Unit, order.Hold]:
         return s[0], order.Hold()
 
-    def core_order(self, s):
+    def core_order(self, s) -> tuple[Province, order.Core]:
         if "no coring" in self.flags:
             raise Exception("Coring is disabled in this gamemode")
         return s[0], order.Core()
     
-    def build_unit(self, s):
+    def build_unit(self, s) -> tuple[Province, Player, order.Build]:
         if isinstance(s[2], tuple):
             province, coast = s[2]
             unit_type = s[3]
-        elif isinstance(s[3], tuple):
+        else:
             province, coast = s[3]
             unit_type = s[2]
 
@@ -88,19 +88,19 @@ class TreeToOrder(Transformer):
 
         return province, province.owner, order.Build(province, unit_type, coast)
     
-    def disband_unit(self, s):
+    def disband_unit(self, s) -> tuple[Province, Player, order.Disband]:
         if isinstance(s[0], Unit):
             u = s[0]
         else:
             u = s[2]
         return u.province, u.player, order.Disband(u.province)
     
-    def waive_order(self, s):
+    def waive_order(self, s) -> tuple[None, Player, order.Waive]:
         if self.player_restriction is None:
             raise ValueError(f"Please order waives in the appropriate player's orders channel.")
         return None, self.player_restriction, order.Waive(int(s[2]))
         
-    def vassal_order(self, s):
+    def vassal_order(self, s) -> tuple[Player, Player, order.Vassal]:
         if isinstance(s[0], Province):
             l = s[0]
         else:
@@ -115,7 +115,7 @@ class TreeToOrder(Transformer):
             raise ValueError(f"A vassal_order currently must be made in a orders channel due to ambiguity")
         return referenced_player, self.player_restriction, order.Vassal(referenced_player)
 
-    def liege_order(self, s):
+    def liege_order(self, s) -> tuple[Player, Player, order.Liege]:
         if isinstance(s[0], Province):
             l = s[0]
         else:
@@ -130,7 +130,7 @@ class TreeToOrder(Transformer):
             raise ValueError(f"A vassal_order currently must be made in a orders channel due to ambiguity")
         return referenced_player, self.player_restriction, order.Liege(referenced_player)
 
-    def monarchy_order(self, s):
+    def monarchy_order(self, s) -> tuple[Player, Player, order.DualMonarchy]:
         if isinstance(s[0], Province):
             l = s[0]
         else:
@@ -145,7 +145,7 @@ class TreeToOrder(Transformer):
             raise ValueError(f"A vassal_order currently must be made in a orders channel due to ambiguity")
         return referenced_player, self.player_restriction, order.DualMonarchy(referenced_player)
 
-    def disown_order(self, s):
+    def disown_order(self, s) -> tuple[Player, Player, order.Disown]:
         if isinstance(s[0], Province):
             l = s[0]
         else:
@@ -183,19 +183,19 @@ class TreeToOrder(Transformer):
         raise Exception("This type of order cannot be issued during build phases")
 
     # format for all of these is (unit, order)
-    def l_hold_order(self, s):
+    def l_hold_order(self, s) -> tuple[Unit, order.Hold]:
         return s[0], order.Hold()
     
-    def l_move_order(self, s):
+    def l_move_order(self, s) -> tuple[Unit, order.Move]:
         return s[0], order.Move(s[-1][0], s[-1][1])
 
-    def move_order(self, s):
+    def move_order(self, s) -> tuple[Unit, order.Move]:
         return s[0], order.Move(s[-1][0], s[-1][1])
 
-    def convoy_order(self, s):
+    def convoy_order(self, s) -> tuple[Unit, order.ConvoyTransport]:
         return s[0], order.ConvoyTransport(s[-1][0], s[-1][1].destination)
 
-    def support_order(self, s):
+    def support_order(self, s) -> tuple[Unit, order.Support]:
         if isinstance(s[-1], Province):
             loc = s[-1]
             unit_order = order.Hold()
@@ -210,16 +210,16 @@ class TreeToOrder(Transformer):
         else:
             raise ValueError("Unknown type of support. Something has broken in the bot. Please report this")
 
-    def retreat_order(self, s):
+    def retreat_order(self, s) -> tuple[Unit, order.RetreatMove]:
         return s[0], order.RetreatMove(s[-1][0], s[-1][1])
 
-    def disband_order(self, s):
+    def disband_order(self, s) -> tuple[Unit, order.RetreatDisband]:
         return s[0], order.RetreatDisband()
 
     def non_retreat_order(self, s):
         raise Exception("This type of order cannot be issued during retreat phases")
         
-    def order(self, order):
+    def order(self, order) -> Unit:
         command = order[0]
         unit, order = command
         if self.player_restriction is not None and unit.player != self.player_restriction:
@@ -229,7 +229,7 @@ class TreeToOrder(Transformer):
         unit.order = order
         return unit
 
-    def retreat(self, order):
+    def retreat(self, order) -> Unit:
         command = order[0]
         unit, order = command
         if self.player_restriction is not None and unit.player != self.player_restriction:

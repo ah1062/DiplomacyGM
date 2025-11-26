@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import abc
 import collections
 import logging
+from typing import TYPE_CHECKING
 
 from DiploGM.adjudicator.defs import (
     ResolutionState,
@@ -8,8 +11,10 @@ from DiploGM.adjudicator.defs import (
     AdjudicableOrder,
     OrderType,
 )
-from DiploGM.models.turn import Turn
-from DiploGM.models.board import Board
+
+if TYPE_CHECKING:
+    from DiploGM.models.turn import Turn
+    from DiploGM.models.board import Board
 from DiploGM.models.order import (
     Order,
     NMR,
@@ -81,6 +86,27 @@ def convoy_is_possible(start: Province, end: Province, check_fleet_orders=False)
     return False
 
 
+def _validate_move_army(province: Province, destination_province: Province) -> tuple[bool, str | None]:
+    if destination_province not in province.adjacent:
+        return False, f"{province} does not border {destination_province}"
+    if destination_province.type == ProvinceType.SEA:
+        return False, "Armies cannot move to sea provinces"
+    return True, None
+
+
+def _validate_move_fleet(province: Province, order: Move | RetreatMove, unit: Unit, strict_coast_movement: bool) -> tuple[bool, str | None]:
+    destination_coast = order.destination_coast if strict_coast_movement else None
+    if not province.is_coastally_adjacent(order.get_destination_and_coast(), unit.coast):
+        return False, f"{province.get_name(unit.coast)} does not border {order.get_destination_str()}"
+    if strict_coast_movement and not destination_coast:
+        reachable_coasts = {c for c in order.destination.get_multiple_coasts() if province.is_coastally_adjacent((order.destination, c), unit.coast)}
+        if len(reachable_coasts) > 1:
+            return False, f"{province} and {order.destination} have multiple coastal paths"
+        if reachable_coasts:
+            order.destination_coast = reachable_coasts.pop()
+    return True, None
+
+
 def order_is_valid(province: Province, order: Order, strict_convoys_supports=False, strict_coast_movement=True) -> tuple[bool, str | None]:
     """
     Checks if order from given location is valid for configured board
@@ -122,20 +148,13 @@ def order_is_valid(province: Province, order: Order, strict_convoys_supports=Fal
     elif isinstance(order, Move) or isinstance(order, RetreatMove):
         destination_province = order.destination
         if unit.unit_type == UnitType.ARMY:
-            if destination_province not in province.adjacent:
-                return False, f"{province} does not border {order.destination}"
-            if destination_province.type == ProvinceType.SEA:
-                return False, "Armies cannot move to sea provinces"
+            valid, reason = _validate_move_army(province, destination_province)
+            if not valid:
+                return valid, reason
         elif unit.unit_type == UnitType.FLEET:
-            destination_coast = order.destination_coast if strict_coast_movement else None
-            if not province.is_coastally_adjacent(order.get_destination_and_coast(), unit.coast):
-                return False, f"{province.get_name(unit.coast)} does not border {order.get_destination_str()}"
-            if strict_coast_movement and not destination_coast:
-                reachable_coasts = {c for c in order.destination.get_multiple_coasts() if province.is_coastally_adjacent((order.destination, c), unit.coast)}
-                if len(reachable_coasts) > 1:
-                    return False, f"{province} and {order.destination} have multiple coastal paths"
-                if reachable_coasts:
-                    order.destination_coast = reachable_coasts.pop()
+            valid, reason = _validate_move_fleet(province, order, unit, strict_coast_movement)
+            if not valid:
+                return valid, reason
         else:
             raise ValueError("Unknown type of unit. Something has broken in the bot. Please report this")
 
@@ -161,11 +180,14 @@ def order_is_valid(province: Province, order: Order, strict_convoys_supports=Fal
     elif isinstance(order, ConvoyTransport):
         if unit.unit_type != UnitType.FLEET:
             return False, "Only fleets can convoy"
+        source_unit = order.source.get_unit()
+        if not isinstance(source_unit, Unit):
+            return False, "There is no unit to convoy"
         if strict_convoys_supports:
-            corresponding_order_is_move = isinstance(order.source.get_unit().order, Move) or isinstance(
-                order.source.get_unit().order, ConvoyMove
+            corresponding_order_is_move = isinstance(source_unit.order, Move) or isinstance(
+                source_unit.order, ConvoyMove
             )
-            if not corresponding_order_is_move or order.source.get_unit().order.destination != order.destination:
+            if not corresponding_order_is_move or source_unit.order.destination != order.destination:
                 return False, f"Convoyed unit {order.source} did not make corresponding order"
         valid_move, reason = order_is_valid(
             order.source, ConvoyMove(order.destination), strict_convoys_supports
@@ -180,7 +202,10 @@ def order_is_valid(province: Province, order: Order, strict_convoys_supports=Fal
             return False, f"No valid convoy path from {order.source} to {province}"
         return True, None
     elif isinstance(order, Support):
-        if isinstance(order.source.get_unit().order, Core) and order_is_valid(order.source, Core):
+        source_unit = order.source.get_unit()
+        if not isinstance(source_unit, Unit):
+            return False, "There is no unit to support"
+        if isinstance(source_unit.order, Core) and order_is_valid(order.source, source_unit.order):
             return False, f"Cannot support a unit that is coring"
 
         move_valid, _ = order_is_valid(province, Move(order.destination), strict_convoys_supports, False)
@@ -198,8 +223,8 @@ def order_is_valid(province: Province, order: Order, strict_convoys_supports=Fal
             return False, "Supported unit can't reach destination"
 
         if strict_convoys_supports:
-            corresponding_order_is_move = isinstance(order.source.get_unit().order, Move) or isinstance(
-                order.source.get_unit().order, ConvoyMove
+            corresponding_order_is_move = isinstance(source_unit.order, Move) or isinstance(
+                source_unit.order, ConvoyMove
             )
             # if move is invalid then it doesn't go through
             if (
@@ -208,8 +233,8 @@ def order_is_valid(province: Province, order: Order, strict_convoys_supports=Fal
                 not is_support_hold and 
                 (
                     not corresponding_order_is_move or
-                    order.source.get_unit().order.destination != order.destination or
-                    (order.destination_coast is not None and order.source.get_unit().order.destination_coast != order.destination_coast)
+                    source_unit.order.destination != order.destination or
+                    (order.destination_coast is not None and source_unit.order.destination_coast != order.destination_coast)
                 )
             ):
                 return False, f"Supported unit {order.source} did not make corresponding order"
@@ -305,7 +330,7 @@ class BuildsAdjudicator(Adjudicator):
 
         for player in self._board.players:
             player.points += len(player.centers)
-            if not player.liege in player.vassals:
+            if player.liege not in player.vassals:
                 for vassal in player.vassals:
                     player.points += len(vassal.centers)
                     for subvassal in vassal.vassals:
@@ -331,6 +356,7 @@ class BuildsAdjudicator(Adjudicator):
                         logger.warning(f"Skipping {order}; tried building an inland fleet")
                         continue
                     if (order.unit_type == UnitType.FLEET
+                        and order.province.get_multiple_coasts()
                         and order.coast not in order.province.get_multiple_coasts()):
                         logger.warning(f"Skipping {order}; someone didn't specify a valid coast")
                         continue
@@ -340,7 +366,7 @@ class BuildsAdjudicator(Adjudicator):
                     if not order.province.has_supply_center or order.province.owner != player:
                         logger.warning(f"Skipping {order}; tried to build in non-sc, non-owned")
                         continue
-                    if order.province.core != player and not "build anywhere" in self.flags:
+                    if order.province.core != player and "build anywhere" not in self.flags:
                         logger.warning(f"Skipping {order}; tried to build in non-core")
                         continue
                     self._board.create_unit(order.unit_type, player, order.province, order.coast, None)
@@ -372,7 +398,7 @@ class RetreatsAdjudicator(Adjudicator):
         super().__init__(board)
 
     def run(self) -> Board:
-        retreats_by_destination: dict[str, set[Unit]] = dict()
+        retreats_by_destination: dict[str, set[Unit]] = {}
         units_to_delete: set[Unit] = set()
         for unit in self._board.units:
             if unit != unit.province.dislodged_unit:
@@ -382,11 +408,12 @@ class RetreatsAdjudicator(Adjudicator):
                 unit.order = NMR()
                 
             if not isinstance(unit.order, RetreatMove):
+                logger.warning(f"Unit {unit.province} is doing an unexpected action during retreat phase")
                 units_to_delete.add(unit)
                 continue
 
             destination = unit.order.get_destination_and_coast()
-            if destination not in unit.retreat_options:
+            if unit.retreat_options is None or destination not in unit.retreat_options:
                 units_to_delete.add(unit)
                 continue
 
@@ -400,6 +427,9 @@ class RetreatsAdjudicator(Adjudicator):
                 continue
 
             (unit,) = retreating_units
+            if not isinstance(unit.order, RetreatMove):
+                units_to_delete.add(unit)
+                continue
 
             destination_province, destination_coast = unit.order.get_destination_and_coast()
 
@@ -423,7 +453,7 @@ class RetreatsAdjudicator(Adjudicator):
             for player in self._board.players:
                 if player.liege in player.vassals:
                     other = player.liege
-                    if (not player.get_class() == PlayerClass.KINGDOM) or (not other.get_class() == PlayerClass.KINGDOM):
+                    if (player.get_class() != PlayerClass.KINGDOM) or (other.get_class() != PlayerClass.KINGDOM):
                         # Dual Monarchy breaks
                         for p in (player, other):
                             p.vassals = []
@@ -503,7 +533,7 @@ class MovesAdjudicator(Adjudicator):
 
 
         self.orders_by_province = {order.current_province.name: order for order in self.orders}
-        self.moves_by_destination: dict[str, set[AdjudicableOrder]] = dict()
+        self.moves_by_destination: dict[str, set[AdjudicableOrder]] = {}
         for order in self.orders:
             if order.type == OrderType.MOVE:
                 if order.destination_province.name not in self.moves_by_destination:
@@ -750,13 +780,12 @@ class MovesAdjudicator(Adjudicator):
                     attack_strength += 1
 
             # If A -> B, and B beats C head on then C can't affect A
-            if attacked_order != None:
-                if not attacked_order.is_convoy:
-                    orders_to_overcome = {
-                        order
-                        for order in orders_to_overcome
-                        if order.source_province != attacked_order.destination_province or order.is_convoy
-                    }
+            if attacked_order is not None and not attacked_order.is_convoy:
+                orders_to_overcome = {
+                    order
+                    for order in orders_to_overcome
+                    if order.source_province != attacked_order.destination_province or order.is_convoy
+                }
 
         for opponent in orders_to_overcome:
             if not opponent.is_valid:

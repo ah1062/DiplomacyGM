@@ -22,7 +22,7 @@ class Unit:
         owner: player.Player,
         current_province: province.Province,
         coast: str | None,
-        retreat_options: set[(province.Province, str | None)] | None,
+        retreat_options: set[tuple[province.Province, str | None]] | None,
     ):
         self.unit_type: UnitType = unit_type
         self.player: player.Player = owner
@@ -30,7 +30,7 @@ class Unit:
         self.coast: str | None = coast
 
         # retreat_options is None when not dislodged and {} when dislodged without retreat options
-        self.retreat_options: set[(province.Province, str | None)] | None = retreat_options
+        self.retreat_options: set[tuple[province.Province, str | None]] | None = retreat_options
         self.order: order.UnitOrder | None = None
 
     def __str__(self):
@@ -51,10 +51,16 @@ class Unit:
                     self.retreat_options.add((province, None))
     
     def remove_retreat_option(self, province: province.Province):
-        self.retreat_options -= {(province, None)}
-        self.retreat_options -= {(province, coast) for coast in province.get_multiple_coasts()}
+        if self.retreat_options is None:
+            return
+        # Use discard to avoid KeyError if an option is not present
+        self.retreat_options.discard((province, None))
+        for coast in province.get_multiple_coasts():
+            self.retreat_options.discard((province, coast))
 
     def remove_many_retreat_options(self, provinces: set[province.Province]):
+        if self.retreat_options is None:
+            return
         for retreat in set(self.retreat_options):
             if retreat[0] in provinces:
-                self.retreat_options.remove(retreat)
+                self.retreat_options.discard(retreat)

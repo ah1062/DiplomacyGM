@@ -141,11 +141,10 @@ class Mapper:
                     continue
                     
                 if current_turn.is_retreats():
-                    unit_locs = unit.province.all_rets[unit.unit_type]
+                    unit_locs = unit.province.all_rets
                 else:
-                    unit_locs = unit.province.all_locs[unit.unit_type]
-                if unit.coast:
-                    unit_locs = unit_locs[unit.coast]
+                    unit_locs = unit.province.all_locs
+                unit_locs = unit_locs[unit.coast] if unit.coast else unit_locs[unit.unit_type]
 
                 # TODO: Maybe there's a better way to handle convoys?
                 if isinstance(unit.order, (RetreatMove, Move, Support)):
@@ -153,7 +152,7 @@ class Mapper:
                     if unit.unit_type not in unit.order.destination.all_locs:
                         e_list = next(iter(unit.order.destination.all_locs.values()))
                     elif unit.order.destination_coast:
-                        e_list = unit.order.destination.all_locs[unit.unit_type][unit.order.destination_coast]
+                        e_list = unit.order.destination.all_locs[unit.order.destination_coast]
                     else:
                         e_list = unit.order.destination.all_locs[unit.unit_type]
                     
@@ -223,7 +222,7 @@ class Mapper:
 
         coast_to_province = {}
         for province in self.board.provinces:
-            for coast in province.get_multiple_coasts:
+            for coast in province.get_multiple_coasts():
                 coast_to_province[province.get_name(coast)] = province.name
 
         province_to_unit_type = {}
@@ -464,9 +463,11 @@ class Mapper:
         if isinstance(order, Build):
             self._draw_build(player, order)
         elif isinstance(order, Disband):
-            coord_list = order.province.all_locs[order.province.unit.unit_type]
-            if order.province.unit.coast:
-                coord_list = coord_list[order.province.unit.coast]
+            disbanding_unit: Unit = order.province.get_unit()
+            if disbanding_unit.coast:
+                coord_list = order.province.all_locs[disbanding_unit.coast]
+            else:
+                coord_list = order.province.all_locs[disbanding_unit.unit_type]
             for coord in coord_list:
                 self._draw_force_disband(coord, self._moves_svg)
         else:
@@ -651,9 +652,9 @@ class Mapper:
             if order.source == order.destination:
                 if isinstance(order.destination.get_unit().order, (ConvoyTransport, Support)) and self.is_moveable(order.destination.get_unit()):
                     if order.destination.get_unit().coast:
-                        destloc = order.destination.all_locs[order.destination.unit.unit_type][order.destination.get_unit().coast]
+                        destloc = order.destination.all_locs[order.destination.get_unit().coast]
                     else:
-                        destloc = order.destination.all_locs[order.destination.unit.unit_type]
+                        destloc = order.destination.all_locs[order.destination.get_unit().unit_type]
                     for coord in destloc:
                         self._draw_hold(coord, False)
 
@@ -915,11 +916,14 @@ class Mapper:
         current_coords = TransGL3(unit_element).transform(current_coords)
 
         if unit == unit.province.dislodged_unit:
-            coord_list = unit.province.all_rets[unit.unit_type]
+            coord_list = unit.province.all_rets
         else:
-            coord_list = unit.province.all_locs[unit.unit_type]
+            coord_list = unit.province.all_locs
         if unit.coast:
             coord_list = coord_list[unit.coast]
+        else:
+            coord_list = coord_list[unit.unit_type]
+
         for desired_coords in coord_list:
             elem = copy.deepcopy(unit_element)
 
@@ -1111,11 +1115,11 @@ class Mapper:
 
     # returns closest point in a set
     # will wrap horizontally
-    def get_closest_loc(self, possibilities: tuple[tuple[float, float]] | dict, coord: tuple[float, float]):
-        possibilities = list(possibilities)
+    def get_closest_loc(self, possibilities: set[tuple[float, float]], coord: tuple[float, float]):
+        possibilities_list = list(possibilities)
         crossed_pos = []
         crossed = []
-        for p in possibilities:
+        for p in possibilities_list:
             x = p[0]
             cx = coord[0]
             if abs(x - cx) > self.board.data["svg config"]["map_width"] / 2:
@@ -1142,21 +1146,13 @@ class Mapper:
             unit_type = loc.get_unit().unit_type
             coast = loc.get_unit().coast
 
-        if use_retreats:
-            if unit_type not in loc.all_rets:
-                coords = next(iter(loc.all_rets.values()))
-            else:
-                coords = loc.all_rets[unit_type]
+        coord_list = loc.all_rets if use_retreats else loc.all_locs
+        if coast and coast in coord_list:
+            coords = coord_list[coast]
+        elif unit_type in coord_list:
+            coords = coord_list[unit_type]
         else:
-            if unit_type not in loc.all_locs:
-                coords = next(iter(loc.all_locs.values()))
-            else:
-                coords = loc.all_locs[unit_type]
-        if coast:
-            coords = coords[coast]
-        
-        if isinstance(coords, dict):
-            coords = loc.all_locs[UnitType.ARMY]
+            coords = next(iter(coord_list.values()))
 
         return self.get_closest_loc(coords, current)
 
