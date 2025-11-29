@@ -51,13 +51,18 @@ class BoardBuilder():
 
         self.build_count = None
 
-        self.france = self.board.get_player("France")
-        self.england = self.board.get_player("England")
-        self.germany = self.board.get_player("Germany")
-        self.italy = self.board.get_player("Italy")
-        self.austria = self.board.get_player("Austria")
-        self.russia = self.board.get_player("Russia")
-        self.turkey = self.board.get_player("Turkey")
+        player_list = {}
+        for player in ["Austria", "England", "France", "Germany", "Italy", "Russia", "Turkey"]:
+            player_list[player] = self.board.get_player(player)
+            if player_list[player] is None:
+                raise RuntimeError(f"Player {player} not found on board")
+        self.france = player_list["France"]
+        self.england = player_list["England"]
+        self.germany = player_list["Germany"]
+        self.italy = player_list["Italy"]
+        self.austria = player_list["Austria"]
+        self.russia = player_list["Russia"]
+        self.turkey = player_list["Turkey"]
 
     def army(self, land: str, player: Player) -> Unit:
         province, _ = self.board.get_province_and_coast(land)

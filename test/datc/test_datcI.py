@@ -13,19 +13,17 @@ class TestDATC_I(unittest.TestCase):
         """ 6.I.1. TEST CASE, TOO MANY BUILD ORDERS
             Check how program reacts when someone orders too many builds.
             Germany may build one:
-            Germany: Build A Warsaw
+            Germany: Build A Berlin
             Germany: Build A Kiel
             Germany: Build A Munich
             Program should not build all three, but handle it in an other way. See issue 4.D.4.
             I prefer that the build orders are just handled one by one until all allowed units are build. According
-            to this preference, the build in Warsaw fails, the build in Kiel succeeds and the build in Munich fails.
+            to this preference, the build in Berlin fails, the build in Kiel succeeds and the build in Munich fails.
         """
         b = BoardBuilder()
-        b.army("Berlin", b.germany)
         b.army("Silesia", b.germany)
         b.army("Prussia", b.germany)
-        b.player_core(b.germany, "Warsaw", "Kiel", "Munich")
-        b.build(b.germany, (UnitType.ARMY, "Warsaw"), (UnitType.ARMY, "Kiel"), (UnitType.ARMY, "Munich"))
+        b.build(b.germany, (UnitType.ARMY, "Berlin"), (UnitType.ARMY, "Kiel"), (UnitType.ARMY, "Munich"))
         b.assertBuildCount(1)
         b.builds_adjudicate(self)
         
@@ -80,9 +78,9 @@ class TestDATC_I(unittest.TestCase):
             Build fails.
         """
         b = BoardBuilder()
-        p_holland = b.board.get_province("Holland")
-        p_holland.owner = b.russia
-        p_holland.core = b.germany
+        p_berlin = b.board.get_province("Berlin")
+        p_berlin.owner = b.russia
+        p_berlin.core = b.germany
         b.build(b.germany, (UnitType.ARMY, "Berlin"))
         b.assertBuildCount(0)
         b.builds_adjudicate(self)
