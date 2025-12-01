@@ -127,6 +127,11 @@ class Mapper:
         self.player_restriction = player_restriction
         self.current_turn = current_turn
 
+        if player_restriction is not None:
+            adjacent_provinces: set[Province] = self.board.get_visible_provinces(player_restriction)
+        else:
+            adjacent_provinces: set[Province] = self.board.provinces
+
         t = self._moves_svg.getroot()
         arrow_layer = get_svg_element(t, self.board.data["svg config"]["arrow_output"])
         if not current_turn.is_builds():
@@ -176,7 +181,7 @@ class Mapper:
             for player in players:
                 for build_order in player.build_orders:
                     if isinstance(build_order, PlayerOrder):
-                        if build_order.location.as_province() in self.adjacent_provinces:
+                        if build_order.location.as_province() in adjacent_provinces:
                             self._draw_player_order(player, build_order)
 
         self.draw_side_panel(self._moves_svg)
@@ -385,7 +390,7 @@ class Mapper:
 
         sc_index = self.board.data["svg config"]["power_sc_index"] if "power_sc_index" in self.board.data["svg config"] else 5
 
-        if not "vassal system" in self.board.data.get("adju flags", []):
+        if "vassal system" not in self.board.data.get("adju flags", []):
             for power_element in all_power_banners_element:
                 for i, player in enumerate(players):
                     if i >= len(self.scoreboard_power_locations):
@@ -1055,7 +1060,7 @@ class Mapper:
         red_ball_marker.append(red_ball_def)
         defs.append(red_ball_marker)
 
-        if not "no coring" in self.board.data.get("adju flags", []):
+        if "no coring" not in self.board.data.get("adju flags", []):
             created_defs = set()
 
             for province in self.board.provinces:

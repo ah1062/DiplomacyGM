@@ -26,6 +26,25 @@ class CommandCog(commands.Cog):
 
     @commands.command(brief="How long has the bot been online?")
     async def uptime(self, ctx: commands.Context) -> None:
+        """Looks like you've got a case of uptime. How long has the bot been running?
+
+        Usage: 
+            Used as `.uptime`
+
+        Note:
+            Also tracks last command from `DiploGM::after_any_command()`
+
+        Args:
+            ctx (commands.Context): Context from discord regarding command invocation
+
+        Returns:
+            None
+
+        Raises:
+            None:
+            Messages:
+        """
+
         uptime = ctx.message.created_at - self.bot.creation_time
 
         hours = int(uptime.total_seconds() // 3600)
@@ -63,6 +82,28 @@ class CommandCog(commands.Cog):
         aliases=["leaderboard"],
     )
     async def scoreboard(self, ctx: commands.Context) -> None:
+        """Gets the scoreboard for the game board
+
+        Usage: 
+            Used as `.scoreboard {args}`
+
+        Note:
+            Mot for Fog of War
+            Chaos output by vassal points or SC count
+
+        Args:
+            ctx (commands.Context): Context from discord regarding command invocation
+                * {a, alpha, alphabetical} sorted output
+                * {csv} raw output no detail (alphabetical)
+
+        Returns:
+            None
+
+        Raises:
+            None:
+            Messages:
+        """
+
         arguments = (
             ctx.message.content.removeprefix(ctx.prefix + ctx.invoked_with)
             .strip()
@@ -87,7 +128,7 @@ class CommandCog(commands.Cog):
         the_player = perms.get_player_by_context(ctx)
 
         response = ""
-        if board.is_chaos() and not "standard" in ctx.message.content:
+        if board.is_chaos() and "standard" not in ctx.message.content:
             scoreboard_rows = []
 
             latest_index = -1
@@ -147,6 +188,23 @@ class CommandCog(commands.Cog):
 
     @commands.command(brief="outputs information about the current game", aliases=["i"])
     async def info(self, ctx: commands.Context) -> None:
+        """Gets context info for the current game board
+
+        Usage: 
+            Used as `.info`
+
+        Note:
+        Args:
+            ctx (commands.Context): Context from discord regarding command invocation
+
+        Returns:
+            None
+
+        Raises:
+            RuntimeError: No current board in the server
+            Messages:
+        """
+
         try:
             board = manager.get_board(ctx.guild.id)
         except RuntimeError:
@@ -185,24 +243,27 @@ class CommandCog(commands.Cog):
         """,
     )
     async def dev(self, ctx: commands.Context, cmd_name: str) -> None:
+        """Gets developer info for a bot command
+
+        Usage: 
+            Used as `.dev <cmd_name>`
+
+        Note:
+            Output is limited to 1024 characters due to `send_message_and_file` limits
+
+        Args:
+            ctx (commands.Context): Context from discord regarding command invocation
+            cmd_name (str): Name of command to inspect
+
+        Returns:
+            None
+
+        Raises:
+            None:
+            Messages:
+                Command could not be found
         """
-        Return docstring information to the user, give a high-level insight into how the bot might work.
 
-        Process:
-            1. Fetch Command (error on NotFound)
-            2. Collect Command information
-                a. Method definition
-                b. Method docstrings
-
-        Parameters
-        ----------
-        ctx (commands.Context): Invoking message context
-        cmd_name (str | None): Name of the command to obtain docstring information from
-
-        Returns
-        -------
-        None
-        """
         cmd = self.bot.get_command(cmd_name)
         if not cmd:
             await send_message_and_file(
@@ -233,6 +294,31 @@ class CommandCog(commands.Cog):
         aliases=["province"],
     )
     async def province_info(self, ctx: commands.Context) -> None:
+        """Gets board state info about a province
+
+        Usage: 
+            Used as `.province <province>`
+
+        Note:
+            Not whilst orders are locked
+            Limited behaviours during Fog of War
+
+        Args:
+            ctx (commands.Context): Context from discord regarding command invocation
+            cmd_name (str): Name of command to inspect
+
+        Returns:
+            None
+
+        Raises:
+            None:
+            Messages:
+                Orders are locked!
+                No province given
+                Province could not be found
+                Province is not visible to you
+        """
+
         board = manager.get_board(ctx.guild.id)
 
         if not board.orders_enabled:
@@ -247,7 +333,7 @@ class CommandCog(commands.Cog):
             ctx.prefix + ctx.invoked_with
         ).strip()
         if not province_name:
-            log_command(logger, ctx, message=f"No province given")
+            log_command(logger, ctx, message="No province given")
             await send_message_and_file(
                 channel=ctx.channel,
                 title="No province given",
@@ -266,7 +352,7 @@ class CommandCog(commands.Cog):
         # FOW permissions
         if board.fow:
             player = perms.require_player_by_context(ctx, "get province info")
-            if player and not province in board.get_visible_provinces(player):
+            if player and province not in board.get_visible_provinces(player):
                 log_command(
                     logger,
                     ctx,
@@ -287,7 +373,7 @@ class CommandCog(commands.Cog):
                 f"Center: {province.has_supply_center}\n" + \
                 f"Core: {province.core.name if province.core else 'None'}\n" + \
                 f"Half-Core: {province.half_core.name if province.half_core else 'None'}\n" + \
-                f"Adjacent Provinces:\n- " + "\n- ".join(sorted([adjacent.name for adjacent in province.adjacent | province.impassible_adjacent])) + "\n"
+                "Adjacent Provinces:\n- " + "\n- ".join(sorted([adjacent.name for adjacent in province.adjacent | province.impassible_adjacent])) + "\n"
         else:
             coast_unit = None
             if province.unit and province.unit.coast == coast:
@@ -312,6 +398,30 @@ class CommandCog(commands.Cog):
         aliases=["player"],
     )
     async def player_info(self, ctx: commands.Context) -> None:
+        """Gets board state info about a player
+
+        Usage: 
+            Used as `.player <player>`
+
+        Note:
+            Not while orders are locked
+            Not for Fog of War
+
+        Args:
+            ctx (commands.Context): Context from discord regarding command invocation
+
+        Returns:
+            None
+
+        Raises:
+            None:
+            Messages:
+                Orders are locked!
+                Game type error!
+                No player given
+                Player could not be found
+        """
+
         guild = ctx.guild
         if not guild:
             return
@@ -330,7 +440,7 @@ class CommandCog(commands.Cog):
             ctx.prefix + ctx.invoked_with
         ).strip()
         if not player_name:
-            log_command(logger, ctx, message=f"No player given")
+            log_command(logger, ctx, message="No player given")
             await send_message_and_file(
                 channel=ctx.channel,
                 title="No player given",
@@ -349,7 +459,7 @@ class CommandCog(commands.Cog):
         elif board.fow:
             await send_message_and_file(
                 channel=ctx.channel,
-                title=f"Gametype Error!",
+                title="Gametype Error!",
                 message="This command does not work with FoW",
                 embed_colour=ERROR_COLOUR,
             )
@@ -378,6 +488,26 @@ class CommandCog(commands.Cog):
 
     @commands.command(brief="outputs all provinces per owner")
     async def all_province_data(self, ctx: commands.Context) -> None:
+        """Output all province names and who owns them
+
+        Usage: 
+            Used as `.all_province_data`
+
+        Note:
+            Not while orders are locked
+
+        Args:
+            ctx (commands.Context): Context from discord regarding command invocation
+
+        Returns:
+            None
+
+        Raises:
+            None:
+            Messages:
+                Orders are locked!
+        """
+
         board = manager.get_board(ctx.guild.id)
 
         if not board.orders_enabled:
@@ -436,6 +566,27 @@ class CommandCog(commands.Cog):
 
     @commands.command(brief="Changes your nickname")
     async def nick(self, ctx: commands.Context) -> None:
+        """Was my name always like that?
+
+        Usage: 
+            Used as `.nick <name>`
+
+        Note:
+            Useful for restricted gametypes (chaos)
+
+        Args:
+            ctx (commands.Context): Context from discord regarding command invocation
+
+        Returns:
+            None
+
+        Raises:
+            None:
+            Messages:
+                Must be one character
+                Must be less than 32 characters
+        """
+
         name: str = ctx.author.nick
         if name == None:
             name = ctx.author.name
@@ -449,7 +600,7 @@ class CommandCog(commands.Cog):
             await send_message_and_file(
                 channel=ctx.channel,
                 embed_colour=ERROR_COLOUR,
-                message=f"A nickname must be at least 1 character",
+                message="A nickname must be at least 1 character",
             )
             return
         if len(prefix + name) > 32:

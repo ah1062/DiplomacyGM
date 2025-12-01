@@ -1,3 +1,15 @@
+1.3.5
+=====
+
+Contributors
+- aahoughton
+
+# Player Changes
+- Resolved 
+
+# Developer Changes
+- Initialised Docstrings 
+
 1.3.4
 =====
 
