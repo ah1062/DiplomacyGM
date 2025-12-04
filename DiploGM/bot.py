@@ -271,6 +271,10 @@ class DiploGM(commands.Bot):
             # if reactions fail, ignore and continue handling existing exception
             pass
 
+        if ctx.handled:
+            logger.info(f"global on_command_error skipped a {type(error)} that was previously handled...")
+            return
+
         time_spent = (
             datetime.datetime.now(datetime.timezone.utc) - ctx.message.created_at
         )
@@ -372,6 +376,7 @@ class DiploGM(commands.Bot):
             unhandled_out_dev = (
                 f"Type: {type(original)}\n"
                 f"Location: {ctx.guild.name} [{ctx.channel.category or ''}]-[{ctx.channel.name}]\n"
+                f"Link: {ctx.message.jump_url}\n"
                 f"Time: {str(datetime.datetime.now(datetime.timezone.utc))[:-13]} UTC\n"
                 f"Invoking User: {ctx.author.mention}[{ctx.author.name}]\n"
                 f"Invoked Command: {ctx.command.name}\n"

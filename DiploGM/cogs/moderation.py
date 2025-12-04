@@ -1,9 +1,10 @@
 import datetime
 
-import discord.utils
 from discord import Member, User
 from discord.ext import commands
+import discord.utils
 
+from DiploGM import config
 from DiploGM import perms
 from DiploGM.utils import send_message_and_file
 

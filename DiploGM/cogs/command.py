@@ -2,7 +2,9 @@ from black.trans import defaultdict
 import inspect
 import logging
 
+from discord import Role
 from discord.ext import commands
+import discord.utils
 
 from DiploGM.config import ERROR_COLOUR
 from DiploGM import perms
@@ -485,6 +487,120 @@ class CommandCog(commands.Cog):
 
         # FIXME title should probably include what coast it is.
         await send_message_and_file(channel=ctx.channel, title=player.name, message=out)
+
+    @commands.command(
+        brief="outputs all channels involving a specific player",
+    )
+    async def directory(self, ctx: commands.Context, power: Role) -> None:
+        """Generate a directory of press channels for a power
+
+        Usage: 
+            Used as `.directory <@power>`
+
+        Note: 
+            Can only function if member has @power
+            Limited to the server of command invocation
+
+        Args:
+            ctx (commands.Context): Context from discord regarding command invocation
+            power (discord.Role): Role of the power to fetch a directory for
+
+        Returns:
+            None
+
+        Raises:
+            None:
+            Messages:
+                No game running in this server.
+                Could not find a player for power.
+                You are not permitted to generate a directory.
+        """
+
+        guild = ctx.guild
+        if not guild:
+            return
+
+        board = manager.get_board(guild.id)
+        if not board:
+            await send_message_and_file(channel=ctx.channel, message="There is no game running in this server.", embed_colour=ERROR_COLOUR)
+            return
+
+        try:
+            player = board.get_player(power.name)
+            if not player:
+                await send_message_and_file(channel=ctx.channel, message=f"Could not find a player for power: {power.mention}", embed_colour=ERROR_COLOUR)
+                return
+        except ValueError:
+            await send_message_and_file(channel=ctx.channel, message=f"Could not find a player for power: {power.mention}", embed_colour=ERROR_COLOUR)
+            return
+        
+        if power not in ctx.author.roles and not perms.is_gm(ctx.author):
+            await send_message_and_file(channel=ctx.channel, message="You are not permitted to generate a directory for this power.", embed_colour=ERROR_COLOUR)
+            return
+
+        power_roles = set()
+        for board_power in board.players:
+            role = discord.utils.find(lambda r: r.name == board_power.name, guild.roles)
+            if role != power:
+                power_roles.add(role)
+
+        unique_press = set()
+        player_channels = {
+            "void": [],
+            "press": [],
+            "group": []
+        }
+        for ch in guild.text_channels:
+            if power not in ch.overwrites:
+                continue
+
+            overwrites = filter(lambda o: isinstance(o, discord.Role), ch.overwrites)
+            count = 0
+            press_roles = set()
+            for role in overwrites:
+                try:
+                    player = board.get_player(role.name)
+                    if player:
+                        count += 1
+
+                        if role != power:
+                            press_roles.add(role)
+
+                except ValueError:
+                    continue
+
+            if count == 1:
+                player_channels["void"].append((ch, []))
+            elif count == 2:
+                player_channels["press"].append((ch, press_roles))
+                unique_press = unique_press.union(press_roles)
+            elif count > 2:
+                player_channels["group"].append((ch, press_roles))
+
+        out = ""
+        for k, v in player_channels.items():
+            out += f"{k.capitalize()}\n"
+            for ch, roles in v:
+                out += f"- {ch.mention}"
+                if len(roles) > 0:
+                    out += " - "
+                    out += ", ".join(map(lambda r: r.mention, sorted(roles, key=lambda r: r.name)))
+                out += "\n"
+            out += "\n"
+        
+        missed_press = power_roles.difference(unique_press)
+        if len(missed_press) != 0:
+            out += "No direct press channel with:\n"
+            out += ", ".join(map(lambda r: r.mention, sorted(missed_press, key=lambda r:r.name)))
+
+        await send_message_and_file(channel=ctx.channel, title=f"{power.name}: Channel Directory", message=out)
+
+    @directory.error
+    async def directory_error(self, ctx: commands.Context, error) -> None:
+        if isinstance(error, commands.errors.RoleNotFound):
+            ctx.handled = True
+            await send_message_and_file(channel=ctx.channel, message="Could not find that role!")
+            return
 
     @commands.command(brief="outputs all provinces per owner")
     async def all_province_data(self, ctx: commands.Context) -> None:
