@@ -93,7 +93,7 @@ class Server:
             id=data["id"],
             name=data["name"],
             users=set(data["users"]),
-            community=data["communities"],
+            community=data["community"],
             created_at=datetime.datetime.fromisoformat(data["created_at"])
         )
 
@@ -143,6 +143,11 @@ class Community:
     def display(self) -> str:
         return f"Name: {self.name}\nOwned by: <@{self.owner}>\nNo. Servers: {len(self.servers)}\nNo. Members: {len(self.users)}"
 
+    def is_owner(self, user: Union[int, User]) -> bool:
+        if isinstance(user, User):
+            return self.owner == user.id
+
+        return user == self.owner
 
 class Repository:
     def save_community(self, community: Community) -> None: ...
@@ -161,12 +166,19 @@ class JSONRepository(Repository):
     def __init__(self, storage_dir: str):
         self.storage = storage_dir
 
-    def save_community(self, community: Community) -> None:
-        file_path = f"{self.storage}/community_{community.id}.json"
-        
-        output = json.dumps(community, indent=4, default=lambda c: c.to_json())
+    def save_entity(self, entity_type: str, entity: Union[User, Server, Community]):
+        file_path = f"{self.storage}/{entity_type.lower()}_{entity.id}.json"
+        output = json.dumps(entity, indent=4, default=lambda e: e.to_json())
         with open(file_path, "w") as f:
             f.write(output)
+
+    def delete_entity(self, entity_type: str, entity: Union[User, Server, Community]):
+        file_path = f"{self.storage}/{entity_type.lower()}_{entity.id}.json"
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+    def save_community(self, community: Community) -> None:
+        self.save_entity("community", community)
 
     def load_community(self, id: int) -> Optional[Community]:
         file_path = f"{self.storage}/community_{id}.json"
@@ -185,11 +197,7 @@ class JSONRepository(Repository):
             os.remove(file_path)
 
     def save_server(self, server: Server) -> None:
-        file_path = f"{self.storage}/server_{server.id}.json"
-        
-        output = json.dumps(server, indent=4, default=lambda c: c.to_json())
-        with open(file_path, "w") as f:
-            f.write(output)
+        self.save_entity("server", server)
 
     def load_server(self, id: int) -> Optional[Server]:
         file_path = f"{self.storage}/server_{id}.json"
@@ -208,11 +216,7 @@ class JSONRepository(Repository):
             os.remove(file_path)
 
     def save_user(self, user: User) -> None:
-        file_path = f"{self.storage}/user_{user.id}.json"
-        
-        output = json.dumps(user, indent=4, default=lambda c: c.to_json())
-        with open(file_path, "w") as f:
-            f.write(output)
+        self.save_entity("user", user)
 
     def load_user(self, id: int) -> Optional[User]:
         file_path = f"{self.storage}/user_{id}.json"
@@ -334,7 +338,7 @@ class CommunityManager:
                 self.save_server(server)
 
         del self.servers[id]
-        self.repo.delete_server(id)
+        self.repo.delete_community(id)
 
     def display_community(self, community: Community) -> str:
         out = ""
@@ -470,9 +474,9 @@ class CommunityManager:
             return
 
         for cid in user.servers:
-            community = self.get_server(cid)
-            if community:
-                self.unlink_user_to_server(user, community)
+            server = self.get_server(cid)
+            if server:
+                self.unlink_user_to_server(user, server)
 
         for cid in user.communities:
             community = self.get_community(cid)
@@ -510,8 +514,8 @@ class CommunityManager:
         self.repo.save_server(server)
 
     def unlink_user_to_server(self, user: User, server: Server) -> None:
-        user.servers.remove(server.id)
-        server.users.remove(user.id)
+        user.servers.discard(server.id)
+        server.users.discard(user.id)
 
         self.repo.save_user(user)
         self.repo.save_server(server)
@@ -524,8 +528,8 @@ class CommunityManager:
         self.repo.save_community(community)
 
     def unlink_user_to_community(self, user: User, community: Community) -> None:
-        user.communities.remove(community.id)
-        community.users.remove(user.id)
+        user.communities.discard(community.id)
+        community.users.discard(user.id)
 
         self.repo.save_user(user)
         self.repo.save_community(community)
@@ -542,7 +546,7 @@ class CommunityManager:
 
     def unlink_server_to_community(self, server: Server, community: Community) -> None:
         server.community = None
-        community.servers.remove(server.id)
+        community.servers.discard(server.id)
 
         self.repo.save_server(server)
         self.repo.save_community(community)
@@ -639,7 +643,7 @@ class CommunityCog(commands.Cog):
 
     @community.command(name="create")
     async def community_create(self, ctx: commands.Context, name: str) -> None: 
-        uid = string_to_u8(name.lower())
+        uid = string_to_u32(name.lower())
         
         community = self.comms.get_community(uid)
         if community:
@@ -704,7 +708,7 @@ class CommunityCog(commands.Cog):
         if not user:
             return
 
-        if user.id == community.owner:
+        if community.is_owner(user):
             await send_message_and_file(channel=ctx.channel, message="You can't leave the community you own!", embed_colour=ERROR_COLOUR)
             return
 
@@ -826,10 +830,12 @@ class CommunityCog(commands.Cog):
         out = self.comms.display_user(user)
         await send_message_and_file(channel=ctx.channel, title = f"User: {user.id}", message=out)
 
-def string_to_u8(s: str) -> int:
+def string_to_u32(s: str) -> int:
     digest = hashlib.sha1(s.encode("utf-8")).hexdigest()
     code = int(digest, 16) % (10 ** 8)
     return code
+
+
 
 def process_server(comms: CommunityManager, guild: discord.Guild) -> None:
     start = datetime.datetime.now(datetime.timezone.utc)
@@ -852,7 +858,7 @@ def process_server(comms: CommunityManager, guild: discord.Guild) -> None:
         comms.link_user_to_server(user, server)        
 
     now = datetime.datetime.now(datetime.timezone.utc)
-    logger.info(f"Processed server {guild.id} for the Community Manager: took {start - now}")
+    logger.info(f"Processed server {guild.id} for the Community Manager: took {now - start}")
     comms.save_server(server)
 
 async def setup(bot):

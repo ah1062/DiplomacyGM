@@ -318,6 +318,13 @@ class GameManagementCog(commands.Cog):
         if not guild:
             return
 
+        arguments = (
+            ctx.message.content.removeprefix(ctx.prefix + ctx.invoked_with)
+            .strip()
+            .lower()
+            .split()
+        )
+
         board = manager.get_previous_board(ctx.guild.id)
         curr_board = manager.get_board(guild.id)
         if not board:
@@ -379,42 +386,43 @@ class GameManagementCog(commands.Cog):
 
         # HACK: Lifted from .ping_players
         # Should really work its way into a util function
-        roles = {}
-        sc_changes = {}
-        for player in curr_board.players:
-            roles[player.name] = player.find_discord_role(guild.roles)
-            sc_changes[player.name] = len(player.centers)
+        if "silent" not in arguments:
+            roles = {}
+            sc_changes = {}
+            for player in curr_board.players:
+                roles[player.name] = player.find_discord_role(guild.roles)
+                sc_changes[player.name] = len(player.centers)
 
-        for player in board.players:
-            sc_changes[player.name] -= len(player.centers)
+            for player in board.players:
+                sc_changes[player.name] -= len(player.centers)
 
-        sc_changes = [f"  **{role.mention if (role := roles[k]) else k}**: ({'+' if v > 0 else ''}{sc_changes[k]})" for k, v in sorted(sc_changes.items()) if v != 0]
-        sc_changes = '\n'.join(sc_changes)
+            sc_changes = [f"  **{role.mention if (role := roles[k]) else k}**: ({'+' if v > 0 else ''}{sc_changes[k]})" for k, v in sorted(sc_changes.items()) if v != 0]
+            sc_changes = '\n'.join(sc_changes)
 
-        player_categories: list[CategoryChannel] = []
-        for c in guild.categories:
-            if config.is_player_category(c.name):
-                player_categories.append(c)
+            player_categories: list[CategoryChannel] = []
+            for c in guild.categories:
+                if config.is_player_category(c.name):
+                    player_categories.append(c)
 
-        for c in player_categories:
-            for ch in c.text_channels:
-                player = board.get_player_by_channel(ch)
-                if not player or (len(player.units) + len(player.centers) == 0):
-                    continue
+            for c in player_categories:
+                for ch in c.text_channels:
+                    player = board.get_player_by_channel(ch)
+                    if not player or (len(player.units) + len(player.centers) == 0):
+                        continue
 
-                role = player.find_discord_role(guild.roles)
-                out = f"Hey **{role.mention if role else player.name}**, the Game has adjudicated!\n"
-                await ch.send(out, silent=True)
-                await send_message_and_file(
-                    channel=ch,
-                    title="Adjudication Information",
-                    message=(
-                        f"**Order Log:** {log.jump_url}\n"
-                        f"**From:** {board.turn}\n"
-                        f"**To:** {curr_board.turn}\n"
-                        f"**SC Changes:**\n{sc_changes}\n"
-                    ),
-                )
+                    role = player.find_discord_role(guild.roles)
+                    out = f"Hey **{role.mention if role else player.name}**, the Game has adjudicated!\n"
+                    await ch.send(out, silent=True)
+                    await send_message_and_file(
+                        channel=ch,
+                        title="Adjudication Information",
+                        message=(
+                            f"**Order Log:** {log.jump_url}\n"
+                            f"**From:** {board.turn}\n"
+                            f"**To:** {curr_board.turn}\n"
+                            f"**SC Changes:**\n{sc_changes}\n"
+                        ),
+                    )
 
         if MAP_ARCHIVE_SAS_TOKEN:
             file, _ = manager.draw_map_for_board(board, draw_moves=True)
