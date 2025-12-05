@@ -13,7 +13,7 @@ from discord.ext import commands
 from DiploGM.config import ERROR_COLOUR
 from DiploGM.manager import Manager
 from DiploGM.perms import is_superuser, superuser_only
-from DiploGM.utils import send_message_and_file
+from DiploGM.utils import get_full_command_name, send_message_and_file
 
 logger = logging.getLogger(__name__)
 manager = Manager()
@@ -175,14 +175,7 @@ class JSONRepository(Repository):
 
         with open(file_path) as f:
             data = json.load(f)
-            community = Community(
-                id=data["id"], 
-                name=data["name"],
-                owner=data["owner"], 
-                users=set(data["users"]),
-                servers=set(data["servers"]),
-                created_at=datetime.datetime.fromisoformat(data["created_at"])
-            )
+            community = Community.from_json(data)
 
         return community
 
@@ -205,13 +198,7 @@ class JSONRepository(Repository):
 
         with open(file_path) as f:
             data = json.load(f)
-            server = Server(
-                id=data["id"], 
-                name=data["name"],
-                users=set(data["users"]),
-                community=data["community"],
-                created_at=datetime.datetime.fromisoformat(data["created_at"])
-            )
+            server = Server.from_json(data)
 
         return server
 
@@ -234,13 +221,7 @@ class JSONRepository(Repository):
 
         with open(file_path) as f:
             data = json.load(f)
-            user = User(
-                id=data["id"], 
-                name=data["name"],
-                servers=set(data["servers"]),
-                communities=set(data["communities"]),
-                created_at=datetime.datetime.fromisoformat(data["created_at"])
-            )
+            user = User.from_json(data)
 
         return user
 
@@ -266,28 +247,28 @@ class CommunityManager:
     def load_existing_data(self):
         if isinstance(self.repo, JSONRepository):
             for filename in os.listdir(self.repo.storage):
-                path = os.path.join(self.repo.storage, filename)
-
-                data = {}
-                with open(path) as f:
-                    data = json.load(f)
-
+                filename = filename.removesuffix(".json")
                 try:
-                    match data["type"]:
-                        case "user":
-                            user = User.from_json(data)
+                    ftype, fid = filename.split("_")
+                    fid = int(fid)
+                except ValueError:
+                    continue
+
+                match ftype:
+                    case "user":
+                        if user := self.repo.load_user(fid):
                             self.users[user.id] = user
                             self.names_to_user_id[user.name] = user.id
-                        case "server":
-                            server = Server.from_json(data)
+                    case "server":
+                        if server := self.repo.load_server(fid):
                             self.servers[server.id] = server
                             self.names_to_server_id[server.name] = server.id
-                        case "community":
-                            community = Community.from_json(data)
+                    case "community":
+                        if community := self.repo.load_community(fid):
                             self.communities[community.id] = community
                             self.names_to_community_id[community.name] = community.id
-                except KeyError:
-                    continue
+                    case _:
+                        continue
 
     # === Manager Community Methods
     def get_communities(self, object: Union[User, Server]) -> List[Community]:
@@ -357,6 +338,7 @@ class CommunityManager:
 
     def display_community(self, community: Community) -> str:
         out = ""
+        out += f"ID: {community.id}\n"
         out += f"Name: {community.name}\n"
         out += f"Owned by: <@{community.owner}>\n"
         out += f"No. of Members: {len(community.users)}\n" 
@@ -577,6 +559,12 @@ class CommunityCog(commands.Cog):
         self.comms = CommunityManager(repo)
 
     @commands.Cog.listener()
+    async def on_command_error(self, ctx: commands.Context, error) -> None:
+        if isinstance(error, commands.errors.UserNotFound):
+            ctx.handled = True
+            await send_message_and_file(channel=ctx.channel, message=f"{error}\nTry: `{self.bot.command_prefix}help {get_full_command_name(ctx)}`", embed_colour=ERROR_COLOUR)
+
+    @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild):
         server = self.comms.get_server(guild.id)
         if not server:
@@ -647,7 +635,7 @@ class CommunityCog(commands.Cog):
 
     @commands.group(name="community", invoke_without_command=True)
     async def community(self, ctx: commands.Context) -> None:
-        await ctx.send("**Options:** create, register, unregister, inspect")
+        await ctx.send("**Options:** create/delete, register/unregister, join/leave, list, inspect")
 
     @community.command(name="create")
     async def community_create(self, ctx: commands.Context, name: str) -> None: 
@@ -684,13 +672,14 @@ class CommunityCog(commands.Cog):
             await send_message_and_file(channel=ctx.channel, message=f"Could not find community attached to: '{id}'", embed_colour=ERROR_COLOUR)
             return
 
-        user = self.comms.get_user(id)
+        user = self.comms.get_user(user.id)
         if not user:
             await send_message_and_file(channel=ctx.channel, message=f"Could not find a user record attached to: '{id}'", embed_colour=ERROR_COLOUR)
             return
 
+        previous = community.owner
         self.comms.change_community_ownership(user, community)
-
+        await send_message_and_file(channel=ctx.channel, message=f"Transferred '{community.name}' from <@{previous}> to <@{user.id}>")
 
     @community.command(name="join")
     async def community_join(self, ctx: commands.Context, id: Union[int, str]) -> None: 
@@ -740,7 +729,7 @@ class CommunityCog(commands.Cog):
             self.comms.link_server_to_community(server, community)
             await send_message_and_file(channel=ctx.channel, message=f"Registered {server.name} to {community.name}")
 
-    @community_unregister.command(name="user")
+    @community_register.command(name="user")
     @superuser_only("register a user to a community")
     async def community_register_user(self, ctx: commands.Context, user: discord.User, community_id: Union[int, str]) -> None:
         community = self.comms.get_community(community_id)
@@ -815,7 +804,7 @@ class CommunityCog(commands.Cog):
             return
 
         out = self.comms.display_community(community)
-        await send_message_and_file(channel=ctx.channel, title = f"Community: {id}", message=out)
+        await send_message_and_file(channel=ctx.channel, title = f"Community: {community.id}", message=out)
 
     @community_inspect.command(name="server")
     async def community_inspect_server(self, ctx: commands.Context, id: Union[int, str]) -> None:
@@ -825,7 +814,7 @@ class CommunityCog(commands.Cog):
             return
 
         out = self.comms.display_server(server)
-        await send_message_and_file(channel=ctx.channel, title = f"Server: {id}", message=out)
+        await send_message_and_file(channel=ctx.channel, title = f"Server: {server.id}", message=out)
 
     @community_inspect.command(name="user")
     async def community_inspect_user(self, ctx: commands.Context, user: discord.User) -> None:
@@ -835,7 +824,7 @@ class CommunityCog(commands.Cog):
             return
 
         out = self.comms.display_user(user)
-        await send_message_and_file(channel=ctx.channel, title = f"User: {id}", message=out)
+        await send_message_and_file(channel=ctx.channel, title = f"User: {user.id}", message=out)
 
 def string_to_u8(s: str) -> int:
     digest = hashlib.sha1(s.encode("utf-8")).hexdigest()

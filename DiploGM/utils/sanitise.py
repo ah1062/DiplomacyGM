@@ -98,6 +98,15 @@ def parse_season(
     else:
         return Turn(year, season + " " + ("Retreats" if retreat else "Moves"))
 
+def get_full_command_name(ctx):
+    parts = []
+    cmd = ctx.command
+
+    while cmd is not None:
+        parts.append(cmd.name)
+        cmd = cmd.parent
+
+    return " ".join(reversed(parts))
 
 def get_value_from_timestamp(timestamp: str) -> int | None:
     if len(timestamp) == 10 and timestamp.isnumeric():
