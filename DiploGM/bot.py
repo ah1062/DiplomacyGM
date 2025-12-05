@@ -271,7 +271,7 @@ class DiploGM(commands.Bot):
             # if reactions fail, ignore and continue handling existing exception
             pass
 
-        if ctx.handled:
+        if getattr(ctx, "handled", False):
             logger.info(f"global on_command_error skipped a {type(error)} that was previously handled...")
             return
 

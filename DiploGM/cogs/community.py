@@ -1,17 +1,18 @@
+import copy
 from dataclasses import dataclass, field
 import datetime
 import hashlib
 import json
 import logging
 import os
-from typing import Dict, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import discord
 from discord.ext import commands
 
 from DiploGM.config import ERROR_COLOUR
 from DiploGM.manager import Manager
-from DiploGM.perms import superuser_only
+from DiploGM.perms import is_superuser, superuser_only
 from DiploGM.utils import send_message_and_file
 
 logger = logging.getLogger(__name__)
@@ -26,10 +27,16 @@ class User:
     communities: set[int] = field(default_factory=set)
     created_at: datetime.datetime = field(default_factory=datetime.datetime.now)
 
+    def __eq__(self, value: object, /) -> bool:
+        if not isinstance(value, User):
+            return False
+
+        return self.id == value.id
+
     def __str__(self) -> str:
         return f"User(id={self.id}, name='{self.name}', in {len(self.servers)} servers)"
 
-    def __json__(self) -> Dict:
+    def to_json(self) -> Dict:
         return {
             "type": "user",
             "id": self.id,
@@ -38,6 +45,16 @@ class User:
             "communities": list(self.communities),
             "created_at": self.created_at.isoformat()
         }
+
+    @classmethod
+    def from_json(cls, data: dict):
+        return User(
+            id=data["id"],
+            name=data["name"],
+            servers=set(data["servers"]),
+            communities=set(data["communities"]),
+            created_at=datetime.datetime.fromisoformat(data["created_at"])
+        )
 
     
     def display(self) -> str:
@@ -51,10 +68,16 @@ class Server:
     community: Optional[int] = None
     created_at: datetime.datetime = field(default_factory=datetime.datetime.now)
 
+    def __eq__(self, value: object, /) -> bool:
+        if not isinstance(value, Server):
+            return False
+
+        return self.id == value.id
+
     def __str__(self) -> str:
         return f"Server(id={self.id}, name='{self.name}', has {len(self.users)} users)"
 
-    def __json__(self) -> Dict:
+    def to_json(self) -> Dict:
         return {
             "type": "server",
             "id": self.id,
@@ -63,6 +86,16 @@ class Server:
             "community": self.community,
             "created_at": self.created_at.isoformat()
         }
+
+    @classmethod
+    def from_json(cls, data: dict):
+        return Server(
+            id=data["id"],
+            name=data["name"],
+            users=set(data["users"]),
+            community=data["communities"],
+            created_at=datetime.datetime.fromisoformat(data["created_at"])
+        )
 
     def display(self) -> str:
         return ""
@@ -76,10 +109,16 @@ class Community:
     servers: set[int] = field(default_factory=set)
     created_at: datetime.datetime = field(default_factory=datetime.datetime.now)
 
+    def __eq__(self, value: object, /) -> bool:
+        if not isinstance(value, Community):
+            return False
+
+        return self.id == value.id
+
     def __str__(self) -> str:
         return f"Community(id={self.id}, name='{self.name}', has {len(self.users)} users in {len(self.servers)} servers)"
 
-    def __json__(self) -> Dict:
+    def to_json(self) -> Dict:
         return {
             "type": "community",
             "id": self.id,
@@ -89,6 +128,17 @@ class Community:
             "servers": list(self.servers),
             "created_at": self.created_at.isoformat()
         }
+
+    @classmethod
+    def from_json(cls, data: dict):
+        return Community(
+            id=data["id"],
+            name=data["name"],
+            owner=data["owner"],
+            users=set(data["users"]),
+            servers=set(data["servers"]),
+            created_at=datetime.datetime.fromisoformat(data["created_at"])
+        )
 
     def display(self) -> str:
         return f"Name: {self.name}\nOwned by: <@{self.owner}>\nNo. Servers: {len(self.servers)}\nNo. Members: {len(self.users)}"
@@ -114,7 +164,7 @@ class JSONRepository(Repository):
     def save_community(self, community: Community) -> None:
         file_path = f"{self.storage}/community_{community.id}.json"
         
-        output = json.dumps(community, indent=4, default=lambda c: c.__json__())
+        output = json.dumps(community, indent=4, default=lambda c: c.to_json())
         with open(file_path, "w") as f:
             f.write(output)
 
@@ -144,7 +194,7 @@ class JSONRepository(Repository):
     def save_server(self, server: Server) -> None:
         file_path = f"{self.storage}/server_{server.id}.json"
         
-        output = json.dumps(server, indent=4, default=lambda c: c.__json__())
+        output = json.dumps(server, indent=4, default=lambda c: c.to_json())
         with open(file_path, "w") as f:
             f.write(output)
 
@@ -173,7 +223,7 @@ class JSONRepository(Repository):
     def save_user(self, user: User) -> None:
         file_path = f"{self.storage}/user_{user.id}.json"
         
-        output = json.dumps(user, indent=4, default=lambda c: c.__json__())
+        output = json.dumps(user, indent=4, default=lambda c: c.to_json())
         with open(file_path, "w") as f:
             f.write(output)
 
@@ -216,28 +266,44 @@ class CommunityManager:
     def load_existing_data(self):
         if isinstance(self.repo, JSONRepository):
             for filename in os.listdir(self.repo.storage):
-                logger.info(f"loading {filename}")
+                path = os.path.join(self.repo.storage, filename)
+
+                data = {}
+                with open(path) as f:
+                    data = json.load(f)
+
                 try:
-                    filename = filename.removesuffix(".json")
-                    ftype, fid = filename.split("_")
-                except Exception as e:
-                    logger.error(e)
+                    match data["type"]:
+                        case "user":
+                            user = User.from_json(data)
+                            self.users[user.id] = user
+                            self.names_to_user_id[user.name] = user.id
+                        case "server":
+                            server = Server.from_json(data)
+                            self.servers[server.id] = server
+                            self.names_to_server_id[server.name] = server.id
+                        case "community":
+                            community = Community.from_json(data)
+                            self.communities[community.id] = community
+                            self.names_to_community_id[community.name] = community.id
+                except KeyError:
                     continue
 
-                if ftype == "user":
-                    if (user := self.repo.load_user(int(fid))):
-                        self.users[user.id] = user
-                        self.names_to_user_id[user.name] = user.id
-                if ftype == "server":
-                    if (server := self.repo.load_server(int(fid))):
-                        self.servers[server.id] = server
-                        self.names_to_server_id[server.name] = server.id
-                if ftype == "community":
-                    if (community := self.repo.load_community(int(fid))):
-                        self.communities[community.id] = community
-                        self.names_to_community_id[community.name] = community.id
+    # === Manager Community Methods
+    def get_communities(self, object: Union[User, Server]) -> List[Community]:
+        communities = []
+        
+        if isinstance(object, User):
+            communities = [community for cid in object.communities if (community := self.get_community(cid))]
+        if isinstance(object, Server):
+            if not object.community:
+                return []
 
-    # === Community User Methods
+            if (community := self.get_community(object.community)):
+                communities.append(community)
+
+        return communities
+
     def get_community(self, id: Union[int, str]) -> Optional[Community]: 
         if isinstance(id, str):
             id = self.names_to_community_id.get(id, -1)
@@ -274,13 +340,13 @@ class CommunityManager:
         if not community:
             return
 
-        for sid in community.users:
+        for sid in copy.deepcopy(community.users):
             user = self.get_user(sid)
             if user:
                 self.unlink_user_to_community(user, community)
                 self.save_user(user)
 
-        for sid in community.servers:
+        for sid in copy.deepcopy(community.servers):
             server = self.get_server(sid)
             if server:
                 self.unlink_server_to_community(server, community)
@@ -289,7 +355,34 @@ class CommunityManager:
         del self.servers[id]
         self.repo.delete_server(id)
 
-    # === Server User Methods
+    def display_community(self, community: Community) -> str:
+        out = ""
+        out += f"Name: {community.name}\n"
+        out += f"Owned by: <@{community.owner}>\n"
+        out += f"No. of Members: {len(community.users)}\n" 
+        out += f"No. of Servers: {len(community.servers)}\n" 
+        out += f"Registered on: {community.created_at}\n" 
+
+        servers = self.get_servers(community)
+        if len(servers) > 0:
+            out += "Registered Servers:\n"
+            servers = self.get_servers(community)
+            for server in sorted(servers, key=lambda s: s.name):
+                out += f"- {server.name}\n"
+
+        return out
+
+    # === Manager Server Methods
+    def get_servers(self, object: Union[User, Community]) -> List[Server]:
+        servers = []
+        
+        if isinstance(object, User):
+            servers = [server for sid in object.servers if (server := self.get_server(sid))]
+        if isinstance(object, Community):
+            servers = [server for sid in object.servers if (server := self.get_server(sid))]
+
+        return servers
+
     def get_server(self, id: Union[int, str]) -> Optional[Server]: 
         if isinstance(id, str):
             id = self.names_to_server_id.get(id, -1)
@@ -325,7 +418,7 @@ class CommunityManager:
         if not server:
             return
 
-        for uid in server.users:
+        for uid in copy.deepcopy(server.users):
             user = self.get_user(uid)
             if user:
                 self.unlink_user_to_server(user, server)
@@ -339,7 +432,26 @@ class CommunityManager:
         del self.servers[id]
         self.repo.delete_server(id)
 
+    def display_server(self, server: Server) -> str:
+        out = ""
+        out += f"Name: {server.name}\n"
+        out += f"Community: {c.name if server.community and (c := self.get_community(server.community)) else 'None'}\n" 
+        out += f"No. of Members: {len(server.users)}\n" 
+        out += f"Registered on: {server.created_at}\n" 
+
+        return out
+
     # === Manager User Methods
+    def get_users(self, object: Union[Server, Community]) -> List[User]:
+        users = []
+        
+        if isinstance(object, Server):
+            users = [user for uid in object.users if (user := self.get_user(uid))]
+        if isinstance(object, Community):
+            users = [user for sid in object.users if (user := self.get_user(sid))]
+
+        return users
+
     def get_user(self, id: Union[int, str]) -> Optional[User]:
         if isinstance(id, str):
             id = self.names_to_user_id.get(id, -1)
@@ -388,6 +500,25 @@ class CommunityManager:
         del self.users[id]
         self.repo.delete_user(id)
 
+    def display_user(self, user: User) -> str:
+        out = ""
+        out += f"Name: {user.name}\n"
+        out += f"Registered on: {user.created_at}\n"
+        
+        communities = self.get_communities(user)
+        if len(communities) > 0:
+            out += "Communities:\n"
+            for community in sorted(communities, key=lambda c: c.name):
+                out += f"- {community.name}\n"
+
+        servers = self.get_servers(user)
+        if len(servers) > 0:
+            out += "Servers:\n"
+            for server in sorted(servers, key=lambda c: c.created_at, reverse=True):
+                out += f"- {server.name}\n"
+
+        return out
+
     # === Object Linking Methods
     def link_user_to_server(self, user: User, server: Server) -> None:
         user.servers.add(server.id)
@@ -421,10 +552,8 @@ class CommunityManager:
         server.community = community.id
         community.servers.add(server.id)
 
-        for uid in server.users:
-            user = self.get_user(uid)
-            if user:
-                self.link_user_to_community(user, community)
+        for user in self.get_users(server):
+            self.link_user_to_community(user, community)
 
         self.repo.save_server(server)
         self.repo.save_community(community)
@@ -433,14 +562,11 @@ class CommunityManager:
         server.community = None
         community.servers.remove(server.id)
 
-        for uid in server.users:
-            user = self.get_user(uid)
-            if user:
-                if len(user.servers & community.servers) == 0:
-                    self.unlink_user_to_community(user, community)
-
-
         self.repo.save_server(server)
+        self.repo.save_community(community)
+
+    def change_community_ownership(self, user: User, community: Community) -> None:
+        community.owner = user.id
         self.repo.save_community(community)
 
 class CommunityCog(commands.Cog):
@@ -534,10 +660,72 @@ class CommunityCog(commands.Cog):
 
         community = Community(id=uid, name=name, owner=ctx.author.id)
         self.comms.save_community(community)
+        await send_message_and_file(channel=ctx.channel, message=f"Created community: {name} ({uid})")
+
+    @community.command(name="delete")
+    async def community_delete(self, ctx: commands.Context, id: Union[int, str]) -> None: 
+        community = self.comms.get_community(id)
+        if not community:
+            await send_message_and_file(channel=ctx.channel, message=f"Could not find community attached to: '{id}'", embed_colour=ERROR_COLOUR)
+            return
+
+        if ctx.author.id != community.owner and not is_superuser(ctx.author):
+            await send_message_and_file(channel=ctx.channel, message="You are not permitted to delete that community.", embed_colour=ERROR_COLOUR)
+            return
+
+        self.comms.delete_community(community.id)
+        await send_message_and_file(channel=ctx.channel, message=f"Deleted community: {id}")
+
+    @community.command(name="transfer")
+    @superuser_only("transfer community ownership")
+    async def community_transfer(self, ctx: commands.Context, id: Union[int, str], user: discord.User) -> None: 
+        community = self.comms.get_community(id)
+        if not community:
+            await send_message_and_file(channel=ctx.channel, message=f"Could not find community attached to: '{id}'", embed_colour=ERROR_COLOUR)
+            return
+
+        user = self.comms.get_user(id)
+        if not user:
+            await send_message_and_file(channel=ctx.channel, message=f"Could not find a user record attached to: '{id}'", embed_colour=ERROR_COLOUR)
+            return
+
+        self.comms.change_community_ownership(user, community)
+
+
+    @community.command(name="join")
+    async def community_join(self, ctx: commands.Context, id: Union[int, str]) -> None: 
+        community = self.comms.get_community(id)
+        if not community:
+            await send_message_and_file(channel=ctx.channel, message=f"Could not find community attached to: '{id}'", embed_colour=ERROR_COLOUR)
+            return
+
+        user = self.comms.get_user(ctx.author.id)
+        if user:
+            self.comms.link_user_to_community(user, community)
+            await send_message_and_file(channel=ctx.channel, message=f"Joined Community: {community.name} ({community.id})")
+
+    @community.command(name="leave")
+    async def community_leave(self, ctx: commands.Context, id: Union[int, str]) -> None: 
+        community = self.comms.get_community(id)
+        if not community:
+            await send_message_and_file(channel=ctx.channel, message=f"Could not find community attached to: '{id}'", embed_colour=ERROR_COLOUR)
+            return
+
+        user = self.comms.get_user(ctx.author.id)
+        if not user:
+            return
+
+        if user.id == community.owner:
+            await send_message_and_file(channel=ctx.channel, message="You can't leave the community you own!", embed_colour=ERROR_COLOUR)
+            return
+
+
+        self.comms.unlink_user_to_community(user, community)
+        await send_message_and_file(channel=ctx.channel, message=f"Left Community: {community.name} ({community.id})")
 
     @community.group(name="register", invoke_without_command=True)
     async def community_register(self, ctx: commands.Context) -> None: 
-        await ctx.send("**Options:** server")
+        await ctx.send("**Options:** server, user*")
 
     @community_register.command(name="server")
     async def community_register_server(self, ctx: commands.Context, community_id: Union[int, str]) -> None:
@@ -550,11 +738,21 @@ class CommunityCog(commands.Cog):
 
         if server and community:
             self.comms.link_server_to_community(server, community)
+            await send_message_and_file(channel=ctx.channel, message=f"Registered {server.name} to {community.name}")
 
+    @community_unregister.command(name="user")
+    @superuser_only("register a user to a community")
+    async def community_register_user(self, ctx: commands.Context, user: discord.User, community_id: Union[int, str]) -> None:
+        community = self.comms.get_community(community_id)
+        user = self.comms.get_user(user.id)
+
+        if user and community:
+            self.comms.link_user_to_community(user, community)
+            await send_message_and_file(channel=ctx.channel, message=f"Registered {user.name} to {community.name}")
 
     @community.group(name="unregister", invoke_without_command=True)
     async def community_unregister(self, ctx: commands.Context) -> None: 
-        await ctx.send("**Options:** server")
+        await ctx.send("**Options:** server, user")
 
     @community_unregister.command(name="server")
     async def community_unregister_server(self, ctx: commands.Context, community_id: Union[int, str]) -> None:
@@ -567,6 +765,43 @@ class CommunityCog(commands.Cog):
 
         if server and community:
             self.comms.unlink_server_to_community(server, community)
+            await send_message_and_file(channel=ctx.channel, message=f"Unregistered {server.name} from {community.name}")
+
+    @community_unregister.command(name="user")
+    @superuser_only("unregister a user from a community")
+    async def community_unregister_user(self, ctx: commands.Context, user: discord.User, community_id: Union[int, str]) -> None:
+        community = self.comms.get_community(community_id)
+        user = self.comms.get_user(user.id)
+
+        if user and community:
+            self.comms.unlink_user_to_community(user, community)
+            await send_message_and_file(channel=ctx.channel, message=f"Unregistered {user.name} from {community.name}")
+
+    @community.group(name="list", invoke_without_command=True)
+    async def community_list(self, ctx:commands.Context) -> None:
+        await ctx.send("**Options:** community, server")
+
+    @community_list.command(name="communities")
+    async def community_list_communities(self, ctx: commands.Context) -> None:
+        out = ""
+        for name, id in sorted(self.comms.names_to_community_id.items(), key=lambda p: p[0]):
+            out += f"- {name} ({id})\n"
+
+        await send_message_and_file(channel=ctx.channel, title="Currently Tracked Communities", message=out)
+
+    @community_list.command(name="servers")
+    async def community_list_servers(self, ctx: commands.Context, community_id: Union[int, str]) -> None:
+        community = self.comms.get_community(community_id)
+        if not community:
+            await send_message_and_file(channel=ctx.channel, message="Could not find that Community!", embed_colour=ERROR_COLOUR)
+            return
+        
+        out = ""
+        servers = self.comms.get_servers(community)
+        for server in sorted(servers, key=lambda s: s.name):
+            out += f"- {server.name}\n"
+
+        await send_message_and_file(channel=ctx.channel, title=f"{community.name} - Servers", message=out)
 
     @community.group(name="inspect", invoke_without_command=True)
     async def community_inspect(self, ctx:commands.Context) -> None:
@@ -579,7 +814,8 @@ class CommunityCog(commands.Cog):
             await send_message_and_file(channel=ctx.channel, message="Could not find that Community!", embed_colour=ERROR_COLOUR)
             return
 
-        await send_message_and_file(channel=ctx.channel, title = f"Community {id}", message=community.display())
+        out = self.comms.display_community(community)
+        await send_message_and_file(channel=ctx.channel, title = f"Community: {id}", message=out)
 
     @community_inspect.command(name="server")
     async def community_inspect_server(self, ctx: commands.Context, id: Union[int, str]) -> None:
@@ -588,16 +824,18 @@ class CommunityCog(commands.Cog):
             await send_message_and_file(channel=ctx.channel, message="Could not find Server!", embed_colour=ERROR_COLOUR)
             return
 
-        await send_message_and_file(channel=ctx.channel, title = f"Server {id}", message=str(server))
+        out = self.comms.display_server(server)
+        await send_message_and_file(channel=ctx.channel, title = f"Server: {id}", message=out)
 
     @community_inspect.command(name="user")
-    async def community_inspect_user(self, ctx: commands.Context, id: Union[int, str]) -> None:
-        user = self.comms.get_user(id)
+    async def community_inspect_user(self, ctx: commands.Context, user: discord.User) -> None:
+        user = self.comms.get_user(user.id)
         if not user:
             await send_message_and_file(channel=ctx.channel, message="Could not find User!", embed_colour=ERROR_COLOUR)
             return
 
-        await send_message_and_file(channel=ctx.channel, title = f"User {id}", message=str(user))
+        out = self.comms.display_user(user)
+        await send_message_and_file(channel=ctx.channel, title = f"User: {id}", message=out)
 
 def string_to_u8(s: str) -> int:
     digest = hashlib.sha1(s.encode("utf-8")).hexdigest()
