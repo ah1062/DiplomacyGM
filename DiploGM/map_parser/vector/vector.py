@@ -14,7 +14,7 @@ from DiploGM.map_parser.vector.utils import get_element_color, get_unit_coordina
 from DiploGM.models.turn import Turn
 from DiploGM.models.board import Board
 from DiploGM.models.player import Player
-from DiploGM.models.province import Province, ProvinceType, Coast
+from DiploGM.models.province import Province, ProvinceType
 from DiploGM.models.unit import Unit, UnitType
 
 # TODO: (BETA) all attribute getting should be in utils which we import and call utils.my_unit()
@@ -42,33 +42,28 @@ class Parser:
         svg_root = etree.parse(self.data["file"])
 
         self.layers = self.data["svg config"]
+        self.layer_data: dict[str, Element] = {}
 
-        for layer in ["land_layer", "island_borders", "island_fill_layer", "sea_borders", "province_names", "supply_center_icons", "army", "retreat_army", "fleet", "retreat_fleet"]:
-            if get_svg_element(svg_root, self.layers[layer]) is None:
-                print(f"bad layer: {layer}")
-
-
-        self.land_layer: Element = get_svg_element(svg_root, self.layers["land_layer"])
-        self.island_layer: Element = get_svg_element(svg_root, self.layers["island_borders"])
-        self.island_fill_layer: Element = get_svg_element(svg_root, self.layers["island_fill_layer"])
-        self.sea_layer: Element = get_svg_element(svg_root, self.layers["sea_borders"])
-        self.names_layer: Element = get_svg_element(svg_root, self.layers["province_names"])
-        self.centers_layer: Element = get_svg_element(svg_root, self.layers["supply_center_icons"])
+        for layer in ["land_layer", "island_borders", "island_fill_layer",
+                       "sea_borders", "province_names", "supply_center_icons",
+                       "army", "retreat_army", "fleet", "retreat_fleet"]:
+            l = get_svg_element(svg_root, self.layers[layer])
+            if l is None:
+                raise ValueError(f"Layer {layer} not found in SVG")
+            self.layer_data[layer] = l
 
         if self.layers["detect_starting_units"]:
-            self.units_layer: Element = get_svg_element(svg_root, self.layers["starting_units"])
-        else:
-            self.units_layer = None
-        self.power_banner_layer: Element = get_svg_element(svg_root, self.layers["power_banners"])
+            starting_units = get_svg_element(svg_root, self.layers["starting_units"])
+            if starting_units is None:
+                raise ValueError("Starting_units layer expected but not found in SVG")
+            else:
+                self.layer_data["starting_units"] = starting_units
 
-        self.impassibles_layer: Element | None = None
         if "impassibles_layer" in self.layers:
-            self.impassibles_layer = get_svg_element(svg_root, self.layers["impassibles_layer"])
-
-        self.phantom_primary_armies_layer: Element = get_svg_element(svg_root, self.layers["army"])
-        self.phantom_retreat_armies_layer: Element = get_svg_element(svg_root, self.layers["retreat_army"])
-        self.phantom_primary_fleets_layer: Element = get_svg_element(svg_root, self.layers["fleet"])
-        self.phantom_retreat_fleets_layer: Element = get_svg_element(svg_root, self.layers["retreat_fleet"])
+            impassibles_layer = get_svg_element(svg_root, self.layers["impassibles_layer"])
+            if impassibles_layer is None:
+                raise ValueError(f"Layer impassibles_layer not found in SVG")
+            self.layer_data["impassibles_layer"] = impassibles_layer
 
         self.fow = self.layers.get("fow", False)
         self.year_offset = self.layers.get("year", 1642)
@@ -132,25 +127,27 @@ class Parser:
         # plt.show()
 
         for province in provinces:
-            province.all_locs -= {None}
-            province.all_rets -= {None}
-            if province.primary_unit_coordinate == None:
-                logger.warning(f"{self.datafile}: Province {province.name} has no unit coord. Setting to 0,0 ...")
-                province.primary_unit_coordinate = (0, 0)
-            if province.retreat_unit_coordinate == None:
-                logger.warning(f"{self.datafile}: Province {province.name} has no retreat coord. Setting to 0,0 ...")
-                province.retreat_unit_coordinate = (0, 0)
-
-        for province in provinces:
-            for coast in province.coasts:
-                coast.all_locs -= {None}
-                coast.all_rets -= {None}
-                if coast.primary_unit_coordinate == None:
-                    logger.warning(f"{self.datafile}: Province {coast.name} has no unit coord. Setting to 0,0 ...")
-                    coast.primary_unit_coordinate = (0, 0)
-                if coast.retreat_unit_coordinate == None:
-                    logger.warning(f"{self.datafile}: Province {coast.name} has no retreat coord. Setting to 0,0 ...")
-                    coast.retreat_unit_coordinate = (0, 0)
+            for coast in province.get_multiple_coasts():
+                if province.get_primary_unit_coordinates(UnitType.FLEET, coast) == (0, 0):
+                    logger.warning(f"{self.datafile}: Province {province.get_name(coast)} has no fleet coord. Setting to 0,0 ...")
+                    province.set_unit_coordinate(None, True, UnitType.FLEET, coast)
+                if province.get_retreat_unit_coordinates(UnitType.FLEET, coast) == (0, 0):
+                    logger.warning(f"{self.datafile}: Province {province.get_name(coast)} has no fleet retreat coord. Setting to 0,0 ...")
+                    province.set_unit_coordinate(None, False, UnitType.FLEET, coast)
+            if not province.get_multiple_coasts() and province.get_coastal_adjacent():
+                if province.get_primary_unit_coordinates(UnitType.FLEET) == (0, 0):
+                    logger.warning(f"{self.datafile}: Province {province.name} has no fleet coord. Setting to 0,0 ...")
+                    province.set_unit_coordinate(None, True, UnitType.FLEET)
+                if province.get_retreat_unit_coordinates(UnitType.FLEET) == (0, 0):
+                    logger.warning(f"{self.datafile}: Province {province.name} has no fleet retreat coord. Setting to 0,0 ...")
+                    province.set_unit_coordinate(None, False, UnitType.FLEET)
+            if province.type != ProvinceType.SEA:
+                if province.get_primary_unit_coordinates(UnitType.ARMY) == (0, 0):
+                    logger.warning(f"{self.datafile}: Province {province.name} has no army coord. Setting to 0,0 ...")
+                    province.set_unit_coordinate(None, True, UnitType.ARMY)
+                if province.get_retreat_unit_coordinates(UnitType.ARMY) == (0, 0):
+                    logger.warning(f"{self.datafile}: Province {province.name} has no army retreat coord. Setting to 0,0 ...")
+                    province.set_unit_coordinate(None, False, UnitType.ARMY)
         
         initial_turn = Turn(self.year_offset, "Spring Moves", self.year_offset)
         if "adju flags" in self.data and "initial builds" in self.data["adju flags"]:
@@ -185,9 +182,6 @@ class Parser:
 
         return (provinces, adjacencies)
 
-    def names_to_provinces(self, names: set[str]):
-        return map((lambda n: self.name_to_province[n]), names)
-
     def add_province_to_board(self, provinces: set[Province], province: Province) -> set[Province]:
         provinces = {x for x in provinces if x.name != province.name}
         provinces.add(province)
@@ -195,8 +189,8 @@ class Parser:
         return provinces
 
     def json_cheats(self, provinces: set[Province]) -> set[Province]:
-        if not "overrides" in self.data:
-            return
+        if "overrides" not in self.data:
+            return set()
         if "high provinces" in self.data["overrides"]:
             for name, data in self.data["overrides"]["high provinces"].items():
                 high_provinces: list[Province] = []
@@ -204,8 +198,8 @@ class Parser:
                     province = Province(
                         name + str(index),
                         shapely.Polygon(),
-                        None,
-                        None,
+                        dict(),
+                        dict(),
                         getattr(ProvinceType, data["type"]),
                         False,
                         set(),
@@ -224,7 +218,7 @@ class Parser:
                             provinceA.adjacent.add(provinceB)
 
             for name, data in self.data["overrides"]["high provinces"].items():
-                adjacent = tuple(self.names_to_provinces(data["adjacencies"]))
+                adjacent = {self.name_to_province[n] for n in data["adjacencies"]}
                 for index in range(1, data["num"] + 1):
                     high_province = self.name_to_province[name + str(index)]
                     high_province.adjacent.update(adjacent)
@@ -247,26 +241,33 @@ class Parser:
                 province = self.name_to_province[name]
                 # TODO: Some way to specify whether or not to clear other adjacencies?
                 if "adjacencies" in data:
-                    province.adjacent.update(self.names_to_provinces(data["adjacencies"]))
+                    province.adjacent.update({self.name_to_province[n] for n in data["adjacencies"]})
                 if "remove_adjacencies" in data:
-                    province.adjacent.difference_update(self.names_to_provinces(data["remove_adjacencies"]))
+                    province.adjacent.difference_update({self.name_to_province[n] for n in data["remove_adjacencies"]})
                 if "remove_adjacent_coasts" in data:
                     province.nonadjacent_coasts.update(data["remove_adjacent_coasts"])
                 if "coasts" in data:
-                    province.coasts = set()
+                    province.fleet_adjacent = {}
                     for coast_name, coast_adjacent in data["coasts"].items():
-                        coast = Coast(f"{name} {coast_name}", None, None, set(self.names_to_provinces(coast_adjacent)), province)
-                        province.coasts.add(coast)
+                        province.fleet_adjacent[coast_name] = {self._get_province_and_coast(n) for n in coast_adjacent}
                 if "unit_loc" in data:
+                    # For compatability reasons, we assume these are sea tiles
+                    # TODO: Add support for armies/multicoastal tiles
                     for coordinate in data["unit_loc"]:
                         coordinate = tuple((tuple(coordinate) + offset).tolist())
-                        province.all_locs.add(coordinate)
-                        province.primary_unit_coordinate = coordinate
+                        if UnitType.FLEET not in province.all_locs:
+                            province.all_locs[UnitType.FLEET] = {coordinate}
+                        else:
+                            province.all_locs[UnitType.FLEET].add(coordinate)
+                        province.primary_unit_coordinates[UnitType.FLEET] = coordinate
                 if "retreat_unit_loc" in data:
                     for coordinate in data["retreat_unit_loc"]:
                         coordinate = tuple((tuple(coordinate) + offset).tolist())
-                        province.all_rets.add(coordinate)
-                        province.retreat_unit_coordinate = coordinate
+                        if UnitType.FLEET not in province.all_rets:
+                            province.all_rets[UnitType.FLEET] = {coordinate}
+                        else:
+                            province.all_rets[UnitType.FLEET].add(coordinate)
+                        province.retreat_unit_coordinates[UnitType.FLEET] = coordinate
 
         return provinces
 
@@ -285,15 +286,14 @@ class Parser:
             province.set_coasts()
 
         for province in provinces:
-            for coast in province.coasts:
-                coast.set_adjacent_coasts()
+            province.set_adjacent_coasts()
 
         # impassible provinces aren't in the list; they're "ghost" and only show up
         # when explicitly asked for in costal topology algorithms
-        provinces = [p for p in provinces if not p.type == ProvinceType.IMPASSIBLE]
+        provinces = {p for p in provinces if p.type != ProvinceType.IMPASSIBLE}
 
-        self._initialize_province_owners(self.land_layer)
-        self._initialize_province_owners(self.island_fill_layer)
+        self._initialize_province_owners(self.layer_data["land_layer"])
+        self._initialize_province_owners(self.layer_data["island_fill_layer"])
 
         # set supply centers
         if self.layers["center_labels"]:
@@ -302,7 +302,7 @@ class Parser:
             self._initialize_supply_centers(provinces)
 
         # set units
-        if self.units_layer is not None:
+        if "starting_units" in self.layer_data:
             if self.layers["unit_labels"]:
                 self._initialize_units_assisted()
             else:
@@ -311,26 +311,32 @@ class Parser:
         # set phantom unit coordinates for optimal unit placements
         self._set_phantom_unit_coordinates()
 
+        # TODO: There's a better way to do this
         for province in provinces:
-            province.all_locs.add(province.primary_unit_coordinate)
-            province.all_rets.add(province.retreat_unit_coordinate)
-            for coast in province.coasts:
-                coast.all_locs.add(coast.primary_unit_coordinate)
-                coast.all_rets.add(coast.retreat_unit_coordinate)
+            for unit in province.primary_unit_coordinates.keys():
+                if unit not in province.all_locs:
+                    province.all_locs[unit] = {province.primary_unit_coordinates[unit]}
+                else:
+                    province.all_locs[unit].add(province.primary_unit_coordinates[unit])
+  
+                if unit not in province.all_rets:
+                    province.all_rets[unit] = {province.retreat_unit_coordinates[unit]}
+                else:
+                    province.all_rets[unit].add(province.retreat_unit_coordinates[unit])
 
         return provinces
 
     def _get_province_coordinates(self) -> set[Province]:
         # TODO: (BETA) don't hardcode translation
-        land_provinces = self._create_provinces_type(self.land_layer, ProvinceType.LAND)
-        island_provinces = self._create_provinces_type(self.island_layer, ProvinceType.ISLAND)
-        sea_provinces = self._create_provinces_type(self.sea_layer, ProvinceType.SEA)
+        land_provinces = self._create_provinces_type(self.layer_data["land_layer"], ProvinceType.LAND)
+        island_provinces = self._create_provinces_type(self.layer_data["island_borders"], ProvinceType.ISLAND)
+        sea_provinces = self._create_provinces_type(self.layer_data["sea_borders"], ProvinceType.SEA)
         # detect impassible to allow for better understanding
         # of coastlines
         # they don't go in board.provinces
         impassible_provinces = set()
-        if self.impassibles_layer is not None:
-            impassible_provinces = self._create_provinces_type(self.impassibles_layer, ProvinceType.IMPASSIBLE)
+        if self.layer_data.get("impassibles_layer") is not None:
+            impassible_provinces = self._create_provinces_type(self.layer_data["impassibles_layer"], ProvinceType.IMPASSIBLE)
         return land_provinces | island_provinces | sea_provinces | impassible_provinces
 
     # TODO: (BETA) can a library do all of this for us? more safety from needing to support wild SVG legal syntax
@@ -340,7 +346,7 @@ class Parser:
         province_type: ProvinceType,
     ) -> set[Province]:
         provinces = set()
-        for province_data in provinces_layer.getchildren():
+        for province_data in list(provinces_layer):
             path_string = province_data.get("d")
             if not path_string:
                 print(tostring(province_data))
@@ -353,7 +359,7 @@ class Parser:
             if len(province_coordinates) <= 1:
                 poly = shapely.Polygon(province_coordinates[0])
             else:
-                poly = shapely.MultiPolygon(map(shapely.Polygon, province_coordinates))
+                poly = shapely.MultiPolygon(list(map(shapely.Polygon, province_coordinates)))
                 poly = poly.buffer(0.1)
                 # import matplotlib.pyplot as plt
 
@@ -369,13 +375,13 @@ class Parser:
             if self.layers["province_labels"]:
                 name = self._get_province_name(province_data)
                 if name == None:
-                    print(tostring(province_data))
+                    raise RuntimeError(f"Province name not found in province with data {province_data}")
 
             province = Province(
                 name,
                 poly,
-                None,
-                None,
+                dict(),
+                dict(),
                 province_type,
                 False,
                 set(),
@@ -389,7 +395,7 @@ class Parser:
         return provinces
 
     def _initialize_province_owners(self, provinces_layer: Element) -> None:
-        for province_data in provinces_layer.getchildren():
+        for province_data in list(provinces_layer):
             name = self._get_province_name(province_data)
             self.name_to_province[name].owner = self.get_element_player(province_data, province_name=name)
 
@@ -398,15 +404,15 @@ class Parser:
         def get_coordinates(name_data: Element) -> tuple[float, float]:
             return float(name_data.get("x")), float(name_data.get("y"))
 
-        def set_province_name(province: Province, name_data: Element) -> None:
+        def set_province_name(province: Province, name_data: Element, _: str | None) -> None:
             if province.name is not None:
                 raise RuntimeError(f"Province already has name: {province.name}")
             province.name = name_data.findall(".//svg:tspan", namespaces=NAMESPACE)[0].text
 
-        initialize_province_resident_data(provinces, self.names_layer.getchildren(), get_coordinates, set_province_name)
+        initialize_province_resident_data(provinces, list(self.layer_data["names_layer"]), get_coordinates, set_province_name)
 
     def _initialize_supply_centers_assisted(self) -> None:
-        for center_data in self.centers_layer.getchildren():
+        for center_data in list(self.layer_data["supply_center_icons"]):
             name = self._get_province_name(center_data)
             province = self.name_to_province[name]
 
@@ -434,18 +440,22 @@ class Parser:
             if not circles:
                 return None, None
             circle = circles[0]
-            base_coordinates = float(circle.get("cx")), float(circle.get("cy"))
+            cx = circle.get("cx")
+            cy = circle.get("cy")
+            if cx is None or cy is None:
+                return None, None
+            base_coordinates = float(cx), float(cy)
             trans = TransGL3(supply_center_data)
             return trans.transform(base_coordinates)
 
-        def set_province_supply_center(province: Province, _: Element) -> None:
+        def set_province_supply_center(province: Province, _element: Element, _coast: str | None) -> None:
             if province.has_supply_center:
                 raise RuntimeError(f"{province.name} already has a supply center")
             province.has_supply_center = True
 
-        initialize_province_resident_data(provinces, self.centers_layer, get_coordinates, set_province_supply_center)
+        initialize_province_resident_data(provinces, self.layer_data["supply_center_icons"], get_coordinates, set_province_supply_center)
 
-    def _set_province_unit(self, province: Province, unit_data: Element, coast: Coast = None) -> Unit:
+    def _set_province_unit(self, province: Province, unit_data: Element, coast: str | None = None) -> None:
         if province.unit:
             return
             raise RuntimeError(f"{province.name} already has a unit")
@@ -454,22 +464,19 @@ class Parser:
 
         # assume that all starting units are on provinces colored in to their color
         player = province.owner
-        if province.owner == None:
+        if player is None:
             raise Exception(f"{province.name} has a unit, but isn't owned by any country")
 
         # color_data = unit_data.findall(".//svg:path", namespaces=NAMESPACE)[0]
         # player = self.get_element_player(color_data)
-        # TODO: (BETA) tech debt: let's pass the coast in instead of only passing in coast when province has multiple
-        if not coast and unit_type == UnitType.FLEET:
-            coast = next((coast for coast in province.coasts), None)
 
         unit = Unit(unit_type, player, province, coast, None)
         province.unit = unit
         unit.player.units.add(unit)
-        return unit
+        return
 
     def _initialize_units_assisted(self) -> None:
-        for unit_data in self.units_layer.getchildren():
+        for unit_data in self.layer_data["starting_units"]:
             province_name = self._get_province_name(unit_data)
             if self.data["svg config"]["unit_type_labeled"]:
                 province_name = province_name[1:]
@@ -485,55 +492,37 @@ class Parser:
             trans = TransGL3(unit_data)
             return trans.transform(base_coordinates)
 
-        initialize_province_resident_data(provinces, self.units_layer, get_coordinates, self._set_province_unit)
+        initialize_province_resident_data(provinces, self.layer_data["starting_units"], get_coordinates, self._set_province_unit)
 
     def _set_phantom_unit_coordinates(self) -> None:
         army_layer_to_key = [
-            (self.phantom_primary_armies_layer, "primary_unit_coordinate"),
-            (self.phantom_retreat_armies_layer, "retreat_unit_coordinate"),
+            (self.layer_data["army"], True),
+            (self.layer_data["retreat_army"], False),
         ]
-        for layer, province_key in army_layer_to_key:
+        for layer, is_primary in army_layer_to_key:
             layer_translation = TransGL3(layer)
-            for unit_data in layer.getchildren():
+            for unit_data in list(layer):
                 unit_translation = TransGL3(unit_data)
                 province = self._get_province(unit_data)
                 coordinate = get_unit_coordinates(unit_data)
-                setattr(province, province_key, layer_translation.transform(unit_translation.transform(coordinate)))
+                province.set_unit_coordinate(layer_translation.transform(unit_translation.transform(coordinate)), is_primary, UnitType.ARMY)
 
         fleet_layer_to_key = [
-            (self.phantom_primary_fleets_layer, "primary_unit_coordinate"),
-            (self.phantom_retreat_fleets_layer, "retreat_unit_coordinate"),
+            (self.layer_data["fleet"], True),
+            (self.layer_data["retreat_fleet"], False),
         ]
-        for layer, province_key in fleet_layer_to_key:
+        for layer, is_primary in fleet_layer_to_key:
 
             layer_translation = TransGL3(layer)
-            for unit_data in layer.getchildren():
+            for unit_data in list(layer):
                 unit_translation = TransGL3(unit_data)
                 # This could either be a sea province or a land coast
                 province_name = self._get_province_name(unit_data)
                 # this is me writing bad code to get this out faster, will fix later when we clean up this file
                 province, coast = self._get_province_and_coast(province_name)
-                is_coastal = False
-                for adjacent in province.adjacent:
-                    if adjacent.type != ProvinceType.LAND:
-                        is_coastal = True
-                        break
-                if not coast and province.type != ProvinceType.SEA and is_coastal:
-                    # bad bandaid: this is probably an extra phantom unit, or maybe it's a primary one?
-                    try:
-                        coast = province.coast()
-                    except Exception:
-                        print(
-                            f"Warning: phantom unit skipped, if drawing some move doesn't work this might be why: {province_name} {province_key}"
-                        )
-                        continue
-
                 coordinate = get_unit_coordinates(unit_data)
                 translated_coordinate = layer_translation.transform(unit_translation.transform(coordinate))
-                if coast:
-                    setattr(coast, province_key, translated_coordinate)
-                else:
-                    setattr(province, province_key, translated_coordinate)
+                province.set_unit_coordinate(translated_coordinate, is_primary, UnitType.FLEET, coast)
 
     @staticmethod
     def _get_province_name(province_data: Element) -> str:
@@ -542,22 +531,19 @@ class Parser:
     def _get_province(self, province_data: Element) -> Province:
         return self.name_to_province[self._get_province_name(province_data)]
 
-    def _get_province_and_coast(self, province_name: str) -> tuple[Province, Coast | None]:
+    def _get_province_and_coast(self, province_name: str) -> tuple[Province, str | None]:
         coast_suffix: str | None = None
-        coast_names = {" (nc)", " (sc)", " (ec)", " (wc)"}
+        coast_names = {" nc", " sc", " ec", " wc"}
+        province_name = province_name.replace("(", "").replace(")", "")
 
         for coast_name in coast_names:
-            if province_name[len(province_name) - 5 :] == coast_name:
-                province_name = province_name[: len(province_name) - 5]
-                coast_suffix = coast_name[2:4]
+            if province_name.endswith(coast_name):
+                province_name = province_name[:-3]
+                coast_suffix = coast_name[1:]
                 break
 
         province = self.name_to_province[province_name]
-        coast = None
-        if coast_suffix:
-            coast = next((coast for coast in province.coasts if coast.name == f"{province_name} {coast_suffix}"), None)
-
-        return province, coast
+        return province, coast_suffix
 
     # Returns province adjacency set
     def _get_adjacencies(self, provinces: set[Province]) -> set[tuple[str, str]]:
@@ -578,14 +564,14 @@ class Parser:
             f.close()
         return adjacencies
 
-    def get_element_player(self, element: Element, province_name: str="") -> Player:
+    def get_element_player(self, element: Element, province_name: str="") -> Player | None:
         color = get_element_color(element)
         #FIXME: only works if there's one person per province
         if self.autodetect_players:
             neutral_color = self.data["svg config"]["neutral"]
             if isinstance(neutral_color, dict):
                 neutral_color = neutral_color["standard"]
-            if color == neutral_color:
+            if color is None or color == neutral_color:
                 return None
             player = Player(province_name, color, "chaos", 101, 1, set(), set())
             self.players.add(player)

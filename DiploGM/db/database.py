@@ -212,11 +212,12 @@ class _DatabaseConnection:
 
                 if is_build:
                     player_order = Build(
-                        board.get_location(location),
+                        board.get_province_and_coast(location)[0],
                         UnitType.ARMY if is_army else UnitType.FLEET,
+                        board.get_province_and_coast(location)[1],
                     )
                 else:
-                    player_order = Disband(board.get_location(location))
+                    player_order = Disband(board.get_province(location))
 
                 player.build_orders.add(player_order)
 
@@ -316,7 +317,7 @@ class _DatabaseConnection:
                     (board_id, board.turn.get_indexed_name(), location),
                 )
                 retreat_options = set(
-                    map(board.get_location, set().union(*retreat_ops))
+                    map(board.get_province_and_coast, set().union(*retreat_ops))
                 )
             else:
                 retreat_options = None
@@ -369,23 +370,17 @@ class _DatabaseConnection:
                         destination_province, destination_coast = (
                             board.get_province_and_coast(order_destination)
                         )
-                        if destination_coast is not None:
-                            destination_province = destination_coast
                     if order_source is not None:
-                        source_province, source_coast = board.get_province_and_coast(
-                            order_source
-                        )
-                        if source_coast is not None:
-                            source_province = source_coast
+                        source_province = board.get_province(order_source)
                     if order_class == NMR:
                         continue
                     elif order_class in [Hold, Core, RetreatDisband]:
                         order = order_class()
                     elif order_class in [Move, ConvoyMove, RetreatMove]:
-                        order = order_class(destination=destination_province)
-                    elif order_class in [Support, ConvoyTransport]:
+                        order = order_class(destination=destination_province, destination_coast=destination_coast)
+                    elif order_class in [ConvoyTransport, Support]:
                         order = order_class(
-                            destination=destination_province, source=source_province
+                            destination=destination_province, source=source_province, destination_coast=destination_coast
                         )
                     else:
                         raise ValueError(f"Could not parse {order_class}")
@@ -471,7 +466,7 @@ class _DatabaseConnection:
                     board_id,
                     board.turn.get_indexed_name(),
                     player.name,
-                    build_order.location.name,
+                    build_order.name,
                     isinstance(build_order, Build),
                     getattr(build_order, "unit_type", None) == UnitType.ARMY,
                 )
@@ -486,27 +481,13 @@ class _DatabaseConnection:
                 (
                     board_id,
                     board.turn.get_indexed_name(),
-                    unit.location().name,
+                    unit.province.get_name(unit.coast),
                     unit == unit.province.dislodged_unit,
                     unit.player.name,
                     unit.unit_type == UnitType.ARMY,
                     unit.order.__class__.__name__ if unit.order is not None else None,
-                    (
-                        getattr(getattr(unit.order, "destination", None), "name", None)
-                        if unit.order is not None
-                        else None
-                    ),
-                    (
-                        getattr(
-                            getattr(
-                                getattr(unit.order, "source", None), "province", None
-                            ),
-                            "name",
-                            None,
-                        )
-                        if unit.order is not None
-                        else None
-                    ),
+                    unit.order.get_destination_str() if unit.order is not None else None,
+                    unit.order.get_source_str() if unit.order is not None else None,
                     unit.order.hasFailed if unit.order is not None else False
                 )
                 for unit in board.units
@@ -518,8 +499,8 @@ class _DatabaseConnection:
                 (
                     board_id,
                     board.turn.get_indexed_name(),
-                    unit.location().name,
-                    retreat_option.name,
+                    unit.province.get_name(unit.coast),
+                    retreat_option[0].get_name(retreat_option[1]),
                 )
                 for unit in board.units
                 if unit.retreat_options is not None
@@ -533,24 +514,17 @@ class _DatabaseConnection:
         cursor = self._connection.cursor()
         cursor.executemany(
             "UPDATE units SET order_type=?, order_destination=?, order_source=?, failed_order=? "
-            "WHERE board_id=? and phase=? and location=? and is_dislodged=?",
+            "WHERE board_id=? and phase=? and (location=? or location=?) and is_dislodged=?",
             [
                 (
                     unit.order.__class__.__name__ if unit.order is not None else None,
-                    (
-                        getattr(getattr(unit.order, "destination", None), "name", None)
-                        if unit.order is not None
-                        else None
-                    ),
-                    (
-                        getattr(getattr(unit.order, "source", None), "name", None)
-                        if unit.order is not None
-                        else None
-                    ),
+                    unit.order.get_destination_str() if unit.order is not None else None,
+                    unit.order.get_source_str() if unit.order is not None else None,
                     unit.order.hasFailed if unit.order is not None else False,
                     board.board_id,
                     board.turn.get_indexed_name(),
-                    unit.location().name,
+                    unit.province.get_name(unit.coast),
+                    f"{unit.province.get_name()} coast" if not unit.coast else None, # Legacy coast support
                     unit.province.dislodged_unit == unit,
                 )
                 for unit in units
@@ -562,7 +536,7 @@ class _DatabaseConnection:
                 (
                     board.board_id,
                     board.turn.get_indexed_name(),
-                    unit.location().name,
+                    unit.province.get_name(unit.coast),
                 )
                 for unit in units
                 if unit.retreat_options is not None
@@ -574,8 +548,8 @@ class _DatabaseConnection:
                 (
                     board.board_id,
                     board.turn.get_indexed_name(),
-                    unit.location().name,
-                    retreat_option.name,
+                    unit.province.get_name(unit.coast),
+                    retreat_option[0].get_name(retreat_option[1]),
                 )
                 for unit in units
                 if unit.retreat_options is not None
@@ -599,7 +573,7 @@ class _DatabaseConnection:
                     board.board_id,
                     board.turn.get_indexed_name(),
                     player.name,
-                    build_order.location.name,
+                    build_order.province.get_name(build_order.coast if isinstance(build_order, Build) else None),
                     isinstance(build_order, Build),
                     getattr(build_order, "unit_type", None) == UnitType.ARMY,
                     isinstance(build_order, Build),

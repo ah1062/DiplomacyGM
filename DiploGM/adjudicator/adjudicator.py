@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import abc
 import collections
 import logging
+from typing import TYPE_CHECKING
 
 from DiploGM.adjudicator.defs import (
     ResolutionState,
@@ -8,8 +11,11 @@ from DiploGM.adjudicator.defs import (
     AdjudicableOrder,
     OrderType,
 )
-from DiploGM.models.turn import Turn
-from DiploGM.models.board import Board
+
+if TYPE_CHECKING:
+    from DiploGM.models.turn import Turn
+    from DiploGM.models.board import Board
+    from DiploGM.models.player import Player
 from DiploGM.models.order import (
     Order,
     NMR,
@@ -33,7 +39,7 @@ from DiploGM.models.order import (
 )
 
 from DiploGM.models.player import PlayerClass
-from DiploGM.models.province import Location, Coast, Province, ProvinceType, get_adjacent_provinces
+from DiploGM.models.province import Province, ProvinceType
 from DiploGM.models.unit import UnitType, Unit
 from DiploGM.db import database
 
@@ -81,11 +87,32 @@ def convoy_is_possible(start: Province, end: Province, check_fleet_orders=False)
     return False
 
 
-def order_is_valid(location: Location, order: Order, strict_convoys_supports=False, strict_coast_movement=True) -> tuple[bool, str | None]:
+def _validate_move_army(province: Province, destination_province: Province) -> tuple[bool, str | None]:
+    if destination_province not in province.adjacent:
+        return False, f"{province} does not border {destination_province}"
+    if destination_province.type == ProvinceType.SEA:
+        return False, "Armies cannot move to sea provinces"
+    return True, None
+
+
+def _validate_move_fleet(province: Province, order: Move | RetreatMove, unit: Unit, strict_coast_movement: bool) -> tuple[bool, str | None]:
+    destination_coast = order.destination_coast if strict_coast_movement else None
+    if not province.is_coastally_adjacent(order.get_destination_and_coast(), unit.coast):
+        return False, f"{province.get_name(unit.coast)} does not border {order.get_destination_str()}"
+    if strict_coast_movement and not destination_coast:
+        reachable_coasts = {c for c in order.destination.get_multiple_coasts() if province.is_coastally_adjacent((order.destination, c), unit.coast)}
+        if len(reachable_coasts) > 1:
+            return False, f"{province} and {order.destination} have multiple coastal paths"
+        if reachable_coasts:
+            order.destination_coast = reachable_coasts.pop()
+    return True, None
+
+
+def order_is_valid(province: Province, order: Order, strict_convoys_supports=False, strict_coast_movement=True) -> tuple[bool, str | None]:
     """
     Checks if order from given location is valid for configured board
 
-    :param location: Province or Coast the order originates from
+    :param province: Province the order originates from
     :param order: Order to check
     :param strict_convoys_supports: Defaults False. Validates only if supported order was also ordered,
                                     or convoyed unit was convoyed correctly
@@ -100,68 +127,35 @@ def order_is_valid(location: Location, order: Order, strict_convoys_supports=Fal
 
     if isinstance(order, Support) or isinstance(order, ConvoyTransport):
         source = order.source
-        source_unit = source.get_unit()
+        source_unit = source.unit
 
         if source_unit == None:
             return False, f"No unit for supporting / convoying at {source}"
 
-        order.source = source_unit.location()
+        order.source = source_unit.province
 
-        # Quick FOW fix for supports
-        if source_unit.unit_type == UnitType.FLEET and isinstance(order.destination, Province):
-            if len(order.destination.coasts) == 1:
-                order.destination = order.destination.coast()
-        if source_unit.unit_type == UnitType.ARMY and isinstance(order.destination, Coast):
-                order.destination = order.destination.province
-
-
-    unit = location.as_province().unit
+    unit = province.unit
     if unit is None:
-        return False, f"There is no unit in {location.name}"
+        return False, f"There is no unit in {province}"
 
     if isinstance(order, Hold) or isinstance(order, RetreatDisband) or isinstance(order, NMR):
         return True, None
     elif isinstance(order, Core):
-        if not location.as_province().has_supply_center:
-            return False, f"{location.name} does not have a supply center to core"
-        if location.get_owner() != unit.player:
+        if not province.has_supply_center:
+            return False, f"{province} does not have a supply center to core"
+        if province.get_owner() != unit.player:
             return False, "Units can only core in owned supply centers"
         return True, None
     elif isinstance(order, Move) or isinstance(order, RetreatMove):
-        destination_province = order.destination.as_province()
+        destination_province = order.destination
         if unit.unit_type == UnitType.ARMY:
-            if destination_province not in get_adjacent_provinces(location):
-                return False, f"{location.name} does not border {order.destination.name}"
-            if destination_province.type == ProvinceType.SEA:
-                return False, "Armies cannot move to sea provinces"
+            valid, reason = _validate_move_army(province, destination_province)
+            if not valid:
+                return valid, reason
         elif unit.unit_type == UnitType.FLEET:
-            check = order.destination.as_province() in get_adjacent_provinces(location)
-
-            # FIXME currently adjacencies for coasts don't work properly, and allow for supporting from different coasts when necessary
-            # when this is fixed, please uncomment out tests test_6_b_3_variant, test_6_d_29, test_6_d_30 as they fail currently
-            source = location
-            destination = order.destination
-            # supports don't need to be strict
-            if strict_coast_movement:
-                if isinstance(source, Coast) and isinstance(destination, Coast):
-                    # coast to coast
-                    check = destination in source.adjacent_coasts
-                elif isinstance(source, Coast) and isinstance(destination, Province):
-                    # coast to sea / island
-                    if destination.type == ProvinceType.LAND:
-                        return False, f"Fleet destination should be a coast"
-                    check = destination in source.adjacent_seas
-                elif isinstance(source, Province) and isinstance(destination, Coast):
-                    # sea / island to coast
-                    if source.type == ProvinceType.LAND:
-                        return False, f"Fleet source {source} should be a coast"
-                    check = source in destination.adjacent_seas
-                elif isinstance(source, Province) and isinstance(destination, Province):
-                    # sea / island to sea / island
-                    check = source in destination.adjacent
-
-            if not check:
-                return False, f"{location.name} does not border {order.destination.name}"
+            valid, reason = _validate_move_fleet(province, order, unit, strict_coast_movement)
+            if not valid:
+                return valid, reason
         else:
             raise ValueError("Unknown type of unit. Something has broken in the bot. Please report this")
 
@@ -171,49 +165,52 @@ def order_is_valid(location: Location, order: Order, strict_convoys_supports=Fal
     elif isinstance(order, ConvoyMove):
         if unit.unit_type != UnitType.ARMY:
             return False, "Only armies can be convoyed"
-        destination_province = order.destination.as_province()
+        destination_province = order.destination
         if destination_province.type == ProvinceType.SEA:
             return False, "Cannot convoy to a sea space"
-        if destination_province == unit.location():
+        if destination_province == unit.province:
             return False, "Cannot convoy army to its previous space"
         return (
             convoy_is_possible(
-                location.as_province(),
+                province,
                 destination_province,
                 check_fleet_orders=strict_convoys_supports,
             ),
-            f"No valid convoy path from {location.name} to {order.destination.name}",
+            f"No valid convoy path from {province} to {order.destination}",
         )
     elif isinstance(order, ConvoyTransport):
         if unit.unit_type != UnitType.FLEET:
             return False, "Only fleets can convoy"
+        source_unit = order.source.unit
+        if not isinstance(source_unit, Unit):
+            return False, "There is no unit to convoy"
         if strict_convoys_supports:
-            corresponding_order_is_move = isinstance(order.source.get_unit().order, Move) or isinstance(
-                order.source.get_unit().order, ConvoyMove
-            )
-            if not corresponding_order_is_move or order.source.get_unit().order.destination.as_province() != order.destination.as_province():
+            if not isinstance(source_unit.order, (Move, ConvoyMove)) or source_unit.order.destination != order.destination:
                 return False, f"Convoyed unit {order.source} did not make corresponding order"
         valid_move, reason = order_is_valid(
-            order.source.as_province(), ConvoyMove(order.destination), strict_convoys_supports
+            order.source, ConvoyMove(order.destination), strict_convoys_supports
         )
         if not valid_move:
             return valid_move, reason
         # Check we are actually part of the convoy chain
-        destination_province = order.destination.as_province()
+        destination_province = order.destination
         if not convoy_is_possible(
-            order.source.as_province(), destination_province, check_fleet_orders=strict_convoys_supports
+            order.source, destination_province, check_fleet_orders=strict_convoys_supports
         ):
-            return False, f"No valid convoy path from {order.source.name} to {location.name}"
+            return False, f"No valid convoy path from {order.source} to {province}"
         return True, None
     elif isinstance(order, Support):
-        if isinstance(order.source.get_unit().order, Core) and order_is_valid(order.source.as_province(), Core):
+        source_unit = order.source.unit
+        if not isinstance(source_unit, Unit):
+            return False, "There is no unit to support"
+        if isinstance(source_unit.order, Core) and order_is_valid(order.source, source_unit.order):
             return False, f"Cannot support a unit that is coring"
 
-        move_valid, _ = order_is_valid(location, Move(order.destination), strict_convoys_supports, False)
+        move_valid, _ = order_is_valid(province, Move(order.destination), strict_convoys_supports, False)
         if not move_valid:
             return False, f"Cannot support somewhere you can't move to"
 
-        is_support_hold = order.source.as_province() == order.destination.as_province()
+        is_support_hold = order.source == order.destination
         source_to_destination_valid = (
             is_support_hold
             or order_is_valid(order.source, Move(order.destination), strict_convoys_supports)[0]
@@ -224,14 +221,16 @@ def order_is_valid(location: Location, order: Order, strict_convoys_supports=Fal
             return False, "Supported unit can't reach destination"
 
         if strict_convoys_supports:
-            corresponding_order_is_move = isinstance(order.source.get_unit().order, Move) or isinstance(
-                order.source.get_unit().order, ConvoyMove
-            )
             # if move is invalid then it doesn't go through
             if (
-                is_support_hold and corresponding_order_is_move
+                is_support_hold and isinstance(source_unit.order, (Move, ConvoyMove))
             ) or (
-                not is_support_hold and (not corresponding_order_is_move or order.source.get_unit().order.destination != order.destination)
+                not is_support_hold and 
+                (
+                    not isinstance(source_unit.order, (Move, ConvoyMove)) or
+                    source_unit.order.destination != order.destination or
+                    (order.destination_coast is not None and source_unit.order.destination_coast != order.destination_coast)
+                )
             ):
                 return False, f"Supported unit {order.source} did not make corresponding order"
 
@@ -242,7 +241,8 @@ def order_is_valid(location: Location, order: Order, strict_convoys_supports=Fal
 
 class MapperInformation:
     def __init__(self, unit: Unit):
-        self.location = unit.location()
+        self.location = unit.province
+        self.coast = unit.coast
         self.order = unit.order
 
 
@@ -265,33 +265,35 @@ class BuildsAdjudicator(Adjudicator):
         super().__init__(board)
 
     def vassal_adju(self):
+        new_vassals: dict[Player, list[Player]] = {}
+        new_lieges: dict[Player, Player | None] = {}
         for player in self._board.players:
             scs = 0
             for vassal in player.vassals:
                 scs += len(vassal.centers)
-            player.new_vassals = player.vassals.copy()
+            new_vassals[player] = player.vassals.copy()
             if scs > len(player.centers):
                 for order in player.vassal_orders.values():
                     if isinstance(order, Disown) and order.player in player.vassals:
-                        player.new_vassals.remove(order.player)
+                        new_vassals[player].remove(order.player)
                     scs2 = 0
-                    for vassal in player.new_vassals:
+                    for vassal in new_vassals[player]:
                         scs2 += len(vassal.centers)
                     if scs2 > len(player.centers):
-                        player.new_vassals = []
+                        new_vassals[player] = []
             else:
                 for order in player.vassal_orders.values():
                     if isinstance(order, Vassal):
                         vassal = order.player
                         if player in vassal.vassal_orders and isinstance(vassal.vassal_orders[player], Liege):
                             if (not vassal.liege) or (vassal.liege in player.vassal_orders and isinstance(player.vassal_orders[vassal.liege], RebellionMarker)):
-                                player.new_vassals.append(vassal)
+                                new_vassals[player].append(vassal)
                 
         for player in self._board.players:
             new_liege = None
             overcommited = False
             for liege in self._board.players:
-                if player in liege.new_vassals:
+                if player in new_vassals[liege]:
                     if new_liege is None:
                         new_liege = liege
                     else:
@@ -299,19 +301,18 @@ class BuildsAdjudicator(Adjudicator):
                         break
             if overcommited:
                 for liege in self._board.players:
-                    if player in liege.new_vassals:
-                        liege.new_vassals.remove(player)
+                    if player in new_vassals[liege]:
+                        new_vassals[liege].remove(player)
             for order in player.vassal_orders:
                 if isinstance(order, Defect):
-                    if player in order.player.new_vassals:
-                        order.player.new_vassals.remove(player)
+                    if player in new_vassals[order.player]:
+                        new_vassals[order.player].remove(player)
                         new_liege = None
-            player.new_liege = new_liege
+            new_lieges[player] = new_liege
             
         for player in self._board.players:
-            player.liege = player.new_liege
-            player.vassals = player.new_vassals
-        
+            player.liege = new_lieges[player]
+            player.vassals = new_vassals[player]
         for player in self._board.players:
             for order in player.vassal_orders.values():
                 if isinstance(order, DualMonarchy) and player in order.player.vassal_orders and isinstance(order.player.vassal_orders[player], DualMonarchy):
@@ -325,7 +326,7 @@ class BuildsAdjudicator(Adjudicator):
 
         for player in self._board.players:
             player.points += len(player.centers)
-            if not player.liege in player.vassals:
+            if player.liege not in player.vassals:
                 for vassal in player.vassals:
                     player.points += len(vassal.centers)
                     for subvassal in vassal.vassals:
@@ -346,33 +347,31 @@ class BuildsAdjudicator(Adjudicator):
             for order in player.build_orders:
 
                 if available_builds > 0 and isinstance(order, Build):
-                    coast = None
-                    province = order.location
                     # ignore coast specifications for army
-                    if isinstance(province, Coast):
-                        if order.unit_type == UnitType.FLEET:
-                            coast = province
-                        province = province.province
-                    if order.unit_type == UnitType.FLEET and coast == None:
-                        logger.warning(f"Skipping {order}; someone tried to build a fleet not on the coast")
+                    if (order.unit_type == UnitType.FLEET and not order.province.fleet_adjacent):
+                        logger.warning(f"Skipping {order}; tried building an inland fleet")
                         continue
-                    if province.unit is not None:
+                    if (order.unit_type == UnitType.FLEET
+                        and order.province.get_multiple_coasts()
+                        and order.coast not in order.province.get_multiple_coasts()):
+                        logger.warning(f"Skipping {order}; someone didn't specify a valid coast")
+                        continue
+                    if order.province.unit is not None:
                         logger.warning(f"Skipping {order}; there is already a unit there")
                         continue
-                    if not province.has_supply_center or province.owner != player:
+                    if not order.province.has_supply_center or order.province.owner != player:
                         logger.warning(f"Skipping {order}; tried to build in non-sc, non-owned")
                         continue
-                    if province.core != player and not "build anywhere" in self.flags:
+                    if order.province.core != player and "build anywhere" not in self.flags:
                         logger.warning(f"Skipping {order}; tried to build in non-core")
                         continue
-                    self._board.create_unit(order.unit_type, player, province, coast, None)
+                    self._board.create_unit(order.unit_type, player, order.province, order.coast, None)
                     available_builds -= 1
                 if available_builds < 0 and isinstance(order, Disband):
-                    province = order.location.as_province()
-                    if province.unit is None:
+                    if order.province.unit is None:
                         logger.warning(f"Skipping {order}; there is no unit there to disband")
                         continue
-                    self._board.delete_unit(province)
+                    self._board.delete_unit(order.province)
                     available_builds += 1
 
                 if available_builds < 0:
@@ -395,7 +394,7 @@ class RetreatsAdjudicator(Adjudicator):
         super().__init__(board)
 
     def run(self) -> Board:
-        retreats_by_destination: dict[str, set[Unit]] = dict()
+        retreats_by_destination: dict[str, set[Unit]] = {}
         units_to_delete: set[Unit] = set()
         for unit in self._board.units:
             if unit != unit.province.dislodged_unit:
@@ -405,17 +404,18 @@ class RetreatsAdjudicator(Adjudicator):
                 unit.order = NMR()
                 
             if not isinstance(unit.order, RetreatMove):
+                logger.warning(f"Unit {unit.province} is doing an unexpected action during retreat phase")
                 units_to_delete.add(unit)
                 continue
 
-            destination_province = unit.order.destination.as_province()
-            if destination_province not in unit.retreat_options:
+            destination = unit.order.get_destination_and_coast()
+            if unit.retreat_options is None or destination not in unit.retreat_options:
                 units_to_delete.add(unit)
                 continue
 
-            if destination_province.name not in retreats_by_destination:
-                retreats_by_destination[destination_province.name] = set()
-            retreats_by_destination[destination_province.name].add(unit)
+            if destination[0].name not in retreats_by_destination:
+                retreats_by_destination[destination[0].name] = set()
+            retreats_by_destination[destination[0].name].add(unit)
 
         for retreating_units in retreats_by_destination.values():
             if len(retreating_units) != 1:
@@ -423,12 +423,11 @@ class RetreatsAdjudicator(Adjudicator):
                 continue
 
             (unit,) = retreating_units
+            if not isinstance(unit.order, RetreatMove):
+                units_to_delete.add(unit)
+                continue
 
-            destination_coast = None
-            destination_province = unit.order.destination
-            if isinstance(unit.order.destination, Coast):
-                destination_coast = unit.order.destination
-                destination_province = destination_coast.province
+            destination_province, destination_coast = unit.order.get_destination_and_coast()
 
             unit.province.dislodged_unit = None
             unit.province = destination_province
@@ -450,7 +449,7 @@ class RetreatsAdjudicator(Adjudicator):
             for player in self._board.players:
                 if player.liege in player.vassals:
                     other = player.liege
-                    if (not player.get_class() == PlayerClass.KINGDOM) or (not other.get_class() == PlayerClass.KINGDOM):
+                    if (player.get_class() != PlayerClass.KINGDOM) or (other.get_class() != PlayerClass.KINGDOM):
                         # Dual Monarchy breaks
                         for p in (player, other):
                             p.vassals = []
@@ -490,21 +489,21 @@ class MovesAdjudicator(Adjudicator):
             not_supportable: bool = False
 
             # TODO clean up mapper info
-            valid, reason = order_is_valid(unit.location(), unit.order, strict_convoys_supports=True)
+            valid, reason = order_is_valid(unit.province, unit.order, strict_convoys_supports=True)
             if not valid:
                 logger.debug(f"Order for {unit} is invalid because {reason}")
                 if isinstance(unit.order, Move) and unit.unit_type == UnitType.ARMY:
                     logger.debug("Retrying move order as ConvoyMove")
                     # TODO Runs duplicated code
                     valid, reason = order_is_valid(
-                        unit.location(), ConvoyMove(unit.order.destination), strict_convoys_supports=False
+                        unit.province, ConvoyMove(unit.order.destination), strict_convoys_supports=False
                     )
                     if not valid:  # move is invalid in the first place, so it is a failed move
                         not_supportable = True
                         failed = True
                     else:
                         strict_valid, reason = order_is_valid(
-                            unit.location(), ConvoyMove(unit.order.destination), strict_convoys_supports=True
+                            unit.province, ConvoyMove(unit.order.destination), strict_convoys_supports=True
                         )
 
                         if not strict_valid:  # move is valid but no convoy, so it is a failed move
@@ -530,7 +529,7 @@ class MovesAdjudicator(Adjudicator):
 
 
         self.orders_by_province = {order.current_province.name: order for order in self.orders}
-        self.moves_by_destination: dict[str, set[AdjudicableOrder]] = dict()
+        self.moves_by_destination: dict[str, set[AdjudicableOrder]] = {}
         for order in self.orders:
             if order.type == OrderType.MOVE:
                 if order.destination_province.name not in self.moves_by_destination:
@@ -570,7 +569,7 @@ class MovesAdjudicator(Adjudicator):
             order.state = ResolutionState.UNRESOLVED
         for order in self.orders:
             self._resolve_order(order)
-            order.base_unit.order.hasFailed = (order.resolution == Resolution.FAILS)
+            order.get_original_order().hasFailed = (order.resolution == Resolution.FAILS)
         if self.save_orders:
             database.get_connection().save_order_for_units(self._board, set(o.base_unit for o in self.orders))
         self._update_board()
@@ -595,15 +594,12 @@ class MovesAdjudicator(Adjudicator):
                 order.destination_province.dislodged_unit = order.destination_province.unit
                 # see DATC 4.A.5
                 if order.destination_province.dislodged_unit is not None:
-                    order.destination_province.dislodged_unit.retreat_options = order.destination_province.adjacent.copy()
+                    order.destination_province.dislodged_unit.add_retreat_options()
                     if not order.is_convoy:
-                        order.destination_province.dislodged_unit.retreat_options -= {order.source_province}
+                        order.destination_province.dislodged_unit.remove_retreat_option(order.source_province)
                 # Move us there
                 order.base_unit.province = order.destination_province
-                if isinstance(order.raw_destination, Coast):
-                    order.base_unit.coast = order.raw_destination
-                else:
-                    order.base_unit.coast = None
+                order.base_unit.coast = order.destination_coast
                 order.destination_province.unit = order.base_unit
                 if not order.destination_province.has_supply_center or self._board.turn.is_fall():
                     self._board.change_owner(order.destination_province, order.country)
@@ -629,11 +625,7 @@ class MovesAdjudicator(Adjudicator):
         for unit in self._board.units:
             unit.order = None
             if unit.retreat_options is not None:
-                unit.retreat_options -= contested
-                if unit.unit_type == UnitType.ARMY:
-                    unit.retreat_options = {x for x in unit.retreat_options if x.type != ProvinceType.SEA}
-                else:
-                    unit.retreat_options &= get_adjacent_provinces(unit.location())
+                unit.remove_many_retreat_options(contested)
 
             # Update provinces again to capture SCs in fall where units held
             if self._board.turn.is_fall():
@@ -732,6 +724,7 @@ class MovesAdjudicator(Adjudicator):
         # Algorithm from https://diplom.org/Zine/S2009M/Kruijswijk/DipMath_Chp2.htm
         elif order.type == OrderType.MOVE:
             return self._adjudicate_move_order(order)
+        raise ValueError("Unknown order type for adjudication")
 
     def _adjudicate_move_order(self, order: AdjudicableOrder) -> Resolution:
         # check that convoy path work
@@ -755,11 +748,11 @@ class MovesAdjudicator(Adjudicator):
         attack_strength = 1
         attacked_move = (
             attacked_order == None
-            or attacked_order.type == OrderType.MOVE
-            and self._resolve_order(attacked_order) == Resolution.SUCCEEDS
+            or (attacked_order.type == OrderType.MOVE
+                and self._resolve_order(attacked_order) == Resolution.SUCCEEDS)
         )
 
-        if head_on or not attacked_move:
+        if attacked_order and (head_on or not attacked_move):
             attacked_country = attacked_order.country
 
             if attacked_country == order.country:
@@ -784,13 +777,12 @@ class MovesAdjudicator(Adjudicator):
                     attack_strength += 1
 
             # If A -> B, and B beats C head on then C can't affect A
-            if attacked_order != None:
-                if not attacked_order.is_convoy:
-                    orders_to_overcome = {
-                        order
-                        for order in orders_to_overcome
-                        if order.source_province != attacked_order.destination_province or order.is_convoy
-                    }
+            if attacked_order is not None and not attacked_order.is_convoy:
+                orders_to_overcome = {
+                    order
+                    for order in orders_to_overcome
+                    if order.source_province != attacked_order.destination_province or order.is_convoy
+                }
 
         for opponent in orders_to_overcome:
             if not opponent.is_valid:

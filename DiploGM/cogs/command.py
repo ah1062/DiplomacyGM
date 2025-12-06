@@ -2,9 +2,7 @@ from black.trans import defaultdict
 import inspect
 import logging
 
-from discord import Role
 from discord.ext import commands
-import discord.utils
 
 from DiploGM.config import ERROR_COLOUR
 from DiploGM import perms
@@ -14,6 +12,7 @@ from DiploGM.utils import (
 )
 from DiploGM.manager import Manager
 from DiploGM.models.player import Player
+from DiploGM.models.province import ProvinceType
 
 
 logger = logging.getLogger(__name__)
@@ -28,25 +27,6 @@ class CommandCog(commands.Cog):
 
     @commands.command(brief="How long has the bot been online?")
     async def uptime(self, ctx: commands.Context) -> None:
-        """Looks like you've got a case of uptime. How long has the bot been running?
-
-        Usage: 
-            Used as `.uptime`
-
-        Note:
-            Also tracks last command from `DiploGM::after_any_command()`
-
-        Args:
-            ctx (commands.Context): Context from discord regarding command invocation
-
-        Returns:
-            None
-
-        Raises:
-            None:
-            Messages:
-        """
-
         uptime = ctx.message.created_at - self.bot.creation_time
 
         hours = int(uptime.total_seconds() // 3600)
@@ -84,30 +64,8 @@ class CommandCog(commands.Cog):
         aliases=["leaderboard"],
     )
     async def scoreboard(self, ctx: commands.Context) -> None:
-        """Gets the scoreboard for the game board
-
-        Usage: 
-            Used as `.scoreboard {args}`
-
-        Note:
-            Mot for Fog of War
-            Chaos output by vassal points or SC count
-
-        Args:
-            ctx (commands.Context): Context from discord regarding command invocation
-                * {a, alpha, alphabetical} sorted output
-                * {csv} raw output no detail (alphabetical)
-
-        Returns:
-            None
-
-        Raises:
-            None:
-            Messages:
-        """
-
         arguments = (
-            ctx.message.content.removeprefix(ctx.prefix + ctx.invoked_with)
+            ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")
             .strip()
             .lower()
             .split()
@@ -118,7 +76,7 @@ class CommandCog(commands.Cog):
         board = manager.get_board(ctx.guild.id)
 
         if board.fow:
-            perms.assert_perms.gm_only(ctx, "get scoreboard")
+            perms.assert_gm_only(ctx, "get scoreboard")
 
         if csv and not board.is_chaos():
             players = sorted(board.players, key=lambda p: p.name)
@@ -130,7 +88,7 @@ class CommandCog(commands.Cog):
         the_player = perms.get_player_by_context(ctx)
 
         response = ""
-        if board.is_chaos() and "standard" not in ctx.message.content:
+        if board.is_chaos() and not "standard" in ctx.message.content:
             scoreboard_rows = []
 
             latest_index = -1
@@ -190,23 +148,6 @@ class CommandCog(commands.Cog):
 
     @commands.command(brief="outputs information about the current game", aliases=["i"])
     async def info(self, ctx: commands.Context) -> None:
-        """Gets context info for the current game board
-
-        Usage: 
-            Used as `.info`
-
-        Note:
-        Args:
-            ctx (commands.Context): Context from discord regarding command invocation
-
-        Returns:
-            None
-
-        Raises:
-            RuntimeError: No current board in the server
-            Messages:
-        """
-
         try:
             board = manager.get_board(ctx.guild.id)
         except RuntimeError:
@@ -245,27 +186,24 @@ class CommandCog(commands.Cog):
         """,
     )
     async def dev(self, ctx: commands.Context, cmd_name: str) -> None:
-        """Gets developer info for a bot command
-
-        Usage: 
-            Used as `.dev <cmd_name>`
-
-        Note:
-            Output is limited to 1024 characters due to `send_message_and_file` limits
-
-        Args:
-            ctx (commands.Context): Context from discord regarding command invocation
-            cmd_name (str): Name of command to inspect
-
-        Returns:
-            None
-
-        Raises:
-            None:
-            Messages:
-                Command could not be found
         """
+        Return docstring information to the user, give a high-level insight into how the bot might work.
 
+        Process:
+            1. Fetch Command (error on NotFound)
+            2. Collect Command information
+                a. Method definition
+                b. Method docstrings
+
+        Parameters
+        ----------
+        ctx (commands.Context): Invoking message context
+        cmd_name (str | None): Name of the command to obtain docstring information from
+
+        Returns
+        -------
+        None
+        """
         cmd = self.bot.get_command(cmd_name)
         if not cmd:
             await send_message_and_file(
@@ -296,31 +234,6 @@ class CommandCog(commands.Cog):
         aliases=["province"],
     )
     async def province_info(self, ctx: commands.Context) -> None:
-        """Gets board state info about a province
-
-        Usage: 
-            Used as `.province <province>`
-
-        Note:
-            Not whilst orders are locked
-            Limited behaviours during Fog of War
-
-        Args:
-            ctx (commands.Context): Context from discord regarding command invocation
-            cmd_name (str): Name of command to inspect
-
-        Returns:
-            None
-
-        Raises:
-            None:
-            Messages:
-                Orders are locked!
-                No province given
-                Province could not be found
-                Province is not visible to you
-        """
-
         board = manager.get_board(ctx.guild.id)
 
         if not board.orders_enabled:
@@ -332,10 +245,10 @@ class CommandCog(commands.Cog):
             return
 
         province_name = ctx.message.content.removeprefix(
-            ctx.prefix + ctx.invoked_with
+            f"{ctx.prefix}{ctx.invoked_with}"
         ).strip()
         if not province_name:
-            log_command(logger, ctx, message="No province given")
+            log_command(logger, ctx, message=f"No province given")
             await send_message_and_file(
                 channel=ctx.channel,
                 title="No province given",
@@ -343,7 +256,7 @@ class CommandCog(commands.Cog):
             )
             return
         try:
-            province, coast = board.get_province_and_coast(province_name)
+            province = board.get_province(province_name)
         except:
             log_command(logger, ctx, message=f"Province `{province_name}` not found")
             await send_message_and_file(
@@ -354,7 +267,7 @@ class CommandCog(commands.Cog):
         # FOW permissions
         if board.fow:
             player = perms.require_player_by_context(ctx, "get province info")
-            if player and province not in board.get_visible_provinces(player):
+            if player and province.name not in board.get_visible_provinces(player):
                 log_command(
                     logger,
                     ctx,
@@ -367,30 +280,40 @@ class CommandCog(commands.Cog):
                 return
 
         # fmt: off
-        if not coast:
-            out = f"Type: {province.type.name}\n" + \
-                f"Coasts: {len(province.coasts)}\n" + \
-                f"Owner: {province.owner.name if province.owner else 'None'}\n" + \
-                f"Unit: {(province.unit.player.name + ' ' + province.unit.unit_type.name) if province.unit else 'None'}\n" + \
-                f"Center: {province.has_supply_center}\n" + \
-                f"Core: {province.core.name if province.core else 'None'}\n" + \
-                f"Half-Core: {province.half_core.name if province.half_core else 'None'}\n" + \
-                "Adjacent Provinces:\n- " + "\n- ".join(sorted([adjacent.name for adjacent in province.adjacent | province.impassible_adjacent])) + "\n"
+        coasts = province.get_multiple_coasts()
+        coast_info = ""
+        adjacent_coasts = ""
+        adjacent_list = []
+        if coasts:
+            coast_info = f"Coasts: {len(coasts)}\n"
+            for c in coasts:
+                adjacent_coasts += f"Adjacent Coastal Provinces ({c}):\n- "
+                for adj in province.get_coastal_adjacent(c):
+                    adjacent_list.append(f"{adj[0].get_name(adj[1])}")
+                adjacent_coasts += "\n- ".join(sorted(adjacent_list))
+                adjacent_coasts += "\n"
+        elif province.type == ProvinceType.LAND and province.get_coastal_adjacent():
+            adjacent_coasts = "Adjacent Coastal Provinces:\n- "
+            for adj in province.get_coastal_adjacent():
+                adjacent_list.append(f"{adj[0].get_name(adj[1])}")
+            adjacent_coasts += "\n- ".join(sorted(adjacent_list))
+            adjacent_coasts += "\n"
+        if province.type == ProvinceType.SEA or province.type == ProvinceType.ISLAND:
+            adjacent_provinces = [adjacent.get_name(coast) for (adjacent, coast) in province.get_coastal_adjacent()]
         else:
-            coast_unit = None
-            if province.unit and province.unit.coast == coast:
-                coast_unit = province.unit
-
-            out = "Type: COAST\n" + \
-                f"Coast Unit: {(coast_unit.player.name + ' ' + coast_unit.unit_type.name) if coast_unit else 'None'}\n" + \
-                f"Province Unit: {(province.unit.player.name + ' ' + province.unit.unit_type.name) if province.unit else 'None'}\n" + \
-                "Adjacent Provinces:\n" + \
-                "- " + \
-                "\n- ".join(sorted([adjacent.name for adjacent in coast.get_adjacent_locations()])) + "\n"
+            adjacent_provinces = [adjacent.name for adjacent in province.adjacent | province.impassible_adjacent]
+        out = f"Type: {province.type.name}\n" + \
+            f"{coast_info}" + \
+            f"Owner: {province.owner.name if province.owner else 'None'}\n" + \
+            f"Unit: {(province.unit.player.name + ' ' + province.unit.unit_type.name) if province.unit else 'None'}\n" + \
+            f"Center: {province.has_supply_center}\n" + \
+            f"Core: {province.core.name if province.core else 'None'}\n" + \
+            f"Half-Core: {province.half_core.name if province.half_core else 'None'}\n" + \
+            f"Adjacent Provinces:\n- " + "\n- ".join(sorted(adjacent_provinces)) + "\n" + \
+            f"{adjacent_coasts}"
         # fmt: on
         log_command(logger, ctx, message=f"Got info for {province_name}")
 
-        # FIXME title should probably include what coast it is.
         await send_message_and_file(
             channel=ctx.channel, title=province.name, message=out
         )
@@ -400,30 +323,6 @@ class CommandCog(commands.Cog):
         aliases=["player"],
     )
     async def player_info(self, ctx: commands.Context) -> None:
-        """Gets board state info about a player
-
-        Usage: 
-            Used as `.player <player>`
-
-        Note:
-            Not while orders are locked
-            Not for Fog of War
-
-        Args:
-            ctx (commands.Context): Context from discord regarding command invocation
-
-        Returns:
-            None
-
-        Raises:
-            None:
-            Messages:
-                Orders are locked!
-                Game type error!
-                No player given
-                Player could not be found
-        """
-
         guild = ctx.guild
         if not guild:
             return
@@ -439,10 +338,10 @@ class CommandCog(commands.Cog):
             return
 
         player_name = ctx.message.content.removeprefix(
-            ctx.prefix + ctx.invoked_with
+            f"{ctx.prefix}{ctx.invoked_with}"
         ).strip()
         if not player_name:
-            log_command(logger, ctx, message="No player given")
+            log_command(logger, ctx, message=f"No player given")
             await send_message_and_file(
                 channel=ctx.channel,
                 title="No player given",
@@ -461,7 +360,7 @@ class CommandCog(commands.Cog):
         elif board.fow:
             await send_message_and_file(
                 channel=ctx.channel,
-                title="Gametype Error!",
+                title=f"Gametype Error!",
                 message="This command does not work with FoW",
                 embed_colour=ERROR_COLOUR,
             )
@@ -488,146 +387,12 @@ class CommandCog(commands.Cog):
         # FIXME title should probably include what coast it is.
         await send_message_and_file(channel=ctx.channel, title=player.name, message=out)
 
-    @commands.command(
-        brief="outputs all channels involving a specific player",
-    )
-    async def directory(self, ctx: commands.Context, power: Role) -> None:
-        """Generate a directory of press channels for a power
-
-        Usage: 
-            Used as `.directory <@power>`
-
-        Note: 
-            Can only function if member has @power
-            Limited to the server of command invocation
-
-        Args:
-            ctx (commands.Context): Context from discord regarding command invocation
-            power (discord.Role): Role of the power to fetch a directory for
-
-        Returns:
-            None
-
-        Raises:
-            None:
-            Messages:
-                No game running in this server.
-                Could not find a player for power.
-                You are not permitted to generate a directory.
-        """
-
-        guild = ctx.guild
-        if not guild:
-            return
-
-        board = manager.get_board(guild.id)
-        if not board:
-            await send_message_and_file(channel=ctx.channel, message="There is no game running in this server.", embed_colour=ERROR_COLOUR)
-            return
-
-        try:
-            player = board.get_player(power.name)
-            if not player:
-                await send_message_and_file(channel=ctx.channel, message=f"Could not find a player for power: {power.mention}", embed_colour=ERROR_COLOUR)
-                return
-        except ValueError:
-            await send_message_and_file(channel=ctx.channel, message=f"Could not find a player for power: {power.mention}", embed_colour=ERROR_COLOUR)
-            return
-        
-        if power not in ctx.author.roles and not perms.is_gm(ctx.author):
-            await send_message_and_file(channel=ctx.channel, message="You are not permitted to generate a directory for this power.", embed_colour=ERROR_COLOUR)
-            return
-
-        power_roles = set()
-        for board_power in board.players:
-            role = discord.utils.find(lambda r: r.name == board_power.name, guild.roles)
-            if role != power:
-                power_roles.add(role)
-
-        unique_press = set()
-        player_channels = {
-            "void": [],
-            "press": [],
-            "group": []
-        }
-        for ch in guild.text_channels:
-            if power not in ch.overwrites:
-                continue
-
-            overwrites = filter(lambda o: isinstance(o, discord.Role), ch.overwrites)
-            count = 0
-            press_roles = set()
-            for role in overwrites:
-                try:
-                    player = board.get_player(role.name)
-                    if player:
-                        count += 1
-
-                        if role != power:
-                            press_roles.add(role)
-
-                except ValueError:
-                    continue
-
-            if count == 1:
-                player_channels["void"].append((ch, []))
-            elif count == 2:
-                player_channels["press"].append((ch, press_roles))
-                unique_press = unique_press.union(press_roles)
-            elif count > 2:
-                player_channels["group"].append((ch, press_roles))
-
-        out = ""
-        for k, v in player_channels.items():
-            out += f"{k.capitalize()}\n"
-            for ch, roles in v:
-                out += f"- {ch.mention}"
-                if len(roles) > 0:
-                    out += " - "
-                    out += ", ".join(map(lambda r: r.mention, sorted(roles, key=lambda r: r.name)))
-                out += "\n"
-            out += "\n"
-        
-        missed_press = power_roles.difference(unique_press)
-        if len(missed_press) != 0:
-            out += "No direct press channel with:\n"
-            out += ", ".join(map(lambda r: r.mention, sorted(missed_press, key=lambda r:r.name)))
-
-        await send_message_and_file(channel=ctx.channel, title=f"{power.name}: Channel Directory", message=out)
-
-    @directory.error
-    async def directory_error(self, ctx: commands.Context, error) -> None:
-        if isinstance(error, commands.errors.RoleNotFound):
-            ctx.handled = True
-            await send_message_and_file(channel=ctx.channel, message="Could not find that role!")
-            return
-
     @commands.command(brief="outputs all provinces per owner")
     async def all_province_data(self, ctx: commands.Context) -> None:
-        """Output all province names and who owns them
-
-        Usage: 
-            Used as `.all_province_data`
-
-        Note:
-            Not while orders are locked
-
-        Args:
-            ctx (commands.Context): Context from discord regarding command invocation
-
-        Returns:
-            None
-
-        Raises:
-            None:
-            Messages:
-                Orders are locked!
-        """
-
         board = manager.get_board(ctx.guild.id)
 
         if not board.orders_enabled:
-            perms.assert_perms.gm_only(
+            perms.assert_gm_only(
                 ctx, "call .all_province_data while orders are locked"
             )
 
@@ -682,27 +447,6 @@ class CommandCog(commands.Cog):
 
     @commands.command(brief="Changes your nickname")
     async def nick(self, ctx: commands.Context) -> None:
-        """Was my name always like that?
-
-        Usage: 
-            Used as `.nick <name>`
-
-        Note:
-            Useful for restricted gametypes (chaos)
-
-        Args:
-            ctx (commands.Context): Context from discord regarding command invocation
-
-        Returns:
-            None
-
-        Raises:
-            None:
-            Messages:
-                Must be one character
-                Must be less than 32 characters
-        """
-
         name: str = ctx.author.nick
         if name == None:
             name = ctx.author.name
@@ -711,12 +455,12 @@ class CommandCog(commands.Cog):
             prefix = prefix + "] "
         else:
             prefix = ""
-        name = ctx.message.content.removeprefix(ctx.prefix + ctx.invoked_with).strip()
+        name = ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}").strip()
         if name == "":
             await send_message_and_file(
                 channel=ctx.channel,
                 embed_colour=ERROR_COLOUR,
-                message="A nickname must be at least 1 character",
+                message=f"A nickname must be at least 1 character",
             )
             return
         if len(prefix + name) > 32:

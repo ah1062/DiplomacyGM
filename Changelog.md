@@ -1,14 +1,24 @@
-1.3.5
+1.4.0
 =====
-
 Contributors
-- aahoughton
+- hdwhite
 
-# Player Changes
-- Resolved 
+# Infrastructure Changes
+- Removed Coasts as a separate Loction from Provinces
+  - All Provinces will now store adjacency and coordinate data for each coast
+  - Units will now keep track of whether they are in a coast
+  - Retreats to coasts will function properly
+  - Specifying a coast in the destination is now optional if there's only one valid coast to move to
+  - References to Locations and Coasts have been properly moved to Provinces
+  - Added back-compatability for existing games in the database
 
-# Developer Changes
-- Initialised Docstrings 
+# Backend changes
+- Added a significant number of type checks
+- Fixed parse_season and made it use Turns
+
+# Test Changes
+- Updated unit tests to make use of the Classic map
+- Added several tests for parse_edit_state, parse_order, and parse_season
 
 1.3.4
 =====

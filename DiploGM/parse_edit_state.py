@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 manager = Manager()
 
 
-def parse_edit_state(message: str, board: Board) -> dict[str, ...]:
+def parse_edit_state(message: str, board: Board) -> dict[str, str | bytes | int | None]:
     invalid: list[tuple[str, Exception]] = []
     commands = str.splitlines(message)
     for command in commands:
@@ -140,9 +140,9 @@ def _parse_command(command: str, board: Board) -> None:
 
 def _set_phase(keywords: list[str], board: Board) -> None:
     old_turn = board.turn.get_indexed_name()
-    new_turn = parse_season(keywords, board.turn.year)
+    new_turn = parse_season(keywords, board.turn)
     if new_turn is None:
-        raise ValueError(f"{keywords.join(' ')} is not a valid phase name")
+        raise ValueError(f"{' '.join(keywords)} is not a valid phase name")
     board.turn = new_turn
     get_connection().execute_arbitrary_sql(
         "UPDATE boards SET phase=? WHERE board_id=? and phase=?",
@@ -190,6 +190,8 @@ def _set_province_half_core(keywords: list[str], board: Board) -> None:
 
 def _set_player_color(keywords: list[str], board: Board) -> None:
     player = board.get_player(keywords[0])
+    if not player:
+        raise ValueError(f"Unknown player: {keywords[0]}")
     color = keywords[1].lower()
     if not len(color) == 6 or not all(c in string.hexdigits for c in color):
         raise ValueError(f"Unknown hexadecimal color: {color}")
@@ -239,6 +241,8 @@ def _create_unit(keywords: list[str], board: Board) -> None:
         raise ValueError(f"Invalid Unit Type received: {unit_type}")
 
     player = board.get_player(keywords[1])
+    if not player:
+        raise ValueError(f"Unknown player: {keywords[1]}")
     province, coast = board.get_province_and_coast(" ".join(keywords[2:]))
     # if unit_type == UnitType.FLEET and coast is None:
     #     coast_name = f"{province} coast"
@@ -252,7 +256,7 @@ def _create_unit(keywords: list[str], board: Board) -> None:
         (
             board.board_id,
             board.turn.get_indexed_name(),
-            unit.location().name,
+            unit.province.get_name(coast),
             False,
             player.name,
             unit_type == UnitType.ARMY,
@@ -265,10 +269,14 @@ def _create_unit(keywords: list[str], board: Board) -> None:
 def _create_dislodged_unit(keywords: list[str], board: Board) -> None:
     if board.turn.is_retreats():
         unit_type = get_unit_type(keywords[0])
+        if not unit_type:
+            raise ValueError(f"Invalid Unit Type received: {unit_type}")
         player = board.get_player(keywords[1])
+        if not player:
+            raise ValueError(f"Unknown player: {keywords[1]}")
         province, coast = board.get_province_and_coast(keywords[2])
         retreat_options = set(
-            [board.get_province(province_name) for province_name in keywords[3:]]
+            [board.get_province_and_coast(province_name) for province_name in keywords[3:]]
         )
         if not all(retreat_options):
             raise ValueError(
@@ -282,7 +290,7 @@ def _create_dislodged_unit(keywords: list[str], board: Board) -> None:
             (
                 board.board_id,
                 board.turn.get_indexed_name(),
-                unit.location().name,
+                unit.province.get_name(coast),
                 True,
                 player.name,
                 unit_type == UnitType.ARMY,
@@ -296,8 +304,8 @@ def _create_dislodged_unit(keywords: list[str], board: Board) -> None:
                 (
                     board.board_id,
                     board.turn.get_indexed_name(),
-                    unit.location().name,
-                    option.name,
+                    unit.province.get_name(coast),
+                    option[0].get_name(option[1]),
                 )
                 for option in retreat_options
             ],
@@ -309,12 +317,14 @@ def _create_dislodged_unit(keywords: list[str], board: Board) -> None:
 def _delete_unit(keywords: list[str], board: Board) -> None:
     province = board.get_province(keywords[0])
     unit = board.delete_unit(province)
+    if not unit:
+        raise RuntimeError(f"No unit to delete in {province}")
     get_connection().execute_arbitrary_sql(
         "DELETE FROM units WHERE board_id=? and phase=? and location=? and is_dislodged=?",
         (
             board.board_id,
             board.turn.get_indexed_name(),
-            unit.location().name,
+            unit.province.get_name(unit.coast),
             False,
         ),
     )
@@ -323,32 +333,35 @@ def _delete_unit(keywords: list[str], board: Board) -> None:
 def _delete_dislodged_unit(keywords: list[str], board: Board) -> None:
     province = board.get_province(keywords[0])
     unit = board.delete_dislodged_unit(province)
+    if not unit:
+        raise RuntimeError(f"No dislodged unit to delete in {province}")
     get_connection().execute_arbitrary_sql(
         "DELETE FROM units WHERE board_id=? and phase=? and location=? and is_dislodged=?",
-        (board.board_id, board.turn.get_indexed_name(), unit.location().name, True),
+        (board.board_id, board.turn.get_indexed_name(), unit.province.get_name(unit.coast), True),
     )
     get_connection().execute_arbitrary_sql(
         "DELETE FROM retreat_options WHERE board_id=? and phase=? and origin=?",
-        (board.board_id, board.turn.get_indexed_name(), unit.location().name),
+        (board.board_id, board.turn.get_indexed_name(), unit.province.get_name(unit.coast)),
     )
 
 
 def _move_unit(keywords: list[str], board: Board) -> None:
     old_province = board.get_province(keywords[0])
     unit = old_province.unit
-    old_location = unit.location()
-    new_location = board.get_location(keywords[1])
-    board.move_unit(unit, new_location)
+    if not unit:
+        raise RuntimeError(f"No unit to move in {old_province}")
+    new_province, new_coast = board.get_province_and_coast(keywords[1])
+    board.move_unit(unit, new_province, new_coast)
     get_connection().execute_arbitrary_sql(
         "DELETE FROM units WHERE board_id=? and phase=? and location=? and is_dislodged=?",
-        (board.board_id, board.turn.get_indexed_name(), old_location.name, False),
+        (board.board_id, board.turn.get_indexed_name(), old_province.get_name(unit.coast), False),
     )
     get_connection().execute_arbitrary_sql(
         "INSERT INTO units (board_id, phase, location, is_dislodged, owner, is_army) VALUES (?, ?, ?, ?, ?, ?)",
         (
             board.board_id,
             board.turn.get_indexed_name(),
-            unit.location().name,
+            new_province.get_name(new_coast),
             False,
             unit.player.name,
             unit.unit_type == UnitType.ARMY,
@@ -365,7 +378,7 @@ def _dislodge_unit(keywords: list[str], board: Board) -> None:
         if unit == None:
             raise RuntimeError("No unit to dislodge in province")
         retreat_options = set(
-            [board.get_province(province_name) for province_name in keywords[1:]]
+            [board.get_province_and_coast(province_name) for province_name in keywords[1:]]
         )
         if not all(retreat_options):
             raise ValueError(
@@ -403,6 +416,8 @@ def _make_units_claim_provinces(keywords: list[str], board: Board) -> None:
 
 def _set_player_points(keywords: list[str], board: Board) -> None:
     player = board.get_player(keywords[0])
+    if not player:
+        raise ValueError("Unknown player specified")
     points = int(keywords[1])
     if points < 0:
         raise ValueError("Can't have a negative number of points!")
@@ -417,6 +432,8 @@ def _set_player_points(keywords: list[str], board: Board) -> None:
 def _set_player_vassal(keywords: list[str], board: Board) -> None:
     liege = board.get_player(keywords[0])
     vassal = board.get_player(keywords[1])
+    if not liege or not vassal:
+        raise ValueError("Unknown player specified")
     vassal.liege = liege
     liege.vassals.append(vassal)
     get_connection().execute_arbitrary_sql(
@@ -428,6 +445,8 @@ def _set_player_vassal(keywords: list[str], board: Board) -> None:
 def _remove_player_vassal(keywords: list[str], board: Board) -> None:
     player1 = board.get_player(keywords[0])
     player2 = board.get_player(keywords[1])
+    if not player1 or not player2:
+        raise ValueError("Unknown player specified")
     for vassal, liege in ((player1, player2), (player2, player1)):
         if vassal.liege == liege:
             vassal.liege = None
@@ -455,7 +474,7 @@ def _load_state(keywords: list[str], board: Board) -> None:
 
     logger.error(keywords)
     server = int(keywords[0])
-    turn = parse_season(keywords[1:], board.turn.year)
+    turn = parse_season(keywords[1:], board.turn)
 
     year = int(keywords[2])
     epoch_year = board.year_offset - turn.year

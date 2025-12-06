@@ -1,5 +1,6 @@
 from typing import List, Tuple
 
+from DiploGM.models.order import PlayerOrder
 from discord.ext.commands import Context
 
 from DiploGM.models.board import Board
@@ -124,7 +125,7 @@ def get_filtered_orders(board: Board, player_restriction: Player) -> str:
                 visible = [
                     order
                     for order in player.build_orders
-                    if order.location.as_province() in visible
+                    if isinstance(order, PlayerOrder) and order.province.name in visible
                 ]
 
                 if len(visible) > 0:

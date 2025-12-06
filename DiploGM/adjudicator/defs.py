@@ -1,7 +1,7 @@
 from enum import Enum
 
-from DiploGM.models.order import NMR, Hold, Core, Move, ConvoyMove, Support, ConvoyTransport
-from DiploGM.models.province import Province, Location
+from DiploGM.models.order import NMR, Hold, Core, Move, ConvoyMove, Support, ConvoyTransport, UnitOrder
+from DiploGM.models.province import Province
 from DiploGM.models.unit import Unit, UnitType
 
 
@@ -35,13 +35,14 @@ class AdjudicableOrder:
         self.country = unit.player
         self.is_army = unit.unit_type == UnitType.ARMY
         self.current_province = unit.province
+        self.current_coast = unit.coast
 
         self.supports: set[AdjudicableOrder] = set()
         self.convoys: set[AdjudicableOrder] = set()
 
         self.type: OrderType
         self.destination_province: Province = self.current_province
-        self.raw_destination: Location = self.current_province
+        self.destination_coast: str | None = self.current_coast
         self.source_province: Province = self.current_province
         self.is_convoy: bool = False
         # indicates that a move is also a convoy that failed, so no support holds
@@ -53,20 +54,17 @@ class AdjudicableOrder:
             self.type = OrderType.CORE
         elif isinstance(unit.order, Move) or isinstance(unit.order, ConvoyMove):
             self.type = OrderType.MOVE
-            self.destination_province = unit.order.destination.as_province()
-            self.raw_destination = unit.order.destination
+            (self.destination_province, self.destination_coast) = unit.order.get_destination_and_coast()
             if isinstance(unit.order, ConvoyMove):
                 self.is_convoy = True
         elif isinstance(unit.order, Support):
             self.type = OrderType.SUPPORT
-            self.source_province = unit.order.source.as_province()
-            self.destination_province = unit.order.destination.as_province()
-            self.raw_destination = unit.order.destination
+            self.source_province = unit.order.source
+            (self.destination_province, self.destination_coast) = unit.order.get_destination_and_coast()
         elif isinstance(unit.order, ConvoyTransport):
             self.type = OrderType.CONVOY
-            self.source_province = unit.order.source.as_province()
-            self.destination_province = unit.order.destination.as_province()
-            self.raw_destination = unit.order.destination
+            self.source_province = unit.order.source
+            self.destination_province = unit.order.destination
         else:
             raise ValueError(f"Can't parse {unit.order.__class__.__name__} to OrderType")
 
@@ -74,4 +72,9 @@ class AdjudicableOrder:
 
     def __str__(self):
         # This could be improved
-        return f"{self.current_province} {self.type} {self.destination_province} [{self.state}:{self.resolution}]"
+        return f"{self.current_province} {self.type} {self.source_province if self.source_province else ''} {self.destination_province} [{self.state}:{self.resolution}]"
+    
+    def get_original_order(self) -> UnitOrder:
+        if self.base_unit.order is None:
+            raise ValueError("AdjudicableOrder can't find source order somehow")
+        return self.base_unit.order

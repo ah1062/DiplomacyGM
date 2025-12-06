@@ -11,6 +11,7 @@ from DiploGM.utils import simple_player_name
 if TYPE_CHECKING:
     from DiploGM.models import province
     from DiploGM.models import unit
+    from DiploGM.models.board import Board
 
 
 class VassalType(Enum):
@@ -30,7 +31,7 @@ class Player:
     def __init__(
         self,
         name: str,
-        color: str,
+        color: str | dict[str, str],
         win_type: str,
         vscc: int,
         iscc: int,
@@ -58,7 +59,7 @@ class Player:
         self.centers: set[province.Province] = centers
         self.units: set[unit.Unit] = units
 
-        self.build_orders: set[order.PlayerOrder] = set()
+        self.build_orders: set[order.PlayerOrder | order.RelationshipOrder] = set()
         self.waived_orders: int = 0
 
         self.vassal_orders: dict[Player, order.RelationshipOrder] = {}
@@ -84,7 +85,7 @@ class Player:
     def info(self, variant: str = "standard") -> str:
         bullet = "\n- "
 
-        units = list(sorted(self.units, key=lambda u: (u.unit_type.value, u.location().name)))
+        units = list(sorted(self.units, key=lambda u: (u.unit_type.value, u.province.get_name(u.coast))))
         centers = list(sorted(self.centers, key=lambda c: c.name))
         
         if variant == "chaos":
@@ -93,7 +94,7 @@ class Player:
                 + f"Points: {self.points}\n"
                 + f"Vassals: {', '.join(map(str,self.vassals))}\n"
                 + f"Liege: {self.liege if self.liege else 'None'}\n"
-                + f"Units ({len(units)}): {(bullet + bullet.join([unit.location().name for unit in units])) if len(units) > 0 else 'None'}\n"
+                + f"Units ({len(units)}): {(bullet + bullet.join([unit.province.get_name(unit.coast) for unit in units])) if len(units) > 0 else 'None'}\n"
                 + f"Centers ({len(centers)}): {(bullet + bullet.join([center.name for center in centers])) if len(centers) > 0 else 'None'}\n"
             )
             return out
@@ -110,7 +111,7 @@ class Player:
 
         unit_str = "Units:"
         for unit in units:
-            unit_str += f"{bullet}({unit.unit_type.value}) {unit.location().name}"
+            unit_str += f"{bullet}({unit.unit_type.value}) {unit.province}"
             
         out = (
             ""

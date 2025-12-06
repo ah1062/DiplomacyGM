@@ -45,7 +45,7 @@ class GameManagementCog(commands.Cog):
     )
     @perms.gm_only("create a game")
     async def create_game(self, ctx: commands.Context) -> None:
-        gametype = ctx.message.content.removeprefix(ctx.prefix + ctx.invoked_with)
+        gametype = ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")
         if gametype == "":
             gametype = "impdip"
         else:
@@ -108,7 +108,7 @@ class GameManagementCog(commands.Cog):
         # extract deadline argument
         timestamp = re.match(
             r"<t:(\d+):[a-zA-Z]>",
-            ctx.message.content.removeprefix(ctx.prefix + ctx.invoked_with).strip(),
+            ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}").strip(),
         )
         if timestamp:
             timestamp = f"<t:{timestamp.group(1)}:R>"
@@ -449,7 +449,7 @@ class GameManagementCog(commands.Cog):
         board = manager.get_board(ctx.guild.id)
 
         arguments = (
-            ctx.message.content.removeprefix(ctx.prefix + ctx.invoked_with)
+            ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")
             .strip()
             .lower()
             .split()
@@ -559,16 +559,16 @@ class GameManagementCog(commands.Cog):
             sevb_player = discord.utils.find(lambda r: r.name == "Player", sevb.roles)
             bperms = sevb_player.permissions
 
-            if "Spring" in new_board.phase.name:
+            if "Spring" in new_board.turn.get_phase():
                 await send_message_and_file(channel=ctx.channel, message="Game A is permitted to play.")
                 aperms.update(send_messages=True)
                 bperms.update(send_messages=False)
 
-            if "Fall" in new_board.phase.name:
+            if "Fall" in new_board.turn.get_phase():
                 await send_message_and_file(channel=ctx.channel, message="Game B is permitted to play.")
                 aperms.update(send_messages=False)
                 bperms.update(send_messages=True)
-            if "Winter" in new_board.phase.name:
+            if "Winter" in new_board.turn.get_phase():
                 if random.choice([0,1]) == 0:
                     await send_message_and_file(channel=ctx.channel, message="Game A is permitted to play.")
                     aperms.update(send_messages=True)
@@ -642,7 +642,7 @@ class GameManagementCog(commands.Cog):
     @perms.gm_only("edit")
     async def edit(self, ctx: commands.Context) -> None:
         edit_commands = ctx.message.content.removeprefix(
-            ctx.prefix + ctx.invoked_with
+            f"{ctx.prefix}{ctx.invoked_with}"
         ).strip()
         message = parse_edit_state(edit_commands, manager.get_board(ctx.guild.id))
         log_command(logger, ctx, message=message["title"])

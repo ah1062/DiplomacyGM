@@ -1,6 +1,10 @@
-import logging
+from __future__ import annotations
 
-import discord
+import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from discord.ext import commands
 
 
 def log_command(
