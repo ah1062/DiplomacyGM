@@ -6,6 +6,7 @@ import discord.utils
 from discord import (
     CategoryChannel,
     Member,
+    User,
     PermissionOverwrite,
     Role,
     Thread,
@@ -15,7 +16,7 @@ from discord.abc import GuildChannel
 from discord.ext import commands
 
 from DiploGM import config
-from DiploGM.config import MAP_ARCHIVE_SAS_TOKEN
+from DiploGM.config import ERROR_COLOUR, MAP_ARCHIVE_SAS_TOKEN
 from DiploGM.parse_edit_state import parse_edit_state
 from DiploGM import perms
 from DiploGM.utils import (
@@ -27,6 +28,7 @@ from DiploGM.utils import (
 
 from DiploGM.perms import is_gm
 from DiploGM.db.database import get_connection
+from DiploGM.models.extension import ExtensionEvent, SQLiteExtensionEventRepository
 from DiploGM.models.order import Disband, Build
 from DiploGM.models.player import Player
 from DiploGM.manager import Manager, SEVERENCE_A_ID, SEVERENCE_B_ID
@@ -38,6 +40,7 @@ manager = Manager()
 class GameManagementCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.grace_repo = SQLiteExtensionEventRepository()
 
     @commands.command(
         brief="Create a game of Imp Dip and output the map.",
@@ -295,6 +298,80 @@ class GameManagementCog(commands.Cog):
             title="Unlocked orders",
             message=f"{board.turn}",
         )
+
+    @commands.group(name="grace", brief="", invoke_without_command=True)
+    @perms.gm_only("handle graces")
+    async def grace(self, ctx: commands.Context) -> None:
+        await send_message_and_file(channel=ctx.channel, message="Valid commands are: *log*, *delete*, and *view*")
+
+    @grace.command(name="log")
+    @perms.gm_only("record a grace")
+    async def grace_log(self, ctx: commands.Context, user: User, hours: int, *, reason: str = "Unspecified") -> None:
+        assert ctx.guild is not None
+
+        if user.bot:
+            await send_message_and_file(channel=ctx.channel, message="Can't log grace for a bot", embed_colour=ERROR_COLOUR)
+            return
+
+        event = ExtensionEvent(
+            user_id=user.id,
+            server_id=ctx.guild.id,
+            hours=hours,
+            reason=reason
+        )
+
+        self.grace_repo.save(event)
+        await send_message_and_file(channel=ctx.channel, title=f"Grace (No. {event.id}) logged!", message=f"Logged under: {user.mention}\nHours: {hours}")
+
+    @grace.command(name="delete")
+    @perms.gm_only("delete a recorded grace")
+    async def grace_delete(self, ctx: commands.Context, id: int) -> None:
+        self.grace_repo.delete(id)
+        await send_message_and_file(channel=ctx.channel, message=f"If a grace with ID {id} existed, it exists no longer :fire:")
+
+    @grace.group(name="view", invoke_without_command=True)
+    async def grace_view(self, ctx: commands.Context) -> None:
+        await send_message_and_file(channel=ctx.channel, message="Valid commands are: *user* and *server*")
+
+    @grace_view.command(name="user")
+    @perms.gm_only("view graces made by a user")
+    async def grace_view_user(self, ctx: commands.Context, user: User) -> None:
+        events = self.grace_repo.load_by_user(user.id)
+
+        handled_servers = set()
+        out = ""
+        for e in sorted(events, key=lambda e: (e.server_id, e.created_at), reverse=True):
+            if e.server_id not in handled_servers:
+                server = self.bot.get_guild(e.server_id)
+                identifier = server.name if server else f"Guild {e.server_id}"
+                out += f"### For: {identifier}\n"
+                handled_servers.add(e.server_id)
+
+            out += f"ID({e.id}):  {user.mention}\n"
+            out += f"- Hours: {e.hours}\n"
+            out += f"- Reason: {e.reason}\n"
+            out += f"- Time: {e.created_at}\n"
+
+        await send_message_and_file(channel=ctx.channel, title=f"Graces caused by {user.name}", message=out)
+
+    @grace_view.command(name="server")
+    @perms.gm_only("view graces that have occurred in a server")
+    async def grace_view_server(self, ctx: commands.Context) -> None:
+        assert ctx.guild is not None
+
+        events = self.grace_repo.load_by_server(ctx.guild.id)
+        out = ""
+        if len(events) == 0:
+            out = "You're yet to have a grace! Congratulations!"
+        else:
+            for e in sorted(events, key=lambda e: e.created_at, reverse=True):
+                user = self.bot.get_user(e.user_id)
+                out += f"ID({e.id}):  {user.mention}\n"
+                out += f"- Hours: {e.hours}\n"
+                out += f"- Reason: {e.reason}\n"
+                out += f"- Time: {e.created_at}\n"
+
+        await send_message_and_file(channel=ctx.channel, title=f"Graces in {ctx.guild.name}", message=out)
 
     @commands.command(brief="Clears all players orders.")
     @perms.gm_only("remove all orders")
