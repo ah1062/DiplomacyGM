@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 from discord import Member, User
 from discord.ext import commands
@@ -8,7 +9,8 @@ from DiploGM import config
 from DiploGM import perms
 from DiploGM.utils import send_message_and_file
 
-NEW_ACCOUNT_WARNING = datetime.timedelta(weeks=2)
+logger = logging.getLogger(__name__)
+NEW_ACCOUNT_WARNING = datetime.timedelta(weeks=6)
 
 class ModerationCog(commands.Cog):
     def __init__(self, bot):
@@ -39,6 +41,7 @@ class ModerationCog(commands.Cog):
         guild = member.guild
         hub = self.bot.get_guild(config.IMPDIP_SERVER_ID)
         if not hub:
+            logger.warning(f"{member.name} joined {member.guild.name}: Could not find the Hub server to check for moderation.")
             return
 
         now = datetime.datetime.now(datetime.timezone.utc)
