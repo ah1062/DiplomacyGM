@@ -10,6 +10,7 @@ class RelationshipType(StrEnum):
     SERVER_MEMBER = "SERVER_MEMBER"
     SERVER_MODERATOR = "SERVER_MODERATOR"
     COMMUNITY_MEMBER = "COMMUNITY_MEMBER"
+    COMMUNITY_SERVER = "COMMUNITY_SERVER"
     COMMUNITY_MODERATOR = "COMMUNITY_MODERATOR"
     COMMUNITY_ADMIN = "COMMUNITY_ADMIN"
     COMMUNITY_OWNER = "COMMUNITY_OWNER"
@@ -34,7 +35,8 @@ class SQLiteRelationshipRepository(Repository[Relationship]):
                 subject_id INTEGER NOT NULL,
                 object_id INTEGER NOT NULL,
                 type TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                UNIQUE (subject_id, object_id, type)
             );
         """)
         self.conn.commit()
@@ -85,7 +87,7 @@ class SQLiteRelationshipRepository(Repository[Relationship]):
         self.conn.commit()
 
     def delete_many(self, ids: list[int]):
-        self.conn.executemany("DELETE FROM relationships WHERE id = ?", (ids,))
+        self.conn.executemany("DELETE FROM relationships WHERE id = ?", [(id,) for id in ids])
         self.conn.commit()
 
     def clear(self) -> None:

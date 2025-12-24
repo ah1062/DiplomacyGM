@@ -12,8 +12,6 @@ class Community:
     name: str
     description: Optional[str] = None
     created_at: datetime.datetime = field(default_factory=datetime.datetime.now)
-    active: bool = True
-    deactivated_at: Optional[datetime.datetime] = None
 
 class SQLiteCommunityRepository(Repository):
     def __init__(self) -> None:
@@ -27,10 +25,7 @@ class SQLiteCommunityRepository(Repository):
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 description TEXT,
-
-                created_at TEXT NOT NULL,
-                active INTEGER NOT NULL CHECK (active IN (0, 1)),
-                deactivated_at TEXT
+                created_at TEXT NOT NULL
             );
         """)
         self.conn.commit()
@@ -39,21 +34,17 @@ class SQLiteCommunityRepository(Repository):
         cur = self.conn.cursor()
         cur.execute(
             """
-            INSERT INTO communities (id, name, description, active, created_at, deactivated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO communities (id, name, description, created_at)
+            VALUES (?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
-                description = excluded.description,
-                active = excluded.active,
-                deactivated_at = excluded.deactivated_at
+                description = excluded.description
             """,
             (
                 entity.id,
                 entity.name,
                 entity.description,
-                int(entity.active),
-                entity.created_at,
-                entity.deactivated_at,
+                entity.created_at.isoformat()
             ),
         )
         self.conn.commit()
@@ -70,14 +61,6 @@ class SQLiteCommunityRepository(Repository):
         cur.execute("DELETE FROM communities WHERE id = ?", (id,))
         self.conn.commit()
 
-    def soft_delete(self, id: int) -> None:
-        self.conn.execute("""
-            UPDATE communities
-            SET active = 0,
-                deactivated_at = ?
-            WHERE id = ?
-        """, (datetime.datetime.now().isoformat(), id,))
-
     def clear(self) -> None:
         self.conn.execute("DELETE FROM communities")
         self.conn.commit()
@@ -90,11 +73,9 @@ class SQLiteCommunityRepository(Repository):
 
     def _row_to_model(self, row) -> Community:
         return Community(
-            id=row["id"],
-            name=row["name"],
-            description=row["description"],
-            active=bool(row["active"]),
-            created_at=row["created_at"],
-            deactivated_at=row["deactivated_at"],
+            id=int(row[0]),
+            name=row[1],
+            description=row[2],
+            created_at=datetime.datetime.fromisoformat(row[3]),
         )
 

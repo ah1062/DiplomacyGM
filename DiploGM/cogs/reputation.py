@@ -4,6 +4,7 @@ import discord
 from discord.ext import commands
 
 from DiploGM.models.rep_delta import ReputationDelta, SQLiteReputationDeltaRepository
+from DiploGM.perms import is_moderator, mod_only
 from DiploGM.utils.send_message import send_message_and_file
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ class ReputationCog(commands.Cog):
         pass
 
     @rep.command(name="add")
+    @mod_only("add a reputation delta")
     async def rep_add(self, ctx: commands.Context, user: discord.User, amount: int, *, reason: str = "unspecified"):
         delta = ReputationDelta(user.id, amount, reason=reason)
         self.rep_repo.save(delta)
@@ -31,19 +33,21 @@ class ReputationCog(commands.Cog):
         await send_message_and_file(channel=ctx.channel, title="Reputation Logged!", message=out)
 
     @rep.command(name="delete")
+    @mod_only("delete a reputation delta")
     async def rep_delete(self, ctx: commands.Context, id: int):
         self.rep_repo.delete(id)
         await send_message_and_file(channel=ctx.channel, message=f"Deleted Reputation Delta with ID of {id}")
 
     @rep.command(name="view")
-    async def rep_view(self, ctx: commands.Context, user: discord.User):
+    async def rep_view(self, ctx: commands.Context, user: discord.User, history_check: str = "none"):
         history = list(self.rep_repo.find_by(lambda d: d.user_id == user.id))
     
-        out = ""
+        out = f"### Overall Value: {sum(d.delta for d in history)}\n"
         for delta in history:
             out += f"({delta.id}): {delta.created_at}\n"
             out += f"- Change: {delta.delta}\n"
-            out += f"- Reason: {delta.reason}\n"
+            if is_moderator(ctx.author) and history_check == "all":
+                out += f"- Reason: {delta.reason}\n"
 
         await send_message_and_file(channel=ctx.channel, title=f"{user.name} reputation history", message=out)
 
