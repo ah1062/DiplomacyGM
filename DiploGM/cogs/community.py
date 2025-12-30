@@ -12,7 +12,7 @@ import discord
 from discord.ext import commands
 
 from DiploGM.config import ERROR_COLOUR
-from DiploGM.perms import is_superuser, superuser_only
+from DiploGM.perms import gm_only, is_superuser, superuser_only
 from DiploGM.models.community.community import Community, SQLiteCommunityRepository
 from DiploGM.models.community.relationship import (
     Relationship,
@@ -171,11 +171,17 @@ class CommunityCog(commands.Cog):
             if r.id:
                 self.service.relation_repo.delete(r.id)
 
-    @commands.group(name="community")
+    @commands.group(name="community", brief="Entry point for community commands")
     async def community(self, ctx: commands.Context):
-        pass
+        await send_message_and_file(
+            channel=ctx.channel,
+            message="Valid commands are: *create/delete*, *register_server/unregister_server*, and *join/leave*",
+        )
 
-    @community.command(name="create")
+    @community.command(
+        name="create",
+        brief="Create a DiploGM community",
+    )
     async def community_create(self, ctx: commands.Context, *, name: str):
         if name.isnumeric():
             await send_message_and_file(
@@ -193,7 +199,10 @@ class CommunityCog(commands.Cog):
             message=f"You are now the owner of {name}",
         )
 
-    @community.command(name="delete")
+    @community.command(
+        name="delete",
+        brief="Delete a DiploGM community",
+    )
     async def community_delete(self, ctx: commands.Context, *, community_id):
         if community_id.isnumeric():
             community_id = int(community_id)
@@ -226,7 +235,10 @@ class CommunityCog(commands.Cog):
             message=f"'{community.name}' is no more.",
         )
 
-    @community.command(name="list")
+    @community.command(
+        name="list",
+        brief="List all DiploGM communities",
+    )
     async def community_list(self, ctx: commands.Context):
         out = ""
         communities = list(self.service.community_repo.all())
@@ -245,7 +257,7 @@ class CommunityCog(commands.Cog):
             channel=ctx.channel, title="DiploGM Communities", message=out
         )
 
-    @community.command(name="inspect")
+    @community.command(name="inspect", brief="Get some information about a community")
     async def community_inspect(self, ctx: commands.Context, *, community_id):
         assert ctx.guild is not None
 
@@ -304,7 +316,11 @@ class CommunityCog(commands.Cog):
             channel=ctx.channel, title=f"{community.name}", message=out
         )
 
-    @community.command(name="register_server")
+    @community.command(
+        name="register_server",
+        brief="Register a server with a community",
+    )
+    @gm_only("register a community")
     async def community_register(self, ctx: commands.Context, *, community_id):
         assert ctx.guild is not None
 
@@ -337,7 +353,11 @@ class CommunityCog(commands.Cog):
             message=f"{ctx.guild.name} is now registered to the '{community.name}' community.",
         )
 
-    @community.command(name="unregister_server")
+    @community.command(
+        name="unregister_server",
+        brief="Unregister a server with a community",
+    )
+    @gm_only("register a community")
     async def community_unregister(self, ctx: commands.Context):
         assert ctx.guild is not None
 
@@ -375,7 +395,10 @@ class CommunityCog(commands.Cog):
             message=f"{ctx.guild.name} is no longer registered to the '{community.name}' community.",
         )
 
-    @community.command(name="join")
+    @community.command(
+        name="join",
+        brief="Join a community",
+    )
     async def community_join(self, ctx: commands.Context, *, community_id):
         if community_id.isnumeric():
             community_id = int(community_id)
@@ -404,7 +427,10 @@ class CommunityCog(commands.Cog):
             message=f"You joined '{community_id}', hope you enjoy your stay!",
         )
 
-    @community.command(name="leave")
+    @community.command(
+        name="leave",
+        brief="Leave a community",
+    )
     async def community_leave(self, ctx: commands.Context, *, community_id):
         if community_id.isnumeric():
             community_id = int(community_id)
@@ -441,7 +467,7 @@ class CommunityCog(commands.Cog):
             message=f"You left '{community_id}', wishing you well going forward!",
         )
 
-    @community.command(name="graph")
+    @community.command(name="graph", brief="create a DiploGM community network")
     @superuser_only("create a community graph")
     async def community_graph(self, ctx: commands.Context):
         G = nx.DiGraph()
@@ -597,7 +623,7 @@ class CommunityCog(commands.Cog):
 
         await ctx.send(file=discord.File(buf, filename="graph.png"))
 
-    @community.command(name="transfer")
+    @community.command(name="transfer", brief="Transfer ownership of a community")
     @superuser_only("transfer ownership")
     async def community_transfer(
         self, ctx: commands.Context, community_id: int, new_owner: discord.User
@@ -627,7 +653,7 @@ class CommunityCog(commands.Cog):
         )
         self.service.relation_repo.save(new_rel)
 
-    @commands.command()
+    @commands.command(name="me", brief="Get some information about you")
     async def me(self, ctx: commands.Context):
         out = (
             "### You\n"
@@ -678,7 +704,7 @@ class CommunityCog(commands.Cog):
 
         await send_message_and_file(channel=ctx.channel, message=out)
 
-    @commands.command()
+    @commands.command(brief="Populate community relationships for server.")
     @superuser_only("populate a server into the community graph")
     async def populate(self, ctx: commands.Context):
         assert ctx.guild is not None
@@ -693,7 +719,7 @@ class CommunityCog(commands.Cog):
             message=f"Took: {diff}",
         )
 
-    @commands.command()
+    @commands.command(brief="Populate community relationships for DiploGM.")
     @superuser_only("populate all servers into the community graph")
     async def populate_all(self, ctx: commands.Context):
         assert ctx.guild is not None

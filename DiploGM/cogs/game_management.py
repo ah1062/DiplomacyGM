@@ -162,6 +162,7 @@ class GameManagementCog(commands.Cog):
         You may also specify a timestamp to send a deadline to the players.
         * .ping_players <timestamp>
         """,
+        aliases=["pp"]
     )
     @perms.gm_only("ping players")
     async def ping_players(self, ctx: commands.Context) -> None:
@@ -782,6 +783,7 @@ class GameManagementCog(commands.Cog):
         * pass test to view maps without doing an actual adjudication
         * pass full to automatically publish orders and maps
         """,
+        aliases=["adju", "adjudication"]
     )
     @perms.gm_only("adjudicate")
     async def adjudicate(self, ctx: commands.Context) -> None:
