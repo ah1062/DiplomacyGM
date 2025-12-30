@@ -12,39 +12,11 @@ from DiploGM.models.player import Player
 from DiploGM.models.province import Province
 from DiploGM.models.unit import Unit, UnitType
 
-_set_phase_str = "set phase"
-_set_core_str = "set core"
-_set_half_core_str = "set half core"
-_set_province_owner_str = "set province owner"
-_set_total_owner_str = "set total owner"
-_set_player_color_str = "set player color"
-_create_unit_str = "create unit"
-_create_dislodged_unit_str = "create dislodged unit"
-_delete_unit_str = "delete unit"
-_delete_dislodged_unit_str = "delete dislodged unit"
-_move_unit_str = "move unit"
-_dislodge_unit_str = "dislodge unit"
-_make_units_claim_provinces_str = "make units claim provinces"
-_set_player_vassal_str = "set vassal"
-_remove_vassal_str = "remove relationship"
-_set_game_name_str = "set game name"
-_create_player_str = "create player"
-_delete_player_str = "delete player"
-_load_state_str = "load state"
-_bulk_str = "bulk"
-_bulk_create_units_str = "bulk create units"
-
-# apocalypse (empty map state)
-_apocalypse_str = "apocalypse"
-
-# chaos
-_set_player_points_str = "set player points"
-
 logger = logging.getLogger(__name__)
 manager = Manager()
 
 
-def parse_edit_state(message: str, board: Board) -> dict[str, str | bytes | int | None]:
+def parse_edit_state(message: str, board: Board) -> tuple[str, str, bytes | None, str | None, str | None]:
     invalid: list[tuple[str, Exception]] = []
     commands = str.splitlines(message)
     for command in commands:
@@ -73,70 +45,13 @@ def parse_edit_state(message: str, board: Board) -> dict[str, str | bytes | int 
     else:
         file, file_name = None, None
 
-    return {
-        "title": response_title,
-        "message": response_body,
-        "file": file,
-        "file_name": file_name,
-        "embed_colour": embed_colour,
-    }
-
-
-def _parse_command(command: str, board: Board) -> None:
-    command_list: list[str] = get_keywords(command)
-    command_type = command_list[0].lower()
-    parameter_str = " ".join(command_list[1:])
-    keywords = [s.lower() for s in command_list[1:]]
-
-    if command_type == _set_phase_str:
-        _set_phase(keywords, board)
-    elif command_type == _set_core_str:
-        _set_province_core(keywords, board)
-    elif command_type == _set_half_core_str:
-        _set_province_half_core(keywords, board)
-    elif command_type == _set_province_owner_str:
-        _set_province_owner(keywords, board)
-    elif command_type == _set_total_owner_str:
-        _set_total_owner(keywords, board)
-    elif command_type == _set_player_color_str:
-        _set_player_color(keywords, board)
-    elif command_type == _create_unit_str:
-        _create_unit(keywords, board)
-    elif command_type == _create_dislodged_unit_str:
-        _create_dislodged_unit(keywords, board)
-    elif command_type == _delete_unit_str:
-        _delete_unit(keywords, board)
-    elif command_type == _move_unit_str:
-        _move_unit(keywords, board)
-    elif command_type == _dislodge_unit_str:
-        _dislodge_unit(keywords, board)
-    elif command_type == _make_units_claim_provinces_str:
-        _make_units_claim_provinces(keywords, board)
-    elif command_type == _delete_dislodged_unit_str:
-        _delete_dislodged_unit(keywords, board)
-    elif command_type == _set_player_points_str:
-        _set_player_points(keywords, board)
-    elif command_type == _set_player_vassal_str:
-        _set_player_vassal(keywords, board)
-    elif command_type == _remove_vassal_str:
-        _remove_player_vassal(keywords, board)
-    elif command_type == _set_game_name_str:
-        _set_game_name(parameter_str, board)
-    elif command_type == _create_player_str:
-        _create_player(keywords, board)
-    elif command_type == _delete_player_str:
-        _delete_player(keywords, board)
-    elif command_type == _load_state_str:
-        _load_state(keywords, board)
-    elif command_type == _apocalypse_str:
-        _apocalypse(keywords, board)
-    elif command_type == _bulk_str:
-        _bulk(keywords, board)
-    elif command_type == _bulk_create_units_str:
-        _bulk_create_units(keywords, board)
-    else:
-        raise RuntimeError(f"No command key phrases found")
-
+    return (
+        response_title,
+        response_body,
+        file,
+        file_name,
+        embed_colour,
+    )
 
 def _set_phase(keywords: list[str], board: Board) -> None:
     old_turn = board.turn.get_indexed_name()
@@ -244,9 +159,10 @@ def _create_unit(keywords: list[str], board: Board) -> None:
     if not player:
         raise ValueError(f"Unknown player: {keywords[1]}")
     province, coast = board.get_province_and_coast(" ".join(keywords[2:]))
-    # if unit_type == UnitType.FLEET and coast is None:
-    #     coast_name = f"{province} coast"
-    #     province, coast = board.get_province_and_coast(coast_name)
+    if province.get_multiple_coasts() and coast not in province.get_multiple_coasts():
+        raise ValueError(f"Province '{province.name}' requires a valid coast.")
+    if not province.get_multiple_coasts():
+        coast = None
 
     unit = board.create_unit(unit_type, player, province, coast, None)
     get_connection().execute_arbitrary_sql(
@@ -275,6 +191,10 @@ def _create_dislodged_unit(keywords: list[str], board: Board) -> None:
         if not player:
             raise ValueError(f"Unknown player: {keywords[1]}")
         province, coast = board.get_province_and_coast(keywords[2])
+        if province.get_multiple_coasts() and coast not in province.get_multiple_coasts():
+            raise ValueError(f"Province '{province.name}' requires a valid coast.")
+        if not province.get_multiple_coasts():
+            coast = None
         retreat_options = set(
             [board.get_province_and_coast(province_name) for province_name in keywords[3:]]
         )
@@ -351,6 +271,10 @@ def _move_unit(keywords: list[str], board: Board) -> None:
     if not unit:
         raise RuntimeError(f"No unit to move in {old_province}")
     new_province, new_coast = board.get_province_and_coast(keywords[1])
+    if new_province.get_multiple_coasts() and new_coast not in new_province.get_multiple_coasts():
+        raise ValueError(f"Province '{new_province.name}' requires a valid coast.")
+    if not new_province.get_multiple_coasts():
+        new_coast = None
     board.move_unit(unit, new_province, new_coast)
     get_connection().execute_arbitrary_sql(
         "DELETE FROM units WHERE board_id=? and phase=? and location=? and is_dislodged=?",
@@ -492,8 +416,7 @@ def _load_state(keywords: list[str], board: Board) -> None:
 
     other = manager._database.get_board(
         server,
-        turn.get_phase(),
-        turn.get_year_index(),
+        turn,
         board.fish,
         name=board.name,
         data_file=board.datafile,
@@ -530,7 +453,6 @@ def _apocalypse(keywords: list[str], board: Board) -> None:
     """
     all = "all" in keywords
 
-    armies = {}
     if all or "army" in keywords:
         armies = set(filter(lambda u: u.unit_type == UnitType.ARMY, board.units))
         board.units -= armies
@@ -580,36 +502,6 @@ def _apocalypse(keywords: list[str], board: Board) -> None:
             "UPDATE provinces SET core=?, half_core=? WHERE board_id=? AND phase=?",
             (None, None, board.board_id, board.turn.get_indexed_name()),
         )
-
-
-def _bulk(keywords: list[str], board: Board) -> None:
-
-    player = keywords[1]
-
-    if keywords[0] == _set_core_str:
-        for i in keywords[2:]:
-            _set_province_core([i, player], board)
-        return
-    elif keywords[0] == _set_half_core_str:
-        for i in keywords[2:]:
-            _set_province_half_core([i, player], board)
-        return
-    elif keywords[0] == _set_province_owner_str:
-        for i in keywords[2:]:
-            _set_province_owner([i, player], board)
-        return
-    elif keywords[0] == _set_total_owner_str:
-        for i in keywords[2:]:
-            _set_total_owner([i, player], board)
-        return
-    elif keywords[0] == _delete_unit_str:
-        for i in keywords[1:]:
-            _delete_unit([i], board)
-        return
-
-    raise RuntimeError(
-        "You can't use bulk with this commands"
-    )
 
 
 def _bulk_create_units(keywords: list[str], board: Board) -> None:
@@ -721,3 +613,55 @@ def _delete_player(keywords: list[str], board: Board) -> None:
     #     "DELETE FROM units WHERE board_id=? AND phase=? AND owner=?",
     #     (board.board_id, board.turn.get_indexed_name(), player.name),
     # )
+
+
+function_list = {
+    "set phase": _set_phase,
+    "set core": _set_province_core,
+    "set half core": _set_province_half_core,
+    "set province owner": _set_province_owner,
+    "set total owner": _set_total_owner,
+    "set player color": _set_player_color,
+    "create unit": _create_unit,
+    "create dislodged unit": _create_dislodged_unit,
+    "delete unit": _delete_unit,
+    "delete dislodged unit": _delete_dislodged_unit,
+    "move unit": _move_unit,
+    "dislodge unit": _dislodge_unit,
+    "make units claim provinces": _make_units_claim_provinces,
+    "set vassal": _set_player_vassal,
+    "remove relationship": _remove_player_vassal,
+    "set game name": _set_game_name,
+    "create player": _create_player,
+    "delete player": _delete_player,
+    "load state": _load_state,
+    "bulk create units": _bulk_create_units,
+    "apocalypse": _apocalypse,
+    "set player points": _set_player_points
+}
+
+def _bulk(keywords: list[str], board: Board) -> None:
+    player = keywords[1]
+    if keywords[0] in ["set core", "set half core", "set province owner", "set total owner", "delete unit"]:
+        for i in keywords[2:]:
+            function_list[keywords[0]]([i, player], board)
+        return
+
+    raise RuntimeError(
+        "You can't use bulk with this commands"
+    )
+
+function_list["bulk"] = _bulk
+
+def _parse_command(command: str, board: Board) -> None:
+    command_list: list[str] = get_keywords(command)
+    command_type = command_list[0].lower()
+    if command_type == "set game name":
+        keywords = " ".join(command_list[1:])
+    else:
+        keywords = [s.lower() for s in command_list[1:]]
+
+    if command_type in function_list:
+        function_list[command_type](keywords, board)
+    else:
+        raise RuntimeError("No command key phrases found")

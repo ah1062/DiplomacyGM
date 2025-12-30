@@ -213,7 +213,7 @@ def order_is_valid(province: Province, order: Order, strict_convoys_supports=Fal
         is_support_hold = order.source == order.destination
         source_to_destination_valid = (
             is_support_hold
-            or order_is_valid(order.source, Move(order.destination), strict_convoys_supports)[0]
+            or order_is_valid(order.source, Move(order.destination), strict_convoys_supports, strict_coast_movement=False)[0]
             or order_is_valid(order.source, ConvoyMove(order.destination), strict_convoys_supports)[0]
         )
 
@@ -252,7 +252,8 @@ class Adjudicator:
     def __init__(self, board: Board):
         self._board = board
         self.save_orders = True
-        self.flags = board.data.get("adju flags", [])
+        self.build_options = board.data.get("build_options", "classic")
+        self.has_vassals = (board.data.get("vassals") == "enabled")
         self.failed_or_invalid_units: set[MapperInformation] = set()
 
     @abc.abstractmethod
@@ -304,10 +305,9 @@ class BuildsAdjudicator(Adjudicator):
                     if player in new_vassals[liege]:
                         new_vassals[liege].remove(player)
             for order in player.vassal_orders:
-                if isinstance(order, Defect):
-                    if player in new_vassals[order.player]:
-                        new_vassals[order.player].remove(player)
-                        new_liege = None
+                if isinstance(order, Defect) and player in new_vassals[order.player]:
+                    new_vassals[order.player].remove(player)
+                    new_liege = None
             new_lieges[player] = new_liege
             
         for player in self._board.players:
@@ -362,7 +362,7 @@ class BuildsAdjudicator(Adjudicator):
                     if not order.province.has_supply_center or order.province.owner != player:
                         logger.warning(f"Skipping {order}; tried to build in non-sc, non-owned")
                         continue
-                    if order.province.core != player and "build anywhere" not in self.flags:
+                    if order.province.core != player and self.build_options != "anywhere":
                         logger.warning(f"Skipping {order}; tried to build in non-core")
                         continue
                     self._board.create_unit(order.unit_type, player, order.province, order.coast, None)
@@ -375,13 +375,10 @@ class BuildsAdjudicator(Adjudicator):
                     available_builds += 1
 
                 if available_builds < 0:
-                    logger.warning(f"Player {player.name} disbanded less orders than they should have")
+                    logger.warning(f"Player {player.get_name()} disbanded less orders than they should have")
 
-        if "vassal system" in self._board.data.get("adju flags", []):
+        if self.has_vassals:
             self.vassal_adju()
-
-
-
 
         for player in self._board.players:
             player.build_orders = set()
@@ -445,7 +442,7 @@ class RetreatsAdjudicator(Adjudicator):
             unit.order = None
             unit.retreat_options = None
 
-        if self._board.turn.is_fall() and "vassal system" in self._board.data.get("adju flags", []):
+        if self._board.turn.is_fall() and self.has_vassals:
             for player in self._board.players:
                 if player.liege in player.vassals:
                     other = player.liege

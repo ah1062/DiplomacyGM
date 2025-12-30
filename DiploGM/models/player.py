@@ -32,9 +32,6 @@ class Player:
         self,
         name: str,
         color: str | dict[str, str],
-        win_type: str,
-        vscc: int,
-        iscc: int,
         centers: set[province.Province],
         units: set[unit.Unit],
     ):
@@ -49,12 +46,6 @@ class Player:
             self.color_dict = None
             self.default_color = color
             self.render_color = color
-
-        self.win_type = win_type
-        # victory supply center count
-        self.vscc: int = vscc
-        # initial supply center count
-        self.iscc: int = iscc
 
         self.centers: set[province.Province] = centers
         self.units: set[unit.Unit] = units
@@ -74,6 +65,9 @@ class Player:
 
     def find_discord_role(self, roles: Sequence[discord.Role]) -> Optional[discord.Role]:
         for role in roles:
+            if simple_player_name(role.name) == simple_player_name(self.get_name()):
+                return role
+        for role in roles:
             if simple_player_name(role.name) == simple_player_name(self.name):
                 return role
         return None
@@ -81,14 +75,19 @@ class Player:
 
     def __str__(self):
         return self.name
+    
+    def get_name(self):
+        if self.board is None:
+            return self.name
+        return self.board.data["players"][self.name].get("nickname", self.name)
 
-    def info(self, variant: str = "standard") -> str:
+    def info(self, board: Board) -> str:
         bullet = "\n- "
 
         units = list(sorted(self.units, key=lambda u: (u.unit_type.value, u.province.get_name(u.coast))))
         centers = list(sorted(self.centers, key=lambda c: c.name))
         
-        if variant == "chaos":
+        if board.data["players"] == "chaos":
             out = (
                 f"Color: #{self.render_color}\n"
                 + f"Points: {self.points}\n"
@@ -116,22 +115,11 @@ class Player:
         out = (
             ""
             + f"Color: {(bullet + bullet.join([k + ': ' + v for k, v in self.color_dict.items()]) if self.color_dict is not None else self.render_color)}\n"
-            + f"Score: [{len(self.centers)}/{self.vscc}] {round(self.score() * 100, 2)}%\n"
+            + f"Score: [{len(self.centers)}/{int(board.data['players'][self.name]['vscc'])}] {round(board.get_score(self) * 100, 2)}%\n"
             + f"{center_str}\n"
             + f"{unit_str}\n"
         )
-
-
-        
         return out
-
-    def score(self):
-        if self.win_type == "classic":
-            return (len(self.centers) / self.vscc)
-        if len(self.centers) > self.iscc:
-            return (len(self.centers) - self.iscc) / (self.vscc - self.iscc)
-        else:
-            return (len(self.centers) / self.iscc) - 1
 
     def get_class(self) -> PlayerClass:
         scs = len(self.centers)

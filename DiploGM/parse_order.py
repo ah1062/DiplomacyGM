@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class TreeToOrder(Transformer):
     def set_state(self, board: Board, player_restriction: Player | None):
         self.board = board
-        self.flags = board.data.get("adju flags", [])
+        self.build_options =  board.data.get("build_options", "classic")
         self.player_restriction = player_restriction
         
     def province(self, s) -> tuple[Province, str | None]:
@@ -58,7 +58,7 @@ class TreeToOrder(Transformer):
         return s[0], order.Hold()
 
     def core_order(self, s) -> tuple[Province, order.Core]:
-        if "no coring" in self.flags:
+        if self.build_options != "cores":
             raise Exception("Coring is disabled in this gamemode")
         return s[0], order.Core()
     
@@ -75,11 +75,13 @@ class TreeToOrder(Transformer):
             raise ValueError(f"{s[2]} isn't a valid unit type")
 
         if not province.has_supply_center:
-                raise ValueError(f"{province} does not have a supply center.")  
+                raise ValueError(f"{province} does not have a supply center.")
+        if unit_type == UnitType.FLEET and province.get_multiple_coasts() and coast not in province.get_multiple_coasts():
+            raise ValueError(f"You did not specify a coast for {province}")
         elif self.player_restriction:
             if province.owner != self.player_restriction:
                 raise ValueError(f"You do not own {province}.")
-            if province.core != self.player_restriction and not "build anywhere" in self.board.data.get("adju flags", []):
+            if province.core != self.player_restriction and self.build_options != "anywhere":
                 raise ValueError(f"You haven't cored {province}.")
 
         return province, province.owner, order.Build(province, unit_type, coast)
@@ -349,7 +351,7 @@ def parse_remove_order(message: str, player_restriction: Player | None, board: B
             removed = _parse_remove_order(command, player_restriction, board)
             if isinstance(removed, Unit):
                 updated_units.add(removed)
-            else:
+            elif isinstance(removed, str):
                 provinces_with_removed_builds.add(removed)
         except Exception as error:
             invalid.append((command, error))
@@ -377,20 +379,23 @@ def parse_remove_order(message: str, player_restriction: Player | None, board: B
         return {"message": "Orders removed successfully."}
 
 
-def _parse_remove_order(command: str, player_restriction: Player | None, board: Board) -> Unit | str:
+def _parse_remove_order(command: str, player_restriction: Player | None, board: Board) -> Player | Unit | str:
     command = command.lower().strip()
     province, coast = board.get_province_and_coast(command)
     if command.startswith("relationship"):
+        if player_restriction is None:
+            raise RuntimeError("Relationship orders can only be removed in a player's orders channel")
         command = command.split(" ", 1)[1]
         target_player = None
         for player in board.players:
-            if player.name.lower() == command.lower().strip():
+            if player.name.lower() == command.lower().strip() or player.get_name().lower() == command.lower().strip():
                 target_player = player
         if target_player == None:
             raise RuntimeError(f"No such player: {command}")
         if not target_player in player_restriction.vassal_orders:
             raise RuntimeError(f"No relationship order with {target_player}")
         remove_relationship_order(board, player_restriction.vassal_orders[target_player], player_restriction)
+        return target_player
 
 
     elif board.turn.is_builds():

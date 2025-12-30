@@ -1,5 +1,6 @@
+from __future__ import annotations
 from functools import wraps
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, TYPE_CHECKING
 
 import discord
 from discord.ext import commands
@@ -11,10 +12,14 @@ from DiploGM.utils import (simple_player_name)
 from DiploGM.manager import Manager
 from DiploGM.models.player import Player
 
+if TYPE_CHECKING:
+    from discord.abc import Messageable
+
 manager = Manager()
 
 
 def get_player_by_context(ctx: commands.Context):
+    assert ctx.guild is not None
     # FIXME cleaner way of doing this
     board = manager.get_board(ctx.guild.id)
     # return if in order channel
@@ -31,15 +36,19 @@ def get_player_by_context(ctx: commands.Context):
     return player
 
 
-def is_player_channel(player_role: str, channel: commands.Context.channel) -> bool:
-    player_channel = player_role + config.player_channel_suffix
-    return simple_player_name(player_channel) == simple_player_name(
-        channel.name
-    ) and config.is_player_category(channel.category.name)
+def is_player_channel(player_role: Player, channel: Messageable) -> bool:
+    if not isinstance(channel, discord.TextChannel) or channel.category is None:
+        return False
+    player_channel = player_role.name + config.player_channel_suffix
+    nickname_channel = player_role.get_name() + config.player_channel_suffix
+    return ((simple_player_name(player_channel) == simple_player_name(channel.name) 
+             or simple_player_name(nickname_channel) == simple_player_name(channel.name))
+            and config.is_player_category(channel.category))
 
 
 
 def require_player_by_context(ctx: commands.Context, description: str):
+    assert ctx.guild is not None and ctx.message is not None
     # FIXME cleaner way of doing this
     board = manager.get_board(ctx.guild.id)
     # return if in order channel
@@ -54,7 +63,7 @@ def require_player_by_context(ctx: commands.Context, description: str):
         player = manager.get_member_player_object(ctx.message.author)
 
     if player:
-        if not is_player_channel(player.name, ctx.channel):
+        if not is_player_channel(player, ctx.channel):
             raise CommandPermissionError(
                 f"You cannot {description} as a player outside of your orders channel."
             )
@@ -122,9 +131,11 @@ async def assert_mod_only(
 def mod_only(description: str = "run this command"):
     return commands.check(lambda ctx: assert_mod_only(ctx, description))
 
-def is_moderator(author: commands.Context.author) -> bool:
+def is_moderator(author: discord.Member | discord.User) -> bool:
+    if not isinstance(author, discord.Member):
+        return False
     for role in author.roles:
-        if config.is_mod_role(role.name):
+        if config.is_mod_role(role):
             return True
 
     return False
@@ -134,6 +145,7 @@ def is_moderator(author: commands.Context.author) -> bool:
 def assert_gm_only(
     ctx: commands.Context, description: str = "run this command", non_gm_alt: str = ""
 ):
+    assert ctx.message is not None
     if not is_gm(ctx.message.author):
         raise CommandPermissionError(
             non_gm_alt or f"You cannot {description} because you are not a GM."
@@ -147,14 +159,16 @@ def assert_gm_only(
 def gm_only(description: str = "run this command"):
     return commands.check(lambda ctx: assert_gm_only(ctx, description))
 
-def is_gm_channel(channel: commands.Context.channel) -> bool:
-    return config.is_gm_channel(channel.name) and config.is_gm_category(
-        channel.category.name
-    )
+def is_gm_channel(channel: Messageable) -> bool:
+    return (isinstance(channel, discord.TextChannel)
+            and config.is_gm_channel(channel)
+            and config.is_gm_category(channel.category))
 
-def is_gm(author: commands.Context.author) -> bool:
+def is_gm(author: discord.Member | discord.User) -> bool:
+    if isinstance(author, discord.User):
+        return False
     for role in author.roles:
-        if config.is_gm_role(role.name):
+        if config.is_gm_role(role):
             return True
     return False
 
@@ -172,5 +186,5 @@ def assert_superuser_only(ctx: commands.Context, description: str = "run this co
 def superuser_only(description: str = "run this command"):
     return commands.check(lambda ctx: assert_superuser_only(ctx, description))
 
-def is_superuser(author: commands.Context.author) -> bool:
+def is_superuser(author: discord.Member | discord.User) -> bool:
     return author.id in SUPERUSERS

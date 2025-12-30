@@ -4,13 +4,14 @@ import logging
 import time
 from typing import Dict, Optional, TYPE_CHECKING
 
-from discord import Thread
+from discord import Thread, TextChannel
 from discord.ext import commands
 
 from DiploGM.config import player_channel_suffix, is_player_category
 from DiploGM.models.unit import Unit, UnitType
 
 if TYPE_CHECKING:
+    from discord.abc import Messageable
     from DiploGM.models.turn import Turn
     from DiploGM.models.player import Player
     from DiploGM.models.province import Province, ProvinceType
@@ -57,6 +58,31 @@ class Board:
         for player in self.players:
             player.board = self
 
+    def add_new_player(self, name: str, color: str):
+        from DiploGM.models.player import Player
+        from DiploGM.utils.sanitise import sanitise_name
+        from DiploGM.utils import simple_player_name
+        new_player = Player(name, color, set(), set())
+        new_player.board = self
+        self.players.add(new_player)
+        self.name_to_player[name.lower()] = new_player
+        self.cleaned_name_to_player[sanitise_name(name.lower())] = new_player
+        self.simple_player_name_to_player[simple_player_name(name)] = new_player
+        if name not in self.data["players"]:
+            self.data["players"][name] = {"color": color}
+        if "iscc" not in self.data["players"][name]:
+            self.data["players"][name]["iscc"] = 1
+        if "vscc" not in self.data["players"][name]:
+            self.data["players"][name]["vscc"] = self.data["victory_count"]
+
+    def update_players(self):
+        for player_name, player_data in self.data["players"].items():
+            if player_name.lower() not in self.name_to_player:
+                self.add_new_player(player_name, player_data["color"])
+        for player in self.players:
+            if (nickname := self.data["players"][player.name].get("nickname")):
+                self.add_nickname(player, nickname)
+
     def get_player(self, name: str) -> Optional[Player]:
         if name.lower() == "none":
             return None
@@ -79,13 +105,45 @@ class Board:
             raise ValueError(f"Player {name} not found")
         return self.simple_player_name_to_player.get(simple_player_name(name))
 
+    def add_nickname(self, player: Player, nickname: str):
+        from DiploGM.utils.sanitise import sanitise_name
+        from DiploGM.utils import simple_player_name
+        cleaned_name = sanitise_name(nickname.lower())
+        simple_name = simple_player_name(nickname)
+        if (nickname.lower() in self.name_to_player
+            or cleaned_name in self.cleaned_name_to_player
+            or simple_name in self.simple_player_name_to_player):
+            raise ValueError(f"A player with {nickname} already exists")
+
+        if (old_nick := self.data["players"][player.name].get("nickname")):
+            self.name_to_player.pop(old_nick.lower(), None)
+            self.cleaned_name_to_player.pop(sanitise_name(old_nick.lower()), None)
+            self.simple_player_name_to_player.pop(simple_player_name(old_nick), None)
+
+        self.data["players"][player.name]["nickname"] = nickname
+        self.name_to_player[nickname.lower()] = player
+        self.cleaned_name_to_player[cleaned_name] = player
+        self.simple_player_name_to_player[simple_name] = player
+
+    def get_score(self, player: Player) -> float:
+        if self.data["victory_conditions"] == "classic":
+            return len(player.centers) / int(self.data["victory_count"])
+        elif self.data["victory_conditions"] == "vscc":
+            if (centers:= len(player.centers)) > (iscc := int(self.data["players"][player.name]["iscc"])):
+                return (centers - iscc) / (int(self.data["players"][player.name]["vscc"]) - iscc)
+            else:
+                return (centers / iscc) - 1
+        raise ValueError("Unknown scoring system found")
 
     # TODO: break ties in a fixed manner
     def get_players_sorted_by_score(self) -> list[Player]:
-        return sorted(self.players, key=lambda sort_player: (-sort_player.score(), sort_player.name.lower()))
+        return sorted(self.players, 
+            key=lambda sort_player: (self.data["players"][sort_player.name].get("hidden", "false"),
+                                    -self.get_score(sort_player),
+                                    sort_player.get_name().lower()))
 
     def get_players_sorted_by_points(self) -> list[Player]:
-        return sorted(self.players, key=lambda sort_player: (-sort_player.points, -len(sort_player.centers), sort_player.name.lower()))
+        return sorted(self.players, key=lambda sort_player: (-sort_player.points, -len(sort_player.centers), sort_player.get_name().lower()))
 
     # TODO: this can be made faster if necessary
     def get_province(self, name: str) -> Province:
@@ -160,7 +218,7 @@ class Board:
     def get_build_counts(self) -> list[tuple[str, int]]:
         build_counts = []
         for player in self.players:
-            build_counts.append((player.name, len(player.centers) - len(player.units)))
+            build_counts.append((player.get_name(), len(player.centers) - len(player.units)))
         build_counts = sorted(build_counts, key=lambda counts: counts[1])
         return build_counts
 
@@ -180,6 +238,10 @@ class Board:
         coast: str | None,
         retreat_options: set[tuple[Province, str | None]] | None,
     ) -> Unit:
+        if province.get_multiple_coasts() and coast not in province.get_multiple_coasts():
+            raise RuntimeError(f"Cannot create unit. Province '{province.name}' requires a valid coast.")
+        if not province.get_multiple_coasts():
+            coast = None
         unit = Unit(unit_type, player, province, coast, retreat_options)
         if retreat_options is not None:
             if province.dislodged_unit:
@@ -268,15 +330,17 @@ class Board:
 
     def get_player_by_channel(
             self,
-            channel: commands.Context.channel,
+            channel: Messageable,
             ignore_category=False,
     ) -> Player | None:
         # thread -> main channel
         if isinstance(channel, Thread):
+            assert isinstance(channel.parent, TextChannel)
             channel = channel.parent
+        assert isinstance(channel, TextChannel)
 
         name = channel.name
-        if (not ignore_category) and not is_player_category(channel.category.name):
+        if (not ignore_category) and not is_player_category(channel.category):
             return None
 
         if self.is_chaos() and name.endswith("-void"):

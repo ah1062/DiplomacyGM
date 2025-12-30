@@ -37,6 +37,67 @@ Contributors
 - Added documentation for many prefix command methods
 - TODO: Write docstrings and comments for the more *core* systems e.g. Adjudicators and Mapping
 
+1.4.5
+=====
+Contributors
+- hdwhite
+
+Fixed some bugs related to Chaos maps
+
+# Known Issues
+- Points do not properly update on the scoreboard in Chaos games
+
+1.4.4
+=====
+Contributors
+- hdwhite
+
+# New Features
+- Added in an .edit_game command which can modify parameters of a game:
+  - build_options: Allows for building in home SCs only, building anywhere, or enables coring mechanic
+  - victory_conditions: Classic-style (all powers must reach X SCs), or VSCC with different SC goals for each country
+  - victory_count: For classic-style victory conditions, the number of SCs required to win
+  - iscc: For VSCC victory conditions, the number of SCs required to win for a given power
+  - vscc: For VSCC victory conditions, the initial SC count for a given power
+  - player_name: Edits the name of a power
+  - hide_player: Causes a power to not show up in scoreboards
+  - add_player: Adds a new power to the game. This cannot be undone
+
+1.4.3
+=====
+Contributors
+- hdwhite
+
+# Features
+- Doing .scoreboard now shows SC and unit changes
+- .sb added as an alias for .scoreboard
+
+# Bugfixes
+- Fixed an issue with the bot crashing when someone tried building a fleet on a multi-coastal province without specifying a coast
+- Fixed an issue in .view_gui where moving a fleet to a sea tile would send it to the Arctic instead
+- Fixed a year 0 issue that was causing startup to take longer than expected
+
+# Backend Changes
+- Added a PhaseName Enum to make Turns slightly better
+- Added a lot more type checks to hopefully catch bugs earlier
+- Refactored a few functions to be slightly less complicated
+
+# Test Changes
+- Added DATC tests that had been previously commented out due to bot limitations
+- All DATC tests pass!
+
+1.4.2
+=====
+Fixed GUI file location
+
+1.4.1
+=====
+Contributors
+- hdwhite
+
+Fixed some bugs with adjacencies of multiple coasts
+
+
 1.4.0
 =====
 Contributors

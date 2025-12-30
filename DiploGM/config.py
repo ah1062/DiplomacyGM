@@ -1,7 +1,14 @@
+from __future__ import annotations
+
+from discord import TextChannel
 import logging
 import tomllib
 import sys
-from typing import List, Tuple, Any
+from typing import List, Tuple, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from discord import CategoryChannel, Role
+    from discord.abc import Messageable
 
 with open("config_defaults.toml", "rb") as toml_file:
     _default_toml = tomllib.load(toml_file)
@@ -94,8 +101,8 @@ _mod_roles: set[str] = {
 }
 
 
-def is_mod_role(role_name: str) -> bool:
-    return _is_member(role_name, _mod_roles)
+def is_mod_role(role: Role) -> bool:
+    return _is_member(role.name, _mod_roles)
 
 
 # Discord roles which are allowed full access to bot commands
@@ -111,8 +118,8 @@ _gm_roles: set[str] = {
 }
 
 
-def is_gm_role(role: str) -> bool:
-    return _is_member(role, _gm_roles)
+def is_gm_role(role: Role) -> bool:
+    return _is_member(role.name, _gm_roles)
 
 
 # Player roles which are allowed player to bot commands
@@ -121,8 +128,8 @@ _player_roles: set[str] = {
 }
 
 
-def is_player_role(role: str) -> bool:
-    return _is_member(role, _player_roles)
+def is_player_role(role: Role) -> bool:
+    return _is_member(role.name, _player_roles)
 
 
 # Discord categories in which GM channels must be
@@ -132,16 +139,16 @@ _gm_categories: set[str] = {
 }
 
 
-def is_gm_category(category: str) -> bool:
-    return _is_member(category, _gm_categories)
+def is_gm_category(category: CategoryChannel | None) -> bool:
+    return category is not None and _is_member(category.name, _gm_categories)
 
 
 # Discord channels in which GMs are allowed to use non-public commands (e.g. adjudication)
 _gm_channels: set[str] = {"admin-chat", "admin-spam", "gm-bot-commands"}
 
 
-def is_gm_channel(channel: str) -> bool:
-    return _is_member(channel, _gm_channels)
+def is_gm_channel(channel: Messageable) -> bool:
+    return isinstance(channel, TextChannel) and _is_member(channel.name, _gm_channels)
 
 
 # Discord categories in which player channels must be
@@ -151,8 +158,8 @@ _player_categories: set[str] = {
 }
 
 
-def is_player_category(category: str) -> bool:
-    return _is_member(category, _player_categories)
+def is_player_category(category: CategoryChannel | None) -> bool:
+    return category is not None and _is_member(category.name, _player_categories)
 
 
 # Channel suffix for player orders channels.

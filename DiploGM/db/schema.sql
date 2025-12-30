@@ -82,3 +82,10 @@ CREATE TABLE IF NOT EXISTS spec_requests (
 	role_id INTEGER NOT NULL,
 	UNIQUE (server_id, user_id) -- only one approved request can be stored per server
 );
+
+CREATE TABLE IF NOT EXISTS board_parameters (
+    board_id INTEGER NOT NULL,
+    parameter_key TEXT NOT NULL,
+    parameter_value TEXT NOT NULL,
+    PRIMARY KEY (board_id, parameter_key)
+)

@@ -33,6 +33,7 @@ class SpecView(discord.ui.View):
 
     @discord.ui.button(label="Accept", style=discord.ButtonStyle.success)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        assert interaction.guild is not None
         # check if player has country spectator role already (HAS NOT LEFT THE SERVER AFTER SPECTATING)
         if self.spec_role in self.member.roles:
             await interaction.response.send_message(
@@ -143,6 +144,12 @@ class SpectatorCog(commands.Cog):
             return
 
         _team = discord.utils.get(guild.roles, name="GM Team")
+        if _team is None:
+            await interaction.response.send_message(
+                "This server has no GM Team!"
+            )
+            return
+
         _team_roles = [
             _team,
             discord.utils.get(guild.roles, name="GM"),

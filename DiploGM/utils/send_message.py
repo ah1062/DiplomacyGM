@@ -6,6 +6,7 @@ import logging
 
 import discord
 from discord import Message, Embed, Colour
+from discord.abc import Messageable
 from discord.ext import commands
 
 from DiploGM import config
@@ -23,7 +24,7 @@ discord_embed_total_limit = 6000
 
 async def send_message_and_file(
     *,
-    channel: commands.Context.channel,
+    channel: Messageable,
     title: str | None = None,
     message: str | None = None,
     messages: list[str] | None = None,
@@ -38,8 +39,11 @@ async def send_message_and_file(
     **_,
 ) -> Message:
 
-    if not embed_colour:
+    if not isinstance(channel, discord.TextChannel):
+        raise ValueError("Can only send messages to text channels")
+    if embed_colour is None:
         embed_colour = config.EMBED_STANDARD_COLOUR
+    assert embed_colour is not None
 
     if convert_svg and file and file_name:
         file, file_name = await svg_to_png(file, file_name)
@@ -192,4 +196,7 @@ async def send_message_and_file(
 
         embeds[-1].timestamp = footer_datetime
 
-    return await channel.send(embeds=embeds, file=discord_file)
+    if discord_file is not None:
+        return await channel.send(embeds=embeds, file=discord_file)
+    else:
+        return await channel.send(embeds=embeds)

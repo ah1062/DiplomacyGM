@@ -18,6 +18,7 @@ from DiploGM.models.order import (
     ConvoyTransport,
     RetreatDisband,
     RetreatMove,
+    PlayerOrder,
     Build,
     Disband,
     Vassal,
@@ -68,14 +69,14 @@ class _DatabaseConnection:
 
         board_keys = [(row[0], row[1]) for row in board_data]
         logger.info(f"Loading {len(board_data)} boards from DB")
-        boards = dict()
+        boards: dict[int, Board] = {}
         for board_row in board_data:
             board_id, phase_string, data_file, fish, name = board_row
 
-            split_index = phase_string.index(" ")
-            year = int(phase_string[:split_index])
-            phase_name = phase_string[split_index:].strip()
-            current_turn = Turn(year, phase_name)
+            current_turn = Turn.turn_from_string(phase_string)
+            if current_turn is None:
+                logger.warning(f"Could not parse turn string '{phase_string}' for board {board_id}")
+                continue
             if (board_id, str(current_turn.get_next_turn())) in board_keys:
                 continue
 
@@ -83,7 +84,7 @@ class _DatabaseConnection:
                 fish = 0
 
             board = self._get_board(
-                board_id, phase_name, year, fish, name, data_file, cursor
+                board_id, current_turn, fish, name, data_file, cursor, year_offset=True
             )
 
             boards[board_id] = board
@@ -95,8 +96,7 @@ class _DatabaseConnection:
     def get_board(
         self,
         board_id: int,
-        board_phase: str,
-        year: int,
+        turn: Turn,
         fish: int,
         name: str | None,
         data_file: str,
@@ -106,13 +106,13 @@ class _DatabaseConnection:
 
         board_data = cursor.execute(
             "SELECT * FROM boards WHERE board_id=? and phase=?",
-            (board_id, f"{year} {board_phase}"),
+            (board_id, turn.get_indexed_name()),
         ).fetchone()
         if not board_data:
             cursor.close()
             return None
 
-        board = self._get_board(board_id, board_phase, year, fish, name, data_file, cursor, clear_status)
+        board = self._get_board(board_id, turn, fish, name, data_file, cursor, clear_status=clear_status)
         cursor.close()
         return board
 
@@ -147,22 +147,40 @@ class _DatabaseConnection:
     def _get_board(
         self,
         board_id: int,
-        board_phase: str,
-        year: int,
+        turn: Turn,
         fish: int,
         name: str | None,
         data_file: str,
         cursor,
         clear_status: bool = False,
+        year_offset: bool = False,
     ) -> Board:
         logger.info(f"Loading board with ID {board_id}")
         # TODO - we should eventually store things like coords, adjacencies, etc
         #  so we don't have to reparse the whole board each time
         board = get_parser(data_file).parse()
-        board.turn = Turn(board.year_offset + year, board_phase, board.year_offset)
+        board.turn = Turn(board.year_offset + turn.year, turn.phase, board.year_offset) if year_offset else turn
         board.fish = fish
         board.name = name
         board.board_id = board_id
+
+        board_params = cursor.execute(
+            "SELECT parameter_key, parameter_value FROM board_parameters WHERE board_id=?",
+            (board_id,),
+        ).fetchall()
+
+        # Turning a key deliniated with slashes into a nested dict
+        for key, value in board_params:
+            cur_dict = board.data
+            split_key = key.split("/", 1)
+            while len(split_key) > 1:
+                if split_key[0] not in cur_dict:
+                    cur_dict[split_key[0]] = {}
+                cur_dict = cur_dict[split_key[0]]
+                split_key = split_key[1].split("/", 1)
+            cur_dict[split_key[0]] = value
+        if board.data["players"] != "chaos":
+            board.update_players()
 
         player_data = cursor.execute(
             "SELECT player_name, color, liege, points FROM players WHERE board_id=?",
@@ -182,9 +200,9 @@ class _DatabaseConnection:
             if liege is not None:
                 try:
                     player.liege = name_to_player[liege]
+                    player.liege.vassals.append(player)
                 except KeyError:
                     logger.warning(f"Invalid liege of player {player.name}: {liege}")
-                player.liege.vassals.append(player)
             player.points = points
             player.units = set()
             player.centers = set()
@@ -238,6 +256,8 @@ class _DatabaseConnection:
             for player_name, target_player_name, order_type in vassals_data:
                 player = get_player_by_name(player_name)
                 target_player = get_player_by_name(target_player_name)
+                assert isinstance(player, Player)
+                assert isinstance(target_player, Player)
                 order_class = next(
                     order_class
                     for order_class in order_classes
@@ -311,6 +331,9 @@ class _DatabaseConnection:
             ) = unit_info
             province, coast = board.get_province_and_coast(location)
             owner_player = board.get_player(owner)
+            if owner_player is None:
+                logger.warning(f"Couldn't find corresponding player for {owner} in DB")
+                continue
             if is_dislodged:
                 retreat_ops = cursor.execute(
                     "SELECT retreat_loc FROM retreat_options WHERE board_id=? and phase=? and origin=?",
@@ -365,7 +388,7 @@ class _DatabaseConnection:
                         for _class in order_classes
                         if _class.__name__ == order_type
                     )
-                    destination_province = None
+                    source_province, destination_province, destination_coast = None, None, None
                     if order_destination is not None:
                         destination_province, destination_coast = (
                             board.get_province_and_coast(order_destination)
@@ -389,8 +412,10 @@ class _DatabaseConnection:
 
                     province, coast = board.get_province_and_coast(location)
                     if is_dislodged:
+                        assert province.dislodged_unit is not None
                         province.dislodged_unit.order = order
                     else:
+                        assert province.unit is not None
                         province.unit.order = order
             except:
                 logger.warning("BAD UNIT INFO: replacing with hold")
@@ -466,12 +491,12 @@ class _DatabaseConnection:
                     board_id,
                     board.turn.get_indexed_name(),
                     player.name,
-                    build_order.name,
+                    build_order.province.get_name(build_order.coast),
                     isinstance(build_order, Build),
                     getattr(build_order, "unit_type", None) == UnitType.ARMY,
                 )
                 for player in board.players
-                for build_order in player.build_orders
+                for build_order in player.build_orders if isinstance(build_order, PlayerOrder)
             ],
         )
         # TODO - this is hacky
@@ -580,7 +605,7 @@ class _DatabaseConnection:
                     getattr(build_order, "unit_type", None) == UnitType.ARMY,
                 )
                 for player in players
-                for build_order in player.build_orders
+                for build_order in player.build_orders if isinstance(build_order, PlayerOrder)
             ],
         )
         cursor.executemany(
@@ -661,6 +686,7 @@ class _DatabaseConnection:
     def total_delete(self, board: Board):
         cursor = self._connection.cursor()
         cursor.execute("DELETE FROM boards WHERE board_id=?", (board.board_id,))
+        cursor.execute("DELETE FROM board_parameters WHERE board_id=?", (board.board_id,))
         cursor.execute("DELETE FROM provinces WHERE board_id=?", (board.board_id,))
         cursor.execute("DELETE FROM units WHERE board_id=?", (board.board_id,))
         cursor.execute("DELETE FROM builds WHERE board_id=?", (board.board_id,))

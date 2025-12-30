@@ -31,13 +31,13 @@ class AdminCog(commands.Cog):
         for server in ctx.bot.guilds:
             if server is None:
                 continue
-            admin_chat_channels = [channel for channel in server.channels if config.is_gm_channel(channel.name)]
+            admin_chat_channels: list[TextChannel] = [channel for channel in server.channels if config.is_gm_channel(channel.name)]
 
             if len(admin_chat_channels) == 0:
                 message += f"\n- ~~{server.name}~~ Couldn't find admin channel"
                 continue
 
-            admin_chat_channel = next(admin_chat_channels)
+            admin_chat_channel = admin_chat_channels[0]
 
             message += f"\n- {server.name}"
             if server.id in guilds_with_games:
@@ -176,8 +176,7 @@ class AdminCog(commands.Cog):
         role_names = list(map(lambda r: r.name, roles))
 
         for role in roles.copy():
-            name = role.name.lower()
-            if config.is_gm_role(name) or config.is_mod_role(name):
+            if config.is_gm_role(role) or config.is_mod_role(role):
                 await send_message_and_file(
                     channel=ctx.channel,
                     title="Error!",
@@ -295,6 +294,7 @@ class AdminCog(commands.Cog):
     )
     @perms.superuser_only("Execute arbitrary python code")
     async def exec_py(self, ctx: commands.Context) -> None:
+        assert ctx.guild is not None
         class ContainedPrinter:
             def __init__(self):
                 self.text = ""

@@ -1,7 +1,7 @@
 
 import re
 
-from DiploGM.models.turn import Turn
+from DiploGM.models.turn import PhaseName, Turn
 from DiploGM.models.unit import UnitType
 
 
@@ -74,29 +74,38 @@ def get_unit_type(command: str) -> UnitType | None:
 
 
 def parse_season(
-    arguments: list[str], default_year: int
-) -> Turn | None:
-    year, season, retreat = default_year, None, False
+    arguments: list[str], default_turn: Turn
+) -> Turn:
+    year, season, retreat = None, None, False
     for s in arguments:
-        if s.isnumeric() and int(s) > 1640:
+        if s.isnumeric() and int(s) >= default_turn.start_year:
             year = int(s)
 
         if s.lower() in ["spring", "s", "sm", "sr"]:
-            season = "Spring"
+            season = PhaseName.SPRING_MOVES
         elif s.lower() in ["fall", "f", "fm", "fr"]:
-            season = "Fall"
+            season = PhaseName.FALL_MOVES
         elif s.lower() in ["winter", "w", "wa"]:
-            season = "Winter"
+            season = PhaseName.WINTER_BUILDS
 
-        if s.lower() in ["retreat", "retreats", "r", "sr", "fr"]:
-            retreat = True
+        retreat = retreat or s.lower() in ["retreat", "retreats", "r", "sr", "fr"]
 
-    if season is None:
-        return None
-    if season == "Winter":
-        return Turn(year, "Winter Builds")
-    else:
-        return Turn(year, season + " " + ("Retreats" if retreat else "Moves"))
+    if year is None:
+        if season is None:
+            return default_turn
+        year = default_turn.year
+    season = season or PhaseName.SPRING_MOVES
+
+    if retreat and season != PhaseName.WINTER_BUILDS:
+        season = PhaseName(season.value + 1)
+
+    new_turn = Turn(year, season, default_turn.start_year)
+    new_turn.year = min(new_turn.year, default_turn.year)
+    if new_turn.year == default_turn.year and new_turn.phase.value > default_turn.phase.value:
+        if new_turn.year == default_turn.start_year:
+            return default_turn
+        return Turn(new_turn.year - 1, season, default_turn.start_year)
+    return new_turn
 
 
 def get_value_from_timestamp(timestamp: str) -> int | None:

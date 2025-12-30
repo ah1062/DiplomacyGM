@@ -1,6 +1,7 @@
 import unittest
 
 from DiploGM.models.unit import UnitType
+from DiploGM.parse_order import parse_order
 from test.utils import BoardBuilder
 
 # These tests are based off https://webdiplomacy.net/doc/DATC_v3_0.html, with 
@@ -81,7 +82,7 @@ class TestDATC_B(unittest.TestCase):
         b = BoardBuilder()
         f_marseilles = b.move(b.france, UnitType.FLEET, "Marseilles", "Gulf of Lyon")
         f_spain_nc = b.supportMove(b.france, UnitType.FLEET, "Spain nc", f_marseilles, "Gulf of Lyon")
-        f_gulf_of_lyon = b.hold(b.italy, UnitType.FLEET, "Gulf of Lyon")
+        b.hold(b.italy, UnitType.FLEET, "Gulf of Lyon")
 
         b.assertIllegal(f_spain_nc)
         b.assertFail(f_marseilles)
@@ -101,7 +102,7 @@ class TestDATC_B(unittest.TestCase):
         """
         b = BoardBuilder()
         f_north_atlantic_ocean = b.move(b.england, UnitType.FLEET, "North Atlantic Ocean", "Mid-Atlantic Ocean")
-        f_irish_sea = b.supportMove(b.england, UnitType.FLEET, "Irish Sea", f_north_atlantic_ocean, "Mid-Atlantic Ocean")
+        b.supportMove(b.england, UnitType.FLEET, "Irish Sea", f_north_atlantic_ocean, "Mid-Atlantic Ocean")
         f_mid_atlantic_ocean = b.hold(b.france, UnitType.FLEET, "Mid-Atlantic Ocean")
         f_spain_nc = b.supportHold(b.france, UnitType.FLEET, "Spain nc", f_mid_atlantic_ocean)
         f_gulf_of_lyon = b.move(b.italy, UnitType.FLEET, "Gulf of Lyon", "Spain sc")
@@ -112,17 +113,133 @@ class TestDATC_B(unittest.TestCase):
         b.assertDislodge(f_mid_atlantic_ocean)
         b.moves_adjudicate(self)
 
-    # NOT APPLICABLE 6_b_7; TEST CASE, SUPPORTING WITH UNSPECIFIED COAST
+    def test_6_b_7(self):
+        """6.B.7. TEST CASE, SUPPORTING OWN UNIT WITH UNSPECIFIED COAST
+            It is a little bit harsh to reject this.
+            France:
+            F Portugal Supports F Mid-Atlantic Ocean - Spain given
+            F Mid-Atlantic Ocean - Spain(nc) fails
 
-    # NOT APPLICABLE 6_b_8; TEST CASE, SUPPORTING WITH UNSPECIFIED COAST WHEN ONLY ONE COAST IS POSSIBLE
+            Italy:
+            F Gulf of Lyon Supports F Western Mediterranean - Spain(sc) given
+            F Western Mediterranean - Spain(sc) fails
 
-    # NOT APPLICABLE 6_b_9; TEST CASE, SUPPORTING WITH WRONG COAST
+            See issue 4.B.4.
 
-    # NOT APPLICABLE 6_b_10; TEST CASE, UNIT ORDERED WITH WRONG COAST
+            I prefer that the support succeeds and the Italian fleet in the Western Mediterranean bounces.
+            However, if orders are checked on submission (such as in web-based play), support without
+            coast should not be given as an option.
+        """
+        b = BoardBuilder()
+        f_mid_atlantic_ocean = b.move(b.france, UnitType.FLEET, "Mid-Atlantic Ocean", "Spain nc")
+        f_portugal = b.supportMove(b.france, UnitType.FLEET, "Portugal", f_mid_atlantic_ocean, "Spain")
+        f_western_mediterranean = b.move(b.italy, UnitType.FLEET, "Western Mediterranean", "Spain sc")
+        b.supportMove(b.italy, UnitType.FLEET, "Gulf of Lyon", f_western_mediterranean, "Spain sc")
 
-    # NOT APPLICABLE 6_b_11; TEST CASE, COAST CAN NOT BE ORDERED TO CHANGE
+        b.assertNotIllegal(f_portugal)
+        b.assertFail(f_mid_atlantic_ocean, f_western_mediterranean)
+        b.moves_adjudicate(self)
 
-    # NOT APPLICABLE 6_b_12; TEST CASE, ARMY MOVEMENT WITH COASTAL SPECIFICATION
+    def test_6_b_8(self):
+        """6.B.8. TEST CASE, SUPPORTING WITH UNSPECIFIED COAST WHEN ONLY ONE COAST IS POSSIBLE
+            If coast is omitted while only coast is possible, it should be considered a poorly
+            written order, that should be followed.
+            France:
+            F Portugal Supports F Gascony - Spain given
+            F Gascony - Spain(nc) fails
+
+            Italy:
+            F Gulf of Lyon Supports F Western Mediterranean - Spain(sc) given
+            F Western Mediterranean - Spain(sc) fails
+
+            Support of Portugal is successful.
+        """
+        b = BoardBuilder()
+        f_gascony = b.move(b.france, UnitType.FLEET, "Gascony", "Spain nc")
+        f_portugal = b.supportMove(b.france, UnitType.FLEET, "Portugal", f_gascony, "Spain")
+        f_western_mediterranean = b.move(b.italy, UnitType.FLEET, "Western Mediterranean", "Spain sc")
+        b.supportMove(b.italy, UnitType.FLEET, "Gulf of Lyon", f_western_mediterranean, "Spain sc")
+
+        b.assertNotIllegal(f_portugal)
+        b.assertFail(f_gascony, f_western_mediterranean)
+        b.moves_adjudicate(self)
+
+    def test_6_b_9(self):
+        """6.B.9. TEST CASE, SUPPORTING WITH WRONG COAST
+            It should be possible to specify a coast and that coast should match.
+            France:
+            F Portugal Supports F Mid-Atlantic Ocean - Spain(nc) invalid
+            F Mid-Atlantic Ocean - Spain(sc) fails
+
+            Italy:
+            F Gulf of Lyon Supports F Western Mediterranean - Spain(sc) given
+            F Western Mediterranean - Spain(sc) succeeds
+
+            See issue 4.B.4. Coastal specification in Portugal support order does not match, making it invalid.
+        """
+        b = BoardBuilder()
+        f_mid_atlantic_ocean = b.move(b.france, UnitType.FLEET, "Mid-Atlantic Ocean", "Spain nc")
+        f_portugal = b.supportMove(b.france, UnitType.FLEET, "Portugal", f_mid_atlantic_ocean, "Spain sc")
+        f_western_mediterranean = b.move(b.italy, UnitType.FLEET, "Western Mediterranean", "Spain sc")
+        b.supportMove(b.italy, UnitType.FLEET, "Gulf of Lyon", f_western_mediterranean, "Spain sc")
+
+        b.assertIllegal(f_portugal)
+        b.assertFail(f_mid_atlantic_ocean)
+        b.assertSuccess(f_western_mediterranean)
+        b.moves_adjudicate(self)
+
+    def test_6_b_10(self):
+        """6.B.10. TEST CASE, UNIT ORDERED WITH WRONG COAST
+            A player might specify the wrong coast for the ordered unit.
+            France owns F Spain(sc)
+
+            France:
+            F Spain(nc) - Gulf of Lyon succeeds
+
+            If only perfect orders are accepted, then the move will fail, but since the
+            coast for the ordered unit has no purpose, it might also be ignored (see issue 4.B.5).
+
+            I prefer that a move will be attempted.
+        """
+        b = BoardBuilder()
+        f_spain = b.fleet("Spain sc", b.france)
+        parse_order(".order Spain nc - Gulf of Lyon", None, b.board)
+
+        b.assertNotIllegal(f_spain)
+        b.assertSuccess(f_spain)
+        b.moves_adjudicate(self)
+
+    def test_6_b_11(self):
+        """6.B.11. TEST CASE, COAST CANNOT BE ORDERED TO CHANGE
+            The coast cannot change by just ordering the other coast.
+            France owns F Spain(nc)
+
+            France:
+            F Spain(sc) - Gulf of Lyon fails
+        """
+        b = BoardBuilder()
+        f_spain = b.fleet("Spain nc", b.france)
+        parse_order(".order Spain sc - Gulf of Lyon", None, b.board)
+
+        b.assertIllegal(f_spain)
+        b.moves_adjudicate(self)
+
+    def test_6_b_12(self):
+        """For armies the coasts are irrelevant:
+            France:
+            A Gascony - Spain(nc) succeeds
+
+            If only perfect orders are accepted, then the move will fail. But it is also possible
+            that coasts are ignored in this case and a move will be attempted (see issue 4.B.6).
+
+            I prefer that a move will be attempted.
+        """
+        b = BoardBuilder()
+        a_gascony = b.move(b.france, UnitType.ARMY, "Gascony", "Spain nc")
+
+        b.assertNotIllegal(a_gascony)
+        b.assertSuccess(a_gascony)
+        b.moves_adjudicate(self)
 
     def test_6_b_13(self):
         """ 6.B.13. TEST CASE, COASTAL CRAWL NOT ALLOWED
@@ -141,4 +258,136 @@ class TestDATC_B(unittest.TestCase):
         b.assertFail(f_constantinople)
         b.moves_adjudicate(self)
 
-    # NOT APPLICABLE 6_b_14; TEST CASE, BUILDING WITH UNSPECIFIED COAST
+    def test_6_b_14(self):
+        """ 6.B.14. TEST CASE, BUILDING WITH UNSPECIFIED COAST
+            Coast must be specified in certain build cases:
+            Russia owns SC St Petersburg
+
+            Russia:
+            Build F St Petersburg fails
+
+            See issue 4.B.7. Build fails, subsequent build orders may use up this right to build.
+        """
+        b = BoardBuilder()
+        b.build(b.russia, (UnitType.FLEET, "St. Petersburg"))
+        b.assertBuildCount(0)
+        b.builds_adjudicate(self)
+
+    def test_6_b_15(self):
+        """ 6.B.15. TEST CASE, SUPPORTING FOREIGN UNIT WITH UNSPECIFIED COAST
+            Opinions differ on this.
+            France:
+            F Portugal Supports F Mid-Atlantic Ocean - Spain given
+
+            England:
+            F Mid-Atlantic Ocean - Spain(nc) fails
+
+            Italy:
+            F Gulf of Lyon Supports F Western Mediterranean - Spain(sc) given
+            F Western Mediterranean - Spain(sc) fails
+
+            See issue 4.B.4.
+
+            Although the move to the north coast of Spain might be a surprise for France, it is hard to believe
+            that England somehow tricked France. Therefore, I prefer that the support succeeds and the Italian fleet
+            in the Western Mediterranean bounces. However, if orders are checked on submission (such as in web-based
+            play), support without coast should not be given as an option.
+        """
+        b = BoardBuilder()
+        f_mid_atlantic_ocean = b.move(b.england, UnitType.FLEET, "Mid-Atlantic Ocean", "Spain nc")
+        f_portugal = b.supportMove(b.france, UnitType.FLEET, "Portugal", f_mid_atlantic_ocean, "Spain")
+        f_western_mediterranean = b.move(b.italy, UnitType.FLEET, "Western Mediterranean", "Spain sc")
+        b.supportMove(b.italy, UnitType.FLEET, "Gulf of Lyon", f_western_mediterranean, "Spain sc")
+
+        b.assertNotIllegal(f_portugal)
+        b.assertFail(f_mid_atlantic_ocean, f_western_mediterranean)
+        b.moves_adjudicate(self)
+
+    def test_6_b_16(self):
+        """ 6.B.16. TEST CASE, HOLD SUPPORT WITH WRONG COAST
+            For a fleet holding on a multi-coast province, the coast doesn't need to be agreed on.
+            France:
+            A Gascony - Spain fails
+            A Marseilles Supports A Gascony - Spain given
+
+            Italy:
+            F Spain(sc) Holds stands
+
+            England:
+            F Portugal Supports F Spain(nc) given
+
+            See issue 4.B.5.
+
+            Although the English support order contains the wrong coast, the coast specification
+            is not required. Therefore, I prefer that the support is valid.
+        """
+        b = BoardBuilder()
+        a_gascony = b.move(b.france, UnitType.ARMY, "Gascony", "Spain")
+        b.supportMove(b.france, UnitType.ARMY, "Marseilles", a_gascony, "Spain")
+        f_spain = b.hold(b.italy, UnitType.FLEET, "Spain sc")
+        f_portugal = b.fleet("Portugal", b.england)
+        parse_order(".order Portugal s Spain nc", None, b.board)
+
+        b.assertNotIllegal(f_portugal)
+        b.assertFail(a_gascony)
+        b.assertNotDislodge(f_spain)
+        b.moves_adjudicate(self)
+
+    def test_6_b_17(self):
+        """ 6.B.17. TEST CASE, MOVE SUPPORT WITH WRONG COAST FOR DEPARTURE PROVINCE
+            For a fleet moving from a multi-coast province, the coast doesn't need to be agreed on.
+            England:
+            F Mid-Atlantic Ocean Holds dislodged
+
+            France:
+            F Spain(sc) - Mid-Atlantic Ocean succeeds
+
+            Italy:
+            F Western Mediterranean Supports F Spain(nc) - Mid-Atlantic Ocean given
+
+            See issue 4.B.5.
+
+            Also, for a move support the coast specification of the departing province is not
+            required. Therefore, I prefer that the support is valid.
+        """
+        b = BoardBuilder()
+        f_mid_atlantic_ocean = b.hold(b.england, UnitType.FLEET, "Mid-Atlantic Ocean")
+        f_spain = b.move(b.france, UnitType.FLEET, "Spain sc", "Mid-Atlantic Ocean")
+        f_western_mediterranean = b.fleet("Western Mediterranean Sea", b.italy)
+        parse_order(".order Western Mediterranean Sea s Spain nc - Mid-Atlantic Ocean", None, b.board)
+
+        b.assertNotIllegal(f_western_mediterranean)
+        b.assertSuccess(f_spain)
+        b.assertDislodge(f_mid_atlantic_ocean)
+        b.moves_adjudicate(self)
+
+    def test_6_b_18(self):
+        """ 6.B.18. TEST CASE, CONVOY STARTING FROM MULTI-COAST PROVINCE
+            A convoy follows fleet movement. However, if starting at a multi-coast province,
+            the army position (without coast specification) is not a legal fleet position.
+            Turkey:
+            A Bulgaria - Sevastopol succeeds
+            F Black Sea Convoys A Bulgaria - Sevastopol available
+        """
+        b = BoardBuilder()
+        a_bulgaria = b.move(b.turkey, UnitType.ARMY, "Bulgaria", "Sevastopol")
+        f_black_sea = b.convoy(b.turkey, "Black Sea", a_bulgaria, "Sevastopol")
+
+        b.assertNotIllegal(f_black_sea)
+        b.assertSuccess(a_bulgaria)
+        b.moves_adjudicate(self)
+
+    def test_6_b_19(self):
+        """ 6.B.19. TEST CASE, CONVOY ENDING AT MULTI-COAST PROVINCE
+            Similar to the previous test case, but now the convoy is ending at a multi-coast province.
+            Italy:
+            A Tuscany - Spain succeeds
+            F Gulf of Lyon Convoys A Tuscany - Spain available
+        """
+        b = BoardBuilder()
+        a_tuscany = b.move(b.italy, UnitType.ARMY, "Tuscany", "Spain")
+        f_gulf_of_lyon = b.convoy(b.italy, "Gulf of Lyon", a_tuscany, "Spain")
+
+        b.assertNotIllegal(f_gulf_of_lyon)
+        b.assertSuccess(a_tuscany)
+        b.moves_adjudicate(self)

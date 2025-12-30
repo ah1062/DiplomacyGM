@@ -68,7 +68,9 @@ class SlashSubstituteCog(commands.Cog):
 
         """
         guild = interaction.guild
-        if not guild or not isinstance(interaction.user, discord.Member):
+        if (not guild
+            or not isinstance(interaction.user, discord.Member)
+            or not isinstance(interaction.channel, discord.TextChannel)):
             return
 
         bot = interaction.client
@@ -168,7 +170,7 @@ class SlashSubstituteCog(commands.Cog):
             f"Phase: {board.turn}\n"
             f"Power: {power_role.name}\n"
             f"SC Count: {len(player.centers)}\n"
-            f"VSCC: {round(player.score() * 100, 2)}%\n"
+            f"VSCC: {round(board.get_score(player) * 100, 2)}%\n"
             "\n"
             f"Message: {message}\n"
             "\n"
@@ -213,7 +215,7 @@ class SlashSubstituteCog(commands.Cog):
     async def substitute(
         self,
         interaction: discord.Interaction,
-        incoming_user: discord.User,
+        incoming_user: discord.Member,
         outgoing_username: str,
         power_role: discord.Role,
         recommended_penalty: Optional[int],
@@ -252,7 +254,9 @@ class SlashSubstituteCog(commands.Cog):
         """
         guild = interaction.guild
         bot = interaction.client
-        if not guild or not isinstance(interaction.user, discord.Member):
+        if (not guild
+            or not isinstance(interaction.user, discord.Member)
+            or not isinstance(interaction.channel, discord.TextChannel)):
             return
 
         # TODO: app_commands permissions check decorators
@@ -441,7 +445,7 @@ class SlashSubstituteCog(commands.Cog):
         sub_tracking = discord_find(
             lambda c: c.name == "player-sub-tracking", guild.channels
         )
-        if sub_tracking:
+        if sub_tracking and isinstance(sub_tracking, discord.TextChannel):
             link = await send_message_and_file(channel=sub_tracking, message=out)
 
         await interaction.followup.send(
