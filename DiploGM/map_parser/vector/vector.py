@@ -182,6 +182,16 @@ class Parser:
 
         return (provinces, adjacencies)
 
+    def names_to_provinces(self, names: set[str]):
+        provinces = set()
+        for n in names:
+            p, c = self._get_province_and_coast(n)
+            if c:
+                provinces.add((p, c))
+            else:
+                provinces.add(p)
+        return provinces
+
     def add_province_to_board(self, provinces: set[Province], province: Province) -> set[Province]:
         provinces = {x for x in provinces if x.name != province.name}
         provinces.add(province)
@@ -218,7 +228,7 @@ class Parser:
                             provinceA.adjacent.add(provinceB)
 
             for name, data in self.data["overrides"]["high provinces"].items():
-                adjacent = {self.name_to_province[n] for n in data["adjacencies"]}
+                adjacent = set(self.names_to_provinces(data["adjacencies"]))
                 for index in range(1, data["num"] + 1):
                     high_province = self.name_to_province[name + str(index)]
                     high_province.adjacent.update(adjacent)
@@ -241,15 +251,15 @@ class Parser:
                 province = self.name_to_province[name]
                 # TODO: Some way to specify whether or not to clear other adjacencies?
                 if "adjacencies" in data:
-                    province.adjacent.update({self.name_to_province[n] for n in data["adjacencies"]})
+                    province.adjacent.update(self.names_to_provinces(data["adjacencies"]))
                 if "remove_adjacencies" in data:
-                    province.adjacent.difference_update({self.name_to_province[n] for n in data["remove_adjacencies"]})
+                    province.adjacent.difference_update(self.names_to_provinces(data["remove_adjacencies"]))
                 if "remove_adjacent_coasts" in data:
                     province.nonadjacent_coasts.update(data["remove_adjacent_coasts"])
                 if "coasts" in data:
                     province.fleet_adjacent = {}
                     for coast_name, coast_adjacent in data["coasts"].items():
-                        province.fleet_adjacent[coast_name] = {self._get_province_and_coast(n) for n in coast_adjacent}
+                        province.fleet_adjacent[coast_name] = set(self.names_to_provinces(coast_adjacent))
                 if "unit_loc" in data:
                     # For compatability reasons, we assume these are sea tiles
                     # TODO: Add support for armies/multicoastal tiles

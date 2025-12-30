@@ -49,6 +49,7 @@ class GameManagementCog(commands.Cog):
     )
     @perms.gm_only("create a game")
     async def create_game(self, ctx: commands.Context) -> None:
+
         """Create a new initial game state tied to the server of invocation.
 
         Usage: 

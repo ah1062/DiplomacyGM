@@ -74,11 +74,11 @@ def get_unit_type(command: str) -> UnitType | None:
 
 
 def parse_season(
-    arguments: list[str], default_turn: Turn
-) -> Turn:
-    year, season, retreat = None, None, False
+    arguments: list[str], default_year: int
+) -> Turn | None:
+    year, season, retreat = default_year, None, False
     for s in arguments:
-        if s.isnumeric() and int(s) >= default_turn.start_year:
+        if s.isnumeric() and int(s) > 1640:
             year = int(s)
 
         if s.lower() in ["spring", "s", "sm", "sr"]:
@@ -91,39 +91,13 @@ def parse_season(
         if s.lower() in ["retreat", "retreats", "r", "sr", "fr"]:
             retreat = True
 
-    if year is None:
-        if season is None:
-            return default_turn
-        year = default_turn.year
     if season is None:
-        season = "Spring"
-
+        return None
     if season == "Winter":
-        season = "Winter Builds"
+        return Turn(year, "Winter Builds")
     else:
-        season = season + (" Retreats" if retreat else " Moves")
+        return Turn(year, season + " " + ("Retreats" if retreat else "Moves"))
 
-    new_turn = Turn(year, season, default_turn.start_year)
-    if new_turn.year > default_turn.year:
-        new_turn.year = default_turn.year
-    if new_turn.year < default_turn.start_year:
-        new_turn.year = default_turn.start_year
-    if new_turn.year == default_turn.year and new_turn.phase > default_turn.phase:
-        if new_turn.year == default_turn.start_year:
-            new_turn = default_turn
-        else:
-            new_turn = Turn(new_turn.year - 1, season, default_turn.start_year)
-    return new_turn
-
-def get_full_command_name(ctx):
-    parts = []
-    cmd = ctx.command
-
-    while cmd is not None:
-        parts.append(cmd.name)
-        cmd = cmd.parent
-
-    return " ".join(reversed(parts))
 
 def get_value_from_timestamp(timestamp: str) -> int | None:
     if len(timestamp) == 10 and timestamp.isnumeric():
