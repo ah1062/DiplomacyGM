@@ -435,7 +435,10 @@ class Mapper:
                     break
 
                 self.color_element(power_element[0], self.player_colors[player.name])
-                power_element.set("transform", self.scoreboard_power_locations[i])
+                initial_pretransform_coordinates = (float(power_element[0].get("x", 0)), float(power_element[0].get("y", 0)))
+                new_translation = (self.scoreboard_power_locations[i][0] - initial_pretransform_coordinates[0],
+                                   self.scoreboard_power_locations[i][1] - initial_pretransform_coordinates[1])
+                power_element.set("transform", f"translate({new_translation[0]}, {new_translation[1]})")
                 if high_player_count or player_data.get("nickname"):
                     power_element[name_index][0].text = player.get_name()
                     # Fix for Poland-Lithuanian Commonwealth
@@ -1034,17 +1037,15 @@ class Mapper:
         all_power_banners_element = get_svg_element(
             self.board_svg, self.board.data[SVG_CONFIG_KEY]["power_banners"]
         )
-        self.scoreboard_power_locations: list[str] = []
+        self.scoreboard_power_locations: list[tuple[float, float]] = []
         for power_element in all_power_banners_element or []:
-            transform = power_element.get("transform")
-            assert transform is not None
-            self.scoreboard_power_locations.append(transform)
+            destination_pretransform_coordinates = (float(power_element[0].get("x", 0)), float(power_element[0].get("y", 0)))
+            destination_coordinates = TransGL3(power_element).transform(destination_pretransform_coordinates)
+            self.scoreboard_power_locations.append(destination_coordinates)
 
         # each power is placed in the right spot based on the transform field which has value of "translate($x,$y)" where x,y
         # are floating point numbers; we parse these via regex and sort by y-value
-        self.scoreboard_power_locations.sort(
-            key=lambda loc: float(re.match(r".*translate\((-?\d+(?:\.\d+)?(?:e-?\d+)?),\s*(-?\d+(?:\.\d+)?(?:e-?\d+)?)\)", loc).groups()[1])
-        )
+        self.scoreboard_power_locations.sort(key=lambda loc: loc[1])
 
     def add_arrow_definition_to_svg(self, svg: ElementTree) -> None:
         defs = svg.find("{http://www.w3.org/2000/svg}defs")
