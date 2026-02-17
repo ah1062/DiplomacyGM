@@ -301,6 +301,14 @@ def parse_order(message: str, player_restriction: Player | None, board: Board) -
     else:
         database.save_order_for_units(board, movement)
 
+    if board.turn.is_builds() and player_restriction is not None:
+        expected_builds = len(player_restriction.centers) - len(player_restriction.units)
+        build_difference = player_restriction.get_number_of_builds() - expected_builds
+        if expected_builds < 0 and build_difference < 0:
+            errors.append(f"You have inputted {abs(build_difference)} more disband order{'' if abs(build_difference) == 1 else 's'} than necessary. Please use .remove_order to fix this.")
+        elif expected_builds > 0 and build_difference > 0:
+            errors.append(f"You have inputted {abs(build_difference)} more build order{'' if abs(build_difference) == 1 else 's'} than necessary. Please use .remove_order to fix this.")
+
     paginator = Paginator(prefix="```ansi\n", suffix="```", max_size=4096)
     for line in orderoutput:
         paginator.add_line(line)
