@@ -425,7 +425,11 @@ class Mapper:
             if i >= len(self.scoreboard_power_locations):
                 break
             for power_element in all_power_banners_element:
-                if high_player_count and power_element.get("transform") != self.scoreboard_power_locations[i]:
+                if len(power_element) == 0:
+                    continue
+                initial_pretransform_coordinates = (float(power_element[0].get("x", 0)), float(power_element[0].get("y", 0)))
+                banner_coordinates = TransGL3(power_element).transform(initial_pretransform_coordinates)
+                if high_player_count and banner_coordinates != self.scoreboard_power_locations[i]:
                     continue
                 if not high_player_count and get_element_color(power_element[0]) != player.default_color:
                     continue
@@ -435,7 +439,6 @@ class Mapper:
                     break
 
                 self.color_element(power_element[0], self.player_colors[player.name])
-                initial_pretransform_coordinates = (float(power_element[0].get("x", 0)), float(power_element[0].get("y", 0)))
                 new_translation = (self.scoreboard_power_locations[i][0] - initial_pretransform_coordinates[0],
                                    self.scoreboard_power_locations[i][1] - initial_pretransform_coordinates[1])
                 power_element.set("transform", f"translate({new_translation[0]}, {new_translation[1]})")
