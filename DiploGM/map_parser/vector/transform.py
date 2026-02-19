@@ -9,36 +9,43 @@ class TransGL3:
         if not isinstance(transform_string, str):
             transform_string = transform_string.get("transform", "")
         
-        x_dx = 1
-        y_dy = 1
-        x_dy = 0
-        y_dx = 0
-        x_c = 0
-        y_c = 0
+        pre = None
+        post = None
+        self.matrix = np.array([
+            [1, 0, 0],
+            [0, 1, 0],
+            [0 , 0 , 1]
+        ])
         transform_string = transform_string.strip()
 
-        if transform_string.startswith("matrix"):
-            match = re.search(r"matrix\((.*),(.*),(.*),(.*),(.*),(.*)\)", transform_string)
+        if "matrix" in transform_string:
+            match = re.search(r"matrix\((.*?),(.*?),(.*?),(.*?),(.*?),(.*?)\)", transform_string)
             if not match:
                 raise Exception(f"Malformed matrix transformation: {transform_string}")
-            x_dx = float(match.group(1))
-            y_dx = float(match.group(2))
-            x_dy = float(match.group(3))
-            y_dy = float(match.group(4))
-            x_c = float(match.group(5))
-            y_c = float(match.group(6))
+            print(match.groups())
+            m = np.array([
+                [float(match.group(1)), float(match.group(2)), 0],
+                [float(match.group(3)), float(match.group(4)), 0],
+                [float(match.group(5)), float(match.group(6)), 1]
+            ])
+            self.matrix = self.matrix @ m
 
-        elif transform_string.startswith("translate"):
-            match = re.search(r"translate\((.*)\)", transform_string)
+        if "translate" in transform_string:
+            match = re.search(r"translate\((.*?)\)", transform_string)
             if not match:
                 raise Exception(f"Malformed translate transformation: {transform_string}")
             coords = match.group(1).split(",")
-            x_c = float(coords[0])
-            y_c = float(coords[1]) if len(coords) > 1 else 0.0
-        elif transform_string.startswith("rotate"):
-            match = re.search(r"rotate\((.*),(.*),(.*)\)", transform_string)
+            m = np.array([
+                [1, 0, 0],
+                [0, 1, 0],
+                [float(coords[0]), float(coords[1]) if len(coords) > 1 else 0, 1]
+            ])
+            self.matrix = self.matrix @ m
+
+        if "rotate" in transform_string:
+            match = re.search(r"rotate\((.*?),(.*?),(.*?)\)", transform_string)
             if not match:
-                match = re.search(r"rotate\((.*)\)", transform_string)
+                match = re.search(r"rotate\((.*?)\)", transform_string)
                 coord = 0, 0
             else:
                 coord = float(match.group(2)), float(match.group(3))
@@ -49,22 +56,22 @@ class TransGL3:
             post = TransGL3().init(x_c=coord[0], y_c=coord[1])
             cos = np.cos(angle)
             sin = np.sin(angle)
-            x_dx =  cos
-            y_dx =  sin
-            x_dy = -sin
-            y_dy =  cos
+            m = np.array([
+                [cos, sin, 0],
+                [-sin, cos, 0],
+                [0, 0, 1]
+            ])
+            self.matrix = self.matrix @ m
 
-        elif transform_string != "":
+        if ("matrix" not in transform_string 
+            and "translate" not in transform_string
+            and "rotate" not in transform_string
+            and transform_string != ""):
             raise Exception(f"Unknown transformation: {transform_string}")
         
         # the matrix represents the transformation from (x, y, const) to (x, y const)
         # we preserve the const via a 1 so that convolutions work correctly
-        self.matrix = np.array([
-            [x_dx, y_dx, 0],
-            [x_dy, y_dy, 0],
-            [x_c , y_c , 1]
-        ])
-        if transform_string.startswith("rotate"):
+        if pre is not None and post is not None:
             self.matrix = pre.matrix @ self.matrix @ post.matrix
 
     # this is so that functions can create TransGL3 with specific values, not from an element
