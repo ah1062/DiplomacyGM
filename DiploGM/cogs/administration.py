@@ -281,6 +281,16 @@ class AdminCog(commands.Cog):
             turn=season,
         )
         await upload_map_to_archive(ctx, server_id, board, file, season)
+    
+    @commands.command(hidden=True)
+    @perms.superuser_only("Checks the adjacencies of a variant to find potential issues")
+    async def verify_adjacencies(self, ctx: commands.Context, arg) -> None:
+        assert ctx.guild is not None
+        gametype = arg if arg else "classic"
+
+        message = manager.verify_adjacencies(gametype)
+        log_command(logger, ctx, message=message)
+        await send_message_and_file(channel=ctx.channel, message=message)
 
     @commands.command(
         brief="Execute Arbitrary Python",

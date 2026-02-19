@@ -76,7 +76,7 @@ class GameManagementCog(commands.Cog):
         assert ctx.guild is not None
         gametype = ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")
         if gametype == "":
-            gametype = "impdip"
+            gametype = "classic"
         else:
             gametype = gametype.removeprefix(" ")
 
