@@ -138,8 +138,6 @@ def _validate_support_order(province: Province, order: Support) -> tuple[OrderVa
     source_unit = order.source.unit
     if not isinstance(source_unit, Unit):
         return OrderValidity.INVALID, "There is no unit to support"
-    if isinstance(source_unit.order, Core) and order_is_valid(order.source, source_unit.order):
-        return OrderValidity.MISMATCHED_ORDER, "Cannot support a unit that is coring"
 
     move_valid, _ = order_is_valid(province, Move(order.destination), strict_coast_movement=False)
     if move_valid != OrderValidity.VALID:
@@ -155,8 +153,8 @@ def _validate_support_order(province: Province, order: Support) -> tuple[OrderVa
 
     # if move is invalid then it doesn't go through
     if is_support_hold:
-        if isinstance(source_unit.order, Move):
-            return OrderValidity.MISMATCHED_ORDER, f"Supported unit {order.source} made a move order"
+        if source_unit.order is not None and not source_unit.order.is_support_holdable:
+            return OrderValidity.INVALID, f"Supported unit {order.source} cannot be supported"
         return OrderValidity.VALID, None
 
     if not isinstance(source_unit.order, Move):

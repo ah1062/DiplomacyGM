@@ -117,7 +117,7 @@ class BuildsAdjudicator(Adjudicator):
             if not order.province.has_supply_center or order.province.owner != player:
                 logger.warning(f"Skipping {order}; tried to build in non-sc, non-owned")
                 return 0
-            if order.province.core != player and self.build_options != "anywhere":
+            if order.province.core != player and self.parameters.get("build_options") != "anywhere":
                 logger.warning(f"Skipping {order}; tried to build in non-core")
                 return 0
             self._board.create_unit(order.unit_type, player, order.province, order.coast, None)
@@ -141,7 +141,7 @@ class BuildsAdjudicator(Adjudicator):
             if available_builds < 0:
                 logger.warning(f"Player {player.get_name()} disbanded less orders than they should have")
 
-        if self.has_vassals:
+        if self.parameters.get("has_vassals"):
             self._vassal_adju()
 
         for player in self._board.players:

@@ -62,27 +62,25 @@ class MovesAdjudicator(Adjudicator):
 
         failed: bool = False
         # indicates that an illegal move / core can't be support held
-        not_supportable: bool = False
+        if isinstance(unit.order, Core) and self.parameters.get("supportable_cores"):
+            unit.order.is_support_holdable = True
 
         # TODO clean up mapper info
         valid, reason = order_is_valid(unit.province, unit.order)
         if not is_valid_result(valid):
             logger.debug(f"Order for {unit} is invalid because {reason}")
             # Invalid moves are considered unsupportable. This deviates from standard adjudication rules
-            # To follow standard rules, not_supportable should be false for Invalid moves but true for Mismatched moves
-            if isinstance(unit.order, (Core, Move)):
-                not_supportable = True
+            # To follow standard rules, set is_support_holdable to true for Invalid moves but false for Mismatched moves
             failed = True
 
         order = AdjudicableOrder(unit)
         # Kinda hacky
         order.is_convoy = (valid == OrderValidity.VALID_WITH_CONVOY)
+        order.not_supportable = not unit.order.is_support_holdable
         if failed:
             self.failed_or_invalid_units.add(MapperInformation(unit))
             order.is_valid = False
             unit.order.has_failed = True
-        if not_supportable:
-            order.not_supportable = True
 
         self.orders.add(order)
 

@@ -23,8 +23,9 @@ class Adjudicator:
     def __init__(self, board: Board):
         self._board = board
         self.save_orders = True
-        self.build_options = board.data.get("build_options", "classic")
-        self.has_vassals = (board.data.get("vassals") == "enabled")
+        self.parameters = {"build_options": board.data.get("build_options", "classic"),
+                           "supportable_cores": board.data.get("supportable_cores") == "enabled",
+                           "has_vassals": (board.data.get("vassals") == "enabled")}
         self.failed_or_invalid_units: set[MapperInformation] = set()
 
     @abc.abstractmethod

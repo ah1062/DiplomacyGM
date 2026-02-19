@@ -27,6 +27,7 @@ class UnitOrder(Order):
         self.destination = None
         self.destination_coast = None
         self.source = None
+        self.is_support_holdable = True
     
     # Used for DB storage
     def get_source_str(self) -> str | None:
@@ -67,6 +68,7 @@ class Core(UnitOrder):
     
     def __init__(self):
         super().__init__()
+        self.is_support_holdable = False
 
     def __str__(self):
         return "Cores"
@@ -79,6 +81,7 @@ class Move(UnitOrder):
         super().__init__()
         self.destination: Province = destination
         self.destination_coast: str | None = destination_coast
+        self.is_support_holdable = False
 
     def __str__(self):
         return f"- {self.get_destination_str()}"

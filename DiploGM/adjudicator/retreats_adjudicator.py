@@ -99,7 +99,7 @@ class RetreatsAdjudicator(Adjudicator):
             unit.order = None
             unit.retreat_options = None
 
-        if self._board.turn.is_fall() and self.has_vassals:
+        if self._board.turn.is_fall() and self.parameters.get("has_vassals"):
             self._handle_vassals()
 
         return self._board
