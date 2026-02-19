@@ -117,8 +117,8 @@ class BuildsAdjudicator(Adjudicator):
             if not order.province.has_supply_center or order.province.owner != player:
                 logger.warning(f"Skipping {order}; tried to build in non-sc, non-owned")
                 return 0
-            if order.province.core != player and self.parameters.get("build_options") != "anywhere":
-                logger.warning(f"Skipping {order}; tried to build in non-core")
+            if not order.province.can_build(self.parameters.get("build_options")):
+                logger.warning(f"Skipping {order}; build order does not meet build requirements")
                 return 0
             self._board.create_unit(order.unit_type, player, order.province, order.coast, None)
             return -1

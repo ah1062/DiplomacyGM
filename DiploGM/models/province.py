@@ -109,6 +109,18 @@ class Province():
     def get_unit(self) -> unit.Unit | None:
         return self.unit
     
+    def can_build(self, build_options) -> bool:
+        if not self.has_supply_center or self.owner is None or self.unit is not None:
+            return False
+        if self.core == self.owner or build_options == "anywhere":
+            return True
+        if build_options == "control":
+            for adj in self.adjacent:
+                if adj.type in (ProvinceType.LAND, ProvinceType.ISLAND) and adj.owner != self.owner:
+                    return False
+            return True
+        return False
+
     # Gets a set of all coasts if multiple exist, otherwise returns an empty set (== False)
     def get_multiple_coasts(self) -> set:
         if self.fleet_adjacent and isinstance(self.fleet_adjacent, dict):

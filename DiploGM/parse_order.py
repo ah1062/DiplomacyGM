@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class TreeToOrder(Transformer):
     def set_state(self, board: Board, player_restriction: Player | None):
         self.board = board
-        self.build_options =  board.data.get("build_options", "classic")
+        self.build_options = board.data.get("build_options", "classic")
         self.player_restriction = player_restriction
         
     def province(self, s) -> tuple[Province, str | None]:
@@ -81,8 +81,8 @@ class TreeToOrder(Transformer):
         elif self.player_restriction:
             if province.owner != self.player_restriction:
                 raise ValueError(f"You do not own {province}.")
-            if province.core != self.player_restriction and self.build_options != "anywhere":
-                raise ValueError(f"You haven't cored {province}.")
+            if not province.can_build(self.build_options):
+                raise ValueError(f"You cannot build in {province}.")
 
         return province, province.owner, order.Build(province, unit_type, coast)
     
