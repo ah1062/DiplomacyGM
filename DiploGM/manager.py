@@ -100,7 +100,7 @@ class Manager(metaclass=SingletonMeta):
                     warnings.append(f"Province {province.name} and {comp_province.name} have different adjacencies")
                 visited_provinces.add(province)
             except ValueError:
-                warnings.append(f"Province {province.name} is named like a high seas province but {province.name[:-1] + "1"} was not found")
+                warnings.append(f"Province {province.name} is named like a high seas province but {province.name[:-1]}1 was not found")
     
         for province in board.provinces:
             if province in visited_provinces:

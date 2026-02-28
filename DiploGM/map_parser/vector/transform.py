@@ -22,7 +22,6 @@ class TransGL3:
             match = re.search(r"matrix\((.*?),(.*?),(.*?),(.*?),(.*?),(.*?)\)", transform_string)
             if not match:
                 raise Exception(f"Malformed matrix transformation: {transform_string}")
-            print(match.groups())
             m = np.array([
                 [float(match.group(1)), float(match.group(2)), 0],
                 [float(match.group(3)), float(match.group(4)), 0],
