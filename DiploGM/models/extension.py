@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class ExtensionEvent:
     user_id: int
     server_id: int
-    hours: int
+    hours: float
     id: Optional[int] = None
     reason: str = "unspecified"
     created_at: datetime.datetime = field(default_factory=datetime.datetime.now)
@@ -49,7 +49,7 @@ class SQLiteExtensionEventRepository(Repository):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
                 server_id INTEGER NOT NULL,
-                hours INTEGER NOT NULL,
+                hours REAL NOT NULL,
                 reason TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );

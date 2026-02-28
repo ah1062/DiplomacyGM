@@ -469,7 +469,7 @@ class GameManagementCog(commands.Cog):
 
     @grace.command(name="log", brief="log grace", description="Usage: .grace <user> <hours> <reason>")
     @perms.gm_only("record a grace")
-    async def grace_log(self, ctx: commands.Context, user: User, hours: int, *, reason: str = "Unspecified") -> None:
+    async def grace_log(self, ctx: commands.Context, user: User, hours: float, *, reason: str = "Unspecified") -> None:
         """Store a record of grace in a game, grace can be NMR or Extension and should be detailed in the reason
 
         Usage: 
@@ -482,7 +482,7 @@ class GameManagementCog(commands.Cog):
         Args:
             ctx (commands.Context): Context from discord regarding command invocation
             user (discord.User): User that has committed the grace
-            hours (int): Time grace lasted/set to last
+            hours (float): Time grace lasted/set to last
             reason (str): Why was the grace stored
 
         Returns:
