@@ -132,7 +132,7 @@ class SlashSubstituteCog(commands.Cog):
             return
 
         board = manager.get_board(guild.id)
-        player = board.get_player_sanitised(power_role.name)
+        player = board.get_player(power_role.name)
         if not player:
             out = f"Could not find Player object for given role {power_role.mention}"
             await send_message_and_file(
@@ -307,7 +307,7 @@ class SlashSubstituteCog(commands.Cog):
 
         # CHECK A VALID PLAYER HAS BEEN GIVEN
         board = manager.get_board(guild.id)
-        player = board.get_player_sanitised(power_role.name)
+        player = board.get_player(power_role.name)
         if not player:
             out = f"Could not find Player object for given role {power_role.mention}"
             await send_message_and_file(
