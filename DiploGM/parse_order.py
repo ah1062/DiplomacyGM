@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class TreeToOrder(Transformer):
     def set_state(self, board: Board, player_restriction: Player | None):
         self.board = board
-        self.build_options =  board.data.get("build_options", "classic")
+        self.build_options = board.data.get("build_options", "classic")
         self.player_restriction = player_restriction
         
     def province(self, s) -> tuple[Province, str | None]:
@@ -81,8 +81,8 @@ class TreeToOrder(Transformer):
         elif self.player_restriction:
             if province.owner != self.player_restriction:
                 raise ValueError(f"You do not own {province}.")
-            if province.core != self.player_restriction and self.build_options != "anywhere":
-                raise ValueError(f"You haven't cored {province}.")
+            if not province.can_build(self.build_options):
+                raise ValueError(f"You cannot build in {province}.")
 
         return province, province.owner, order.Build(province, unit_type, coast)
     
@@ -300,6 +300,14 @@ def parse_order(message: str, player_restriction: Player | None, board: Board) -
         database.save_build_orders_for_players(board, player_restriction)
     else:
         database.save_order_for_units(board, movement)
+
+    if board.turn.is_builds() and player_restriction is not None:
+        expected_builds = len(player_restriction.centers) - len(player_restriction.units)
+        build_difference = player_restriction.get_number_of_builds() - expected_builds
+        if expected_builds < 0 and build_difference < 0:
+            errors.append(f"You have inputted {abs(build_difference)} more disband order{'' if abs(build_difference) == 1 else 's'} than necessary. Please use .remove_order to fix this.")
+        elif expected_builds > 0 and build_difference > 0:
+            errors.append(f"You have inputted {abs(build_difference)} more build order{'' if abs(build_difference) == 1 else 's'} than necessary. Please use .remove_order to fix this.")
 
     paginator = Paginator(prefix="```ansi\n", suffix="```", max_size=4096)
     for line in orderoutput:

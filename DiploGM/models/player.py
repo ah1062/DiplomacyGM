@@ -5,6 +5,7 @@ from enum import Enum
 import discord
 
 from DiploGM.models import order
+from DiploGM.models.order import Disband, Build
 from DiploGM.utils import simple_player_name
 
 
@@ -120,6 +121,17 @@ class Player:
             + f"{unit_str}\n"
         )
         return out
+
+    def get_number_of_builds(self) -> int:
+        if not self.board or not self.board.turn.is_builds():
+            return 0
+        num_builds = self.waived_orders
+        for order in self.build_orders:
+            if isinstance(order, Disband):
+                num_builds -= 1
+            elif isinstance(order, Build):
+                num_builds += 1
+        return num_builds
 
     def get_class(self) -> PlayerClass:
         scs = len(self.centers)

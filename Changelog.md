@@ -1,3 +1,26 @@
+1.5.2
+=====
+
+Contributors
+- hdwhite
+
+# New Features
+- Added a supportable_cores config value for variants
+- Added a "control" version in build options where one can build in non-home SCs if they own all the non-sea provinces around it
+- Added a .verify_adjacencies command to look for potential missing or extra connections in a variant
+
+# Quality of Life
+- Added failbacks and warnings of a unit coordinate could not be found
+- Power banners no longer have to be created in an exactly specific way
+- Players are given a warning if they build/disband more than they are supposed to
+- GMs can set a non-integer number of hours for graces
+
+# Bugfixes
+- Fixed an issue when adding and hiding powers
+- Retreating into a multi-coastal province works properly
+- Fixed /advertise and /substitute
+- Fixed /spec explicitly trying to find #admin-chat
+
 1.5.1
 =====
 

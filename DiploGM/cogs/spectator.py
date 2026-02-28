@@ -203,12 +203,13 @@ class SpectatorCog(commands.Cog):
             )
             return
 
+        admin_channel_names = ["admin-chat", "admin-spam", "gm-bot-commands"]
         admin_channel = discord.utils.find(
-            lambda c: c.name == "admin-chat", guild.text_channels
+            lambda c: c.name in admin_channel_names, guild.text_channels
         )
         if not admin_channel:
             logger.warning(
-                f"Server: {guild.name} does not have an #admin-chat channel."
+                f"Server: {guild.name} does not have a #gm-bot-commands channel."
             )
             await interaction.response.send_message(
                 "Could not process your request. (Contact Admin)", ephemeral=True

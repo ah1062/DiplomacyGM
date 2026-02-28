@@ -7,7 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 from discord.utils import find as discord_find
 
-from DiploGM import config, utils
+from DiploGM import config, perms
 from DiploGM.utils import send_message_and_file
 from DiploGM.manager import Manager
 
@@ -76,13 +76,13 @@ class SlashSubstituteCog(commands.Cog):
         bot = interaction.client
 
         # TODO: app_commands permissions check decorators
-        if not bot.perms.is_gm(interaction.user):
+        if not perms.is_gm(interaction.user):
             await interaction.response.send_message(
                 "You are not allowed to use `.advertise`!", ephemeral=True
             )
             return
 
-        if not bot.perms.is_gm_channel(interaction.channel):
+        if not perms.is_gm_channel(interaction.channel):
             await interaction.response.send_message(
                 "You are not allowed to use `.advertise` here!", ephemeral=True
             )
@@ -132,7 +132,7 @@ class SlashSubstituteCog(commands.Cog):
             return
 
         board = manager.get_board(guild.id)
-        player = board.get_player_sanitised(power_role.name)
+        player = board.get_player(power_role.name)
         if not player:
             out = f"Could not find Player object for given role {power_role.mention}"
             await send_message_and_file(
@@ -260,13 +260,13 @@ class SlashSubstituteCog(commands.Cog):
             return
 
         # TODO: app_commands permissions check decorators
-        if not bot.perms.is_gm(interaction.user):
+        if not perms.is_gm(interaction.user):
             await interaction.response.send_message(
                 "You are not allowed to use `.substitute`!", ephemeral=True
             )
             return
 
-        if not bot.perms.is_gm_channel(interaction.channel):
+        if not perms.is_gm_channel(interaction.channel):
             await interaction.response.send_message(
                 "You are not allowed to use `.substitute` here!", ephemeral=True
             )
@@ -307,7 +307,7 @@ class SlashSubstituteCog(commands.Cog):
 
         # CHECK A VALID PLAYER HAS BEEN GIVEN
         board = manager.get_board(guild.id)
-        player = board.get_player_sanitised(power_role.name)
+        player = board.get_player(power_role.name)
         if not player:
             out = f"Could not find Player object for given role {power_role.mention}"
             await send_message_and_file(

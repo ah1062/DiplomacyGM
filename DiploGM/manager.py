@@ -5,6 +5,7 @@ from typing import Optional
 
 from discord import Member, User
 
+from DiploGM.models.province import Province
 from DiploGM.utils import SingletonMeta
 from DiploGM.adjudicator.make_adjudicator import make_adjudicator
 from DiploGM.adjudicator.mapper import Mapper
@@ -48,6 +49,91 @@ class Manager(metaclass=SingletonMeta):
         self._database.save_board(server_id, self._boards[server_id])
 
         return f"{self._boards[server_id].data['name']} game created"
+
+    # Gets adjacent provinces, but with High Seas combined into one for the purpose of finding adjacency issues
+    def _get_adjacent_geom(self, province: Province) -> set[Province]:
+        return {a for a in province.adjacent if a.name[-1] not in "23456789"}
+
+    # A recursive function to find loops of provinces with no internal adjacencies
+    # Generally, two adjacent provinces should share exactly two adjacencies on either side
+    # If there's only one, that typeically means there's a "hole" or the edge of the board
+    # We try to trace a chain of such provinces, and if we reach the start, we have a loop
+    def _find_province_loop(self, province: Province, destination: Province, visited: list[Province], ignored_provinces: set[Province]) -> Optional[list[Province]]:
+        if province == destination:
+            return None if len(visited) == 2 else visited # A -> B -> A shouldn't count
+        visited.append(province)
+        for adj in self._get_adjacent_geom(province):
+            if adj in visited[1:] or adj in ignored_provinces: # ignored_provinces prevents us finding the same loop multiple times
+                continue
+            if len(self._get_adjacent_geom(province) & self._get_adjacent_geom(adj)) > 1:
+                continue
+            loop = self._find_province_loop(adj, destination, visited, ignored_provinces)
+            if loop is not None:
+                return loop
+        visited.pop()
+        return None
+
+    # This is a function that goes through a map and attempts to find adjacency issues
+    # It will not be fool-proof, but it should detect the majority of potential errors
+    # The list of warnings it generates include the following:
+    # - High Seas provinces in the same region that have different adjacencies (e.g. Cape Khoe bordering SAO1 but not SAO2)
+    # - Provinces with zero adjacencies
+    # - Adjacent provinces that have no common adjacencies
+    # - Loops of provinces that have no internal connections (note that this does detect the board edges)
+    # - Groups of four provinces that all border each other
+    # TODO: Potentially simplify this function's complexity
+    def verify_adjacencies(self, variant: str) -> str:
+        if not os.path.isdir(f"variants/{variant}"):
+            return f"Game {variant} does not exist."
+        board: Board = get_parser(variant).parse()
+        warnings = []
+        visited_provinces = set()
+
+        # High Seas
+        for province in board.provinces:
+            if province.name[-1] not in "23456789":
+                continue
+            try:
+                comp_province = board.get_province(province.name[:-1] + "1")
+                # Two high seas' adjacencies should differ by only each other
+                if comp_province.adjacent ^ province.adjacent != {province, comp_province}:
+                    warnings.append(f"Province {province.name} and {comp_province.name} have different adjacencies")
+                visited_provinces.add(province)
+            except ValueError:
+                warnings.append(f"Province {province.name} is named like a high seas province but {province.name[:-1]}1 was not found")
+    
+        for province in board.provinces:
+            if province in visited_provinces:
+                continue
+            if len(province.adjacent) == 0:
+                warnings.append(f"Province {province.name} has no adjacencies")
+            visited_adjacent = set()
+            for adj in self._get_adjacent_geom(province) - visited_provinces:
+                common_adj = self._get_adjacent_geom(province) & self._get_adjacent_geom(adj)
+                if len(common_adj) == 0:
+                    warnings.append(f"Provinces {province.name} and {adj.name} are adjacent but have no common adjacencies")
+                    continue
+                # Finding loops of provinces
+                if len(common_adj) == 1:
+                    loop = self._find_province_loop(adj, province, [province], visited_provinces)
+                    if loop is not None and loop[1].name > loop[-1].name: # Otherwise we would see each loop in both directions
+                        warnings.append(f"Found a loop of provinces {', '.join(p.name for p in loop)}. If they surround an impassible province or the board edge, this is expected")
+                
+                # Searching for groups of four provinces that all share a border
+                visited_third = set()
+                for third_province in common_adj - visited_provinces - visited_adjacent:
+                    fourth_adjacent = common_adj & self._get_adjacent_geom(third_province) - visited_provinces - visited_adjacent - visited_third
+                    for fourth_province in fourth_adjacent:
+                        if min(len(self._get_adjacent_geom(province)),
+                               len(self._get_adjacent_geom(adj)),
+                               len(self._get_adjacent_geom(third_province)),
+                               len(self._get_adjacent_geom(fourth_province))) == 3:
+                            continue # Skips provinces that only border the other three, as that's geometrically possible
+                        warnings.append(f"Provinces {province.name}, {adj.name}, {third_province.name}, and {fourth_province.name} all border each other")
+                    visited_third.add(third_province)
+                visited_adjacent.add(adj)
+            visited_provinces.add(province)
+        return "\n".join(warnings) if warnings else "No adjacency issues found"
 
     def get_spec_request(self, server_id: int, user_id: int) -> SpecRequest | None:
         if server_id not in self._spec_requests:
