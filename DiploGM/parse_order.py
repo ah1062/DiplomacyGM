@@ -20,6 +20,7 @@ class TreeToOrder(Transformer):
     def set_state(self, board: Board, player_restriction: Player | None):
         self.board = board
         self.build_options = board.data.get("build_options", "classic")
+        self.transform_options = board.data.get("transformation", "disabled")
         self.player_restriction = player_restriction
         
     def province(self, s) -> tuple[Province, str | None]:
@@ -63,6 +64,8 @@ class TreeToOrder(Transformer):
         return s[0], order.Core()
 
     def transform_order(self, s) -> tuple[Province, order.Transform]:
+        if self.transform_options not in ["moves", "all"]:
+            raise Exception("Transforming during moves is disabled in this gamemode")
         coast = s[4] if len(s) > 4 else None
         return s[0], order.Transform(coast)
     
@@ -98,6 +101,8 @@ class TreeToOrder(Transformer):
         return u.province, u.player, order.Disband(u.province)
 
     def transform_unit(self, s) -> tuple[Province, Player, order.TransformBuild]:
+        if self.transform_options not in ["builds", "all"]:
+            raise Exception("Transforming during builds is disabled in this gamemode")
         unit = s[0] if isinstance(s[0], Unit) else s[2]
         coast = s[4] if len(s) > 4 else None
         return unit.province, unit.player, order.TransformBuild(unit.province, coast)

@@ -263,11 +263,11 @@ class DiploGM(commands.Bot):
         )
 
     async def on_command_error(self, ctx: commands.Context, error):
-        assert ctx.guild is not None and ctx.command is not None
         if isinstance(error, commands.CommandNotFound):
             # we shouldn't do anything if the user says something like "..."
             return
 
+        assert ctx.guild is not None and ctx.command is not None
         try:
             # mark the message as failed
             await ctx.message.add_reaction("❌")

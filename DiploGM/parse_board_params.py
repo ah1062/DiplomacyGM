@@ -45,10 +45,29 @@ def parse_board_params(message: str, board: Board) -> tuple[str, str, bytes | No
 
 def _set_build_options(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
     key_name = "build_options"
-    valid_options = "classic", "cores", "anywhere"
+    valid_options = "classic", "cores", "control", "anywhere"
     new_value = keywords[0].lower()
     if new_value not in valid_options:
         raise ValueError(f"{new_value} is not a valid build option")
+    board.data[key_name] = new_value
+    return key_name, new_value
+
+def _set_supportable_cores(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
+    key_name = "supportable_cores"
+    valid_options = "true", "false", "enabled", "disabled"
+    new_value = keywords[0].lower()
+    if new_value not in valid_options:
+        raise ValueError(f"{new_value} is not a valid supportable cores option")
+    new_value = "enabled" if new_value in ["true", "enabled"] else "disabled"
+    board.data[key_name] = new_value
+    return key_name, new_value
+
+def _set_transformation(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
+    key_name = "transformation"
+    valid_options = "disabled", "moves", "builds", "all"
+    new_value = keywords[0].lower()
+    if new_value not in valid_options:
+        raise ValueError(f"{new_value} is not a valid transformation option")
     board.data[key_name] = new_value
     return key_name, new_value
 
@@ -126,6 +145,8 @@ def _add_player(keywords: list[str], board: Board) -> tuple[str | None, str | No
 
 function_list = {
     "building": _set_build_options,
+    "supportable cores": _set_supportable_cores,
+    "transformation": _set_transformation,
     "victory conditions": _set_victory_conditions,
     "victory count": _set_victory_count,
     "iscc": _set_iscc,
