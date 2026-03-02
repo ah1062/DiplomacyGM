@@ -61,6 +61,10 @@ class TreeToOrder(Transformer):
         if self.build_options != "cores":
             raise Exception("Coring is disabled in this gamemode")
         return s[0], order.Core()
+
+    def transform_order(self, s) -> tuple[Province, order.Transform]:
+        coast = s[4] if len(s) > 4 else None
+        return s[0], order.Transform(coast)
     
     def build_unit(self, s) -> tuple[Province, Player, order.Build]:
         if isinstance(s[2], tuple):
@@ -92,7 +96,12 @@ class TreeToOrder(Transformer):
         else:
             u = s[2]
         return u.province, u.player, order.Disband(u.province)
-    
+
+    def transform_unit(self, s) -> tuple[Province, Player, order.TransformBuild]:
+        unit = s[0] if isinstance(s[0], Unit) else s[2]
+        coast = s[4] if len(s) > 4 else None
+        return unit.province, unit.player, order.TransformBuild(unit.province, coast)
+
     def waive_order(self, s) -> tuple[None, Player, order.Waive]:
         if self.player_restriction is None:
             raise ValueError("Please order waives in the appropriate player's orders channel.")
@@ -237,9 +246,7 @@ class TreeToOrder(Transformer):
         unit.order = order
         return unit
 
-
 generator = TreeToOrder()
-
 
 with open("DiploGM/orders.ebnf", "r") as f:
     ebnf = f.read()
@@ -366,7 +373,6 @@ def parse_remove_order(message: str, player_restriction: Player | None, board: B
     else:
         return {"message": "Orders removed successfully."}
 
-
 def _parse_remove_order(command: str, player_restriction: Player | None, board: Board) -> Player | Unit | str:
     command = command.lower().strip()
     province, _ = board.get_province_and_coast(command)
@@ -384,7 +390,6 @@ def _parse_remove_order(command: str, player_restriction: Player | None, board: 
             raise RuntimeError(f"No relationship order with {target_player}")
         remove_relationship_order(board, player_restriction.vassal_orders[target_player], player_restriction)
         return target_player
-
 
     elif board.turn.is_builds():
         # remove build order
@@ -412,7 +417,6 @@ def _parse_remove_order(command: str, player_restriction: Player | None, board: 
             unit.order = None
             return unit
         raise ValueError(f"You control neither a unit nor a dislodged unit in {province.name}")
-
 
 def remove_player_order_for_province(board: Board, player: Player, province: Province) -> bool:
     if province is None:

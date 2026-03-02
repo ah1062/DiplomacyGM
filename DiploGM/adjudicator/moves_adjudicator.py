@@ -13,7 +13,8 @@ from DiploGM.adjudicator.defs import (
 )
 from DiploGM.adjudicator.validate_order import OrderValidity, is_valid_result, order_is_valid
 from DiploGM.db import database
-from DiploGM.models.order import NMR, Move, Core, Support
+from DiploGM.models.order import NMR, Move, Core, Transform, Support
+from DiploGM.models.unit import UnitType
 
 if TYPE_CHECKING:
     from DiploGM.models.board import Board
@@ -116,6 +117,14 @@ class MovesAdjudicator(Adjudicator):
     def _update_order(self, order: AdjudicableOrder):
         if order.type == OrderType.CORE and order.resolution == Resolution.SUCCEEDS:
             order.source_province.corer = order.country
+        if order.type == OrderType.TRANSFORM and order.resolution == Resolution.SUCCEEDS:
+            logger.debug(f"Transforming {order.base_unit}")
+            if order.base_unit.unit_type == UnitType.ARMY:
+                order.base_unit.unit_type = UnitType.FLEET
+                order.base_unit.coast = order.destination_coast
+            else:
+                order.base_unit.unit_type = UnitType.ARMY
+                order.base_unit.coast = None
         if order.type == OrderType.MOVE and order.resolution == Resolution.SUCCEEDS:
             logger.debug(f"Moving {order.source_province} to {order.destination_province}")
             if order.source_province.unit == order.base_unit:
@@ -233,8 +242,8 @@ class MovesAdjudicator(Adjudicator):
         if order.type == OrderType.HOLD:
             # Resolution is arbitrary for holds; they don't do anything
             return Resolution.SUCCEEDS
-        elif order.type == OrderType.CORE or order.type == OrderType.SUPPORT:
-            # Both these orders fail if attacked by nation, even if that order isn't successful
+        elif order.type in (OrderType.CORE, OrderType.TRANSFORM, OrderType.SUPPORT):
+            # These orders fail if attacked by nation, even if that order isn't successful
             moves_here = self.moves_by_destination.get(order.current_province.name, set()) - {order}
             for move_here in moves_here:
                 # coring should fail even if the attack comes from the same nation

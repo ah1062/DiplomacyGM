@@ -4,15 +4,17 @@ order: (move_order
       | hold_order
       | support_order
       | convoy_order
-      | core_order) WS
+      | core_order
+      | transform_order) WS
    
 retreat: (retreat_order
-        | disband_order
+       | disband_order
 	| non_retreat_order) WS
 
 build: ( build_unit
        | disband_unit
-	   | waive_order
+       | transform_unit
+	| waive_order
        | vassal_order
        | liege_order
        | monarchy_order
@@ -34,15 +36,19 @@ convoy_order: unit WS CONVOY WS l_move_order
 
 core_order: unit WS CORE
 
+transform_order: unit WS TRANSFORM (WS COAST)?
+
 retreat_order: retreat_unit WS RETREAT WS province
 
 disband_order: ( retreat_unit WS DISBAND ) | ( DISBAND WS retreat_unit )
 
-non_retreat_order: (support_order | convoy_order | core_order | build_unit | waive_order | vassal_order | liege_order | monarchy_order | disown_order | defect_order)
+non_retreat_order: (support_order | convoy_order | core_order | transform_order | build_unit | waive_order | vassal_order | liege_order | monarchy_order | disown_order | defect_order)
 
 disband_unit: ( unit WS DISBAND ) | ( DISBAND WS unit )
 
 build_unit: ( BUILD WS DESCRIPTOR province ) | ( BUILD WS province DESCRIPTOR )
+
+transform_unit: (unit WS TRANSFORM (WS COAST)?) | (TRANSFORM WS unit (WS COAST)?)
 
 waive_order: ( WAIVE WS NUMBER )
 
@@ -104,6 +110,11 @@ CONVOY.2 : "c"
 CORE.2 : "core"
        | "cores"
 
+TRANSFORM.2 : "transform"
+            | "transforms"
+            | "converts"
+            | "t"
+
 RETREAT.2 : MOVE
           | "r"
           | "retreat"
@@ -139,3 +150,5 @@ DESCRIPTOR.2 : /a|army|cannon|f|fleet|boat|ship/i WS
 province : PROVINCE (WS PROVINCE) ~ 0..3
 
 PROVINCE : /(?![fFaA]\s)[a-zA-Z0-9\._‘’`´′‛'-]+(?=\s)/
+
+COAST.2: /[a-z]c/i

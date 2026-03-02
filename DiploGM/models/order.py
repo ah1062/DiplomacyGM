@@ -73,6 +73,19 @@ class Core(UnitOrder):
     def __str__(self):
         return "Cores"
 
+class Transform(UnitOrder):
+    display_priority: int = 20
+    
+    def __init__(self, destination_coast: str | None = None):
+        super().__init__()
+        self.destination_coast = destination_coast
+        self.is_support_holdable = False
+
+    def __str__(self):
+        return "Transforms" + (f" to {self.destination_coast}" if self.destination_coast else "")
+
+    def get_destination_str(self) -> str:
+        return self.destination_coast if self.destination_coast else ""
 
 class Move(UnitOrder):
     display_priority: int = 30
@@ -192,6 +205,15 @@ class Disband(PlayerOrder):
 
     def __str__(self):
         return f"Disband {self.province}"
+
+class TransformBuild(PlayerOrder):
+    
+    def __init__(self, province: Province, destination_coast: str | None = None):
+        super().__init__(province)
+        self.coast = destination_coast
+
+    def __str__(self):
+        return f"Transform {self.province}" + (f" {self.coast}" if self.coast else "")
 
 class Waive(Order):
     def __init__(self, quantity: int):

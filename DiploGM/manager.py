@@ -269,7 +269,6 @@ class Manager(metaclass=SingletonMeta):
         # mapper.draw_moves_map(None)
         adjudicator = make_adjudicator(old_board)
         adjudicator.save_orders = not test
-        # TODO - use adjudicator.orders() (tells you which ones succeeded and failed) to draw a better moves map
         new_board = adjudicator.run()
         new_board.turn = new_board.turn.get_next_turn()
         logger.info("Adjudicator ran successfully")

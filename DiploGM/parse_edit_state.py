@@ -159,7 +159,7 @@ def _create_unit(keywords: list[str], board: Board) -> None:
     if not player:
         raise ValueError(f"Unknown player: {keywords[1]}")
     province, coast = board.get_province_and_coast(" ".join(keywords[2:]))
-    if province.get_multiple_coasts() and coast not in province.get_multiple_coasts():
+    if unit_type == UnitType.FLEET and province.get_multiple_coasts() and coast not in province.get_multiple_coasts():
         raise ValueError(f"Province '{province.name}' requires a valid coast.")
     if not province.get_multiple_coasts():
         coast = None

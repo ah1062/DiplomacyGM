@@ -4,7 +4,7 @@ import collections
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from DiploGM.models.order import Order, Hold, Move, Support, ConvoyTransport, Core, RetreatMove, RetreatDisband, NMR
+from DiploGM.models.order import Order, Hold, Move, Support, ConvoyTransport, Core, Transform, RetreatMove, RetreatDisband, NMR
 from DiploGM.models.province import ProvinceType
 from DiploGM.models.unit import Unit, UnitType
 
@@ -195,6 +195,20 @@ def order_is_valid(province: Province, order: Order, strict_coast_movement=True)
             return OrderValidity.INVALID, f"{province} does not have a supply center to core"
         if province.get_owner() != province.unit.player:
             return OrderValidity.INVALID, "Units can only core in owned supply centers"
+        return OrderValidity.VALID, None
+    elif isinstance(order, Transform):
+        if not province.has_supply_center:
+            return OrderValidity.INVALID, "Transformation must be done in a supply center"
+        if province.get_owner() != province.unit.player:
+            return OrderValidity.INVALID, "Units can only transform in owned supply centers"
+        if province.type == ProvinceType.SEA:
+            return OrderValidity.INVALID, "Fleets cannot transform in sea provinces"
+        if not province.fleet_adjacent:
+            return OrderValidity.INVALID, "Armies cannot transform in inland provinces"
+        if (province.unit.unit_type == UnitType.ARMY
+            and province.get_multiple_coasts()
+            and order.destination_coast not in province.get_multiple_coasts()):
+            return OrderValidity.INVALID, "Unit needs to transform to a valid coast"
         return OrderValidity.VALID, None
     elif isinstance(order, Move) or isinstance(order, RetreatMove):
         valid, reason = _validate_move_order(province, order, strict_coast_movement)

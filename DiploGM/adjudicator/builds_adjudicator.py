@@ -8,6 +8,7 @@ from DiploGM.models.player import Player
 from DiploGM.models.order import (
     Build,
     Disband,
+    TransformBuild,
     Disown,
     Vassal,
     Liege,
@@ -15,6 +16,7 @@ from DiploGM.models.order import (
     DualMonarchy,
     RebellionMarker
 )
+from DiploGM.models.province import ProvinceType
 from DiploGM.models.unit import UnitType
 
 if TYPE_CHECKING:
@@ -129,6 +131,25 @@ class BuildsAdjudicator(Adjudicator):
                 return 0
             self._board.delete_unit(order.province)
             return 1
+
+        if isinstance(order, TransformBuild):
+            if order.province.unit is None:
+                logger.warning(f"Skipping {order}; there is no unit there to transform")
+            elif not order.province.has_supply_center:
+                logger.warning(f"Skipping {order}; tried to transform in a province without a supply center")
+            elif order.province.type == ProvinceType.SEA:
+                logger.warning(f"Skipping {order}; tried to transform in a sea province")
+            elif not order.province.fleet_adjacent:
+                logger.warning(f"Skipping {order}; tried to transform in an inland province")
+            elif (order.province.unit.unit_type == UnitType.ARMY
+                  and order.province.get_multiple_coasts()
+                  and order.coast not in order.province.get_multiple_coasts()):
+                logger.warning(f"Skipping {order}; tried to transform to an invalid coast")
+            else:
+                new_unit_type = UnitType.FLEET if order.province.unit.unit_type == UnitType.ARMY else UnitType.ARMY
+                order.province.unit.unit_type = new_unit_type
+                order.province.unit.coast = order.coast
+            return 0
         return 0
 
     def run(self) -> Board:

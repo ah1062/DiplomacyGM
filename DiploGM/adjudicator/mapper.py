@@ -19,12 +19,14 @@ from DiploGM.db.database import logger
 from DiploGM.models.order import (
     Hold,
     Core,
+    Transform,
     ConvoyTransport,
     Support,
     RetreatMove,
     RetreatDisband,
     Build,
     Disband,
+    TransformBuild,
     Move,
     PlayerOrder,
 )
@@ -485,6 +487,8 @@ class Mapper:
             self._draw_hold(coordinate, order.has_failed)
         elif isinstance(order, Core):
             self._draw_core(coordinate, order.has_failed)
+        elif isinstance(order, Transform):
+            self._draw_transform(coordinate, order.has_failed)
         elif isinstance(order, Move):
             # moves are just convoyed moves that have no convoys
             return self._draw_convoyed_move(unit, coordinate, order.has_failed)
@@ -515,6 +519,15 @@ class Mapper:
                 coord_list = order.province.all_locs[disbanding_unit.unit_type]
             for coord in coord_list:
                 self._draw_force_disband(coord, self._moves_svg)
+        elif isinstance(order, TransformBuild):
+            assert order.province.unit is not None
+            transforming_unit: Unit = order.province.unit
+            if transforming_unit.coast:
+                coord_list = order.province.all_locs[transforming_unit.coast]
+            else:
+                coord_list = order.province.all_locs[transforming_unit.unit_type]
+            for coord in coord_list:
+                self._draw_transform(coord, False)
         else:
             logger.error(f"Could not draw player order {order}")
 
@@ -548,6 +561,23 @@ class Mapper:
                 "stroke": "red" if has_failed else "black",
                 "stroke-width": self.board.data[SVG_CONFIG_KEY]["order_stroke_width"],
                 "transform": f"rotate(45 {coordinate[0]} {coordinate[1]})",
+            },
+        )
+        element.append(drawn_order)
+
+    def _draw_transform(self, coordinate: tuple[float, float], has_failed: bool) -> None:
+        element = self._moves_svg.getroot()
+        assert element is not None
+        drawn_order = self.create_element(
+            "rect",
+            {
+                "x": coordinate[0] - self.board.data[SVG_CONFIG_KEY]["unit_radius"],
+                "y": coordinate[1] - self.board.data[SVG_CONFIG_KEY]["unit_radius"],
+                "width": self.board.data[SVG_CONFIG_KEY]["unit_radius"] * 2,
+                "height": self.board.data[SVG_CONFIG_KEY]["unit_radius"] * 2,
+                "fill": "none",
+                "stroke": "red" if has_failed else "black",
+                "stroke-width": self.board.data[SVG_CONFIG_KEY]["order_stroke_width"],
             },
         )
         element.append(drawn_order)

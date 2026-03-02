@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS builds(
     phase text,
     player text,
     location text,
-    is_build boolean,
+    order_type text,
     is_army boolean,
     PRIMARY KEY (board_id, phase, player, location),
     FOREIGN KEY (board_id, phase) REFERENCES boards (board_id, phase),
