@@ -1,3 +1,12 @@
+1.5.3
+=====
+
+Contributors
+- aahoughton
+
+# New Features
+- Added a .press_directory command to output a list of all active press channels for a user's power in their orders channel
+
 1.5.2
 =====
 

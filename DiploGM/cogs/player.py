@@ -1,5 +1,6 @@
 import logging
 
+import discord
 from discord.ext import commands
 
 from DiploGM import config
@@ -397,6 +398,76 @@ class PlayerCog(commands.Cog):
             channel=ctx.channel, message=", ".join([p.name for p in visible_provinces])
         )
 
+    @commands.command(name="press_directory", brief="outputs a list of press channels")
+    @perms.player("generate a press directory")
+    async def press_directory(self, ctx: commands.Context, player: Player | None) -> None:
+        assert ctx.guild is not None
+        board = manager.get_board(ctx.guild.id)
+        power_roles = set(map(lambda p: p.find_discord_role(ctx.guild.roles), board.players))
+
+        if player is None:
+            await send_message_and_file(
+                channel=ctx.channel,
+                message="Due to the number of potential channels, global press directories are not currently permitted for GMs, instead create them in player orders channels",
+                embed_colour=config.PARTIAL_ERROR_COLOUR,
+            )
+            return
+
+        void_channels = [] # channels where the only perms are the calling country
+        direct_channels = [] # channels where the only perms are the calling country +1
+        group_channels = [] # channels where the only perms are the calling country + >1
+
+        player_role = player.find_discord_role(ctx.guild.roles)
+        if player_role is None:
+            await send_message_and_file(
+                channel=ctx.channel,
+                message=f"Could not find the role for {player.name}",
+                embed_colour=config.ERROR_COLOUR,
+            )
+            return
+
+        for ch in ctx.guild.text_channels:
+            # evaluate player access to channels
+            allowed_roles = []
+            for target, overwrite in ch.overwrites.items():
+                if isinstance(target, discord.Role):
+                    if overwrite.view_channel:
+                        allowed_roles.append(target)
+
+            if player_role not in allowed_roles:
+                continue
+
+            # remove non-player roles
+            allowed_roles = list(set(allowed_roles) & power_roles)
+            allowed_roles.remove(player_role)
+            if len(allowed_roles) == 0:
+                info = (ch, None)
+                void_channels.append(info)
+            elif len(allowed_roles) == 1:
+                info = (ch, f"{allowed_roles[0].mention}")
+                direct_channels.append(info)
+            elif len(allowed_roles) > 1:
+                info = (ch, " ".join(map(lambda r: r.mention, sorted(allowed_roles, key=lambda r: r.name))))
+                group_channels.append(info)
+            else:
+                continue
+
+        void_out = "\n".join([f"- {c.mention}" for c, _ in void_channels])
+        direct_out = "\n".join([f"- {c.mention} - {r_mentions}" for c, r_mentions in direct_channels]) if len(direct_channels) > 0 else ""
+        group_out = "\n".join([f"- {c.mention} - {r_mentions}" for c, r_mentions in group_channels]) if len(group_channels) > 0 else ""
+        out = (
+            "Void\n"
+            f"{void_out}\n"
+            "Press\n"
+            f"{direct_out}\n"
+            "Group\n"
+            f"{group_out}"
+        )
+        await send_message_and_file(
+            channel=ctx.channel,
+            title=f"{player_role.name} Press Channel Directory",
+            message=out
+        )
 
 async def setup(bot):
     cog = PlayerCog(bot)
