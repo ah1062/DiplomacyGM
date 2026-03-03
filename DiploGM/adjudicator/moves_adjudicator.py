@@ -136,7 +136,7 @@ class MovesAdjudicator(Adjudicator):
             # Dislodge whatever is there
             order.destination_province.dislodged_unit = order.destination_province.unit
             # see DATC 4.A.5
-            if order.destination_province.dislodged_unit is not None:
+            if order.destination_province.dislodged_unit is not None and order.destination_province.dislodged_unit.player is not None:
                 order.destination_province.dislodged_unit.add_retreat_options()
                 if not order.is_convoy:
                     order.destination_province.dislodged_unit.remove_retreat_option(order.source_province)

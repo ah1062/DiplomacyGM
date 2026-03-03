@@ -470,16 +470,14 @@ class Parser:
 
         # assume that all starting units are on provinces colored in to their color
         player = province.owner
-        if player is None:
-            raise Exception(f"{province.name} has a unit, but isn't owned by any country")
 
         # color_data = unit_data.findall(".//svg:path", namespaces=NAMESPACE)[0]
         # player = self.get_element_player(color_data)
 
         unit = Unit(unit_type, player, province, coast, None)
         province.unit = unit
-        unit.player.units.add(unit)
-        return
+        if unit.player is not None:
+            unit.player.units.add(unit)
 
     def _initialize_units_assisted(self) -> None:
         for unit_data in self.layer_data["starting_units"]:

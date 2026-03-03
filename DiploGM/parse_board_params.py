@@ -15,7 +15,7 @@ def parse_board_params(message: str, board: Board) -> tuple[str, str, bytes | No
         except Exception as error:
             invalid.append((command, error))
 
-    embed_colour = None
+    embed_colour: str | None = None
     if invalid:
         response_title = "Error"
         response_body = "The following commands were invalid:"

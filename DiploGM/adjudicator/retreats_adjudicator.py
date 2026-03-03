@@ -99,7 +99,8 @@ class RetreatsAdjudicator(Adjudicator):
                 self._board.change_owner(destination_province, unit.player)
 
         for unit in units_to_delete:
-            unit.player.units.remove(unit)
+            if unit.player is not None:
+                unit.player.units.remove(unit)
             self._board.units.remove(unit)
             unit.province.dislodged_unit = None
 

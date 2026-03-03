@@ -115,6 +115,8 @@ class Mapper:
     def is_moveable(self, unit: Unit):
         if unit.province.name not in self.adjacent_provinces:
             return False
+        if unit.player is None:
+            return False
         if self.player_restriction and unit.player.name != self.player_restriction.name:
             return False
         if self.current_turn.is_retreats() and unit.province.dislodged_unit != unit:
@@ -308,7 +310,8 @@ class Mapper:
 
     def load_colors(self, color_mode: str | None = None) -> None:
         self.player_colors = {
-            "None": "ffffff"
+            "None": "ffffff",
+            "Neutral": self.board.data[SVG_CONFIG_KEY].get("neutral", "ffffff")
         }
         for player in self.board.players:
             if color_mode is not None and player.color_dict and color_mode in player.color_dict:
@@ -994,7 +997,7 @@ class Mapper:
         unit_element = self._get_element_for_unit_type(unit.unit_type)
 
         for path in unit_element:
-            self.color_element(path, self.player_colors[unit.player.name])
+            self.color_element(path, self.player_colors["Neutral" if unit.player is None else unit.player.name])
 
         current_coords = get_unit_coordinates(unit_element)
         current_coords = TransGL3(unit_element).transform(current_coords)

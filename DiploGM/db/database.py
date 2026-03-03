@@ -261,8 +261,8 @@ class _DatabaseConnection:
             has_failed,
         ) = unit_info
         province, coast = board.get_province_and_coast(location)
-        owner_player = board.get_player(owner)
-        if owner_player is None:
+        owner_player = None
+        if owner is not None and (owner_player := board.get_player(owner)) is None:
             logger.warning(f"Couldn't find corresponding player for {owner} in DB")
             return
         if is_dislodged:
@@ -286,7 +286,8 @@ class _DatabaseConnection:
             province.dislodged_unit = unit
         else:
             province.unit = unit
-        owner_player.units.add(unit)
+        if owner_player is not None:
+            owner_player.units.add(unit)
         board.units.add(unit)
 
         if order_type is None:
@@ -522,7 +523,7 @@ class _DatabaseConnection:
                     board.turn.get_indexed_name(),
                     unit.province.get_name(unit.coast),
                     unit == unit.province.dislodged_unit,
-                    unit.player.name,
+                    unit.player.name if unit.player else None,
                     unit.unit_type == UnitType.ARMY,
                     unit.order.__class__.__name__ if unit.order is not None else None,
                     unit.order.get_destination_str() if unit.order is not None else None,
