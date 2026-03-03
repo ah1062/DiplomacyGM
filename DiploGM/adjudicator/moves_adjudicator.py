@@ -278,7 +278,8 @@ class MovesAdjudicator(Adjudicator):
         raise ValueError("Unknown order type for adjudication")
 
     def _count_strength(self, order: AdjudicableOrder, attacked_country: Player | None = None) -> int:
-        strength = 1
+        # Your own unit counts, unless it's a difficult adjacency
+        strength = 0 if order.destination_province.name in order.base_unit.province.difficult_adjacencies else 1
         for support in order.supports:
             if self._resolve_order(support) == Resolution.SUCCEEDS and attacked_country != support.country:
                 strength += 1
@@ -303,12 +304,14 @@ class MovesAdjudicator(Adjudicator):
                 head_on = not attacked_order.is_convoy and not order.is_convoy
 
         attack_strength = 1
+        # Determine if destination unit moved
         attacked_move = (
             attacked_order == None
             or (attacked_order.type == OrderType.MOVE
                 and self._resolve_order(attacked_order) == Resolution.SUCCEEDS)
         )
 
+        # If there is a unit in the destionation and it either didn't move or is a head-on attack, we need to compare supports
         if attacked_order and (head_on or not attacked_move):
             attacked_country = attacked_order.country
 

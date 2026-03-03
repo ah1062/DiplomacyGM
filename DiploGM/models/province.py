@@ -52,6 +52,7 @@ class Province():
         self.unit: unit.Unit | None = local_unit
         self.dislodged_unit: unit.Unit | None = None
         self.nonadjacent_coasts: set[str] = set()
+        self.difficult_adjacencies: set[str] = set()
 
         # primary/retreat unit coordinates are of the form {unit_type/coast: (x, y)}
         # all_locs/all_rets are of the form {unit_type/coast: set((x, y), (x2, y2), ...)}

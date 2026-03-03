@@ -142,6 +142,8 @@ def _validate_support_order(province: Province, order: Support) -> tuple[OrderVa
     move_valid, _ = order_is_valid(province, Move(order.destination), strict_coast_movement=False)
     if move_valid != OrderValidity.VALID:
         return OrderValidity.INVALID, "Cannot support somewhere you can't move to"
+    if order.destination.name in province.difficult_adjacencies:
+        return OrderValidity.INVALID, f"Cannot support to {order.destination} from {province} due to difficult adjacency"
     is_support_hold = (order.source == order.destination)
     source_to_destination_valid = (
         is_support_hold

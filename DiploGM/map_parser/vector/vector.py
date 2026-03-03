@@ -256,6 +256,8 @@ class Parser:
                 province.adjacent.difference_update({self.name_to_province[n] for n in data["remove_adjacencies"]})
             if "remove_adjacent_coasts" in data:
                 province.nonadjacent_coasts.update(data["remove_adjacent_coasts"])
+            if "difficult_adjacency" in data:
+                province.difficult_adjacencies.update(data["difficult_adjacency"])
             if "coasts" in data:
                 province.fleet_adjacent = {}
                 for coast_name, coast_adjacent in data["coasts"].items():
