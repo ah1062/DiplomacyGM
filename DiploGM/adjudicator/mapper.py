@@ -319,6 +319,10 @@ class Mapper:
             else:
                 color = player.render_color
             self.player_colors[player.name] = color
+        neutral_color = self.board.data[SVG_CONFIG_KEY].get("neutral", "ffffff")
+        if isinstance(neutral_color, dict):
+            neutral_color = neutral_color.get(color_mode, neutral_color.get("standard", "ffffff"))
+        self.player_colors["Neutral"] = neutral_color
         
         #TODO: draw dual monarchies as stripes
         if color_mode == "empires":
@@ -621,7 +625,7 @@ class Mapper:
                     )
                 ]
             if (
-                possibility.type == ProvinceType.SEA
+                possibility.can_convoy
                 and possibility.unit is not None
                 and (self.player_restriction is None or possibility.unit.player == self.player_restriction)
                 and possibility.unit.unit_type == UnitType.FLEET

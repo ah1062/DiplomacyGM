@@ -32,7 +32,7 @@ def convoy_is_possible(start: Province, end: Province, check_fleet_orders: bool 
     :return: True if there are fleets connecting start -> end
     """
     visited: set[str] = set()
-    to_visit = collections.deque()
+    to_visit: collections.deque[Province] = collections.deque()
     to_visit.append(start)
     while 0 < len(to_visit):
         current = to_visit.popleft()
@@ -44,10 +44,11 @@ def convoy_is_possible(start: Province, end: Province, check_fleet_orders: bool 
         for adjacent_province in current.adjacent:
             if adjacent_province == end:
                 return True
-            adjacent_could_convoy = (adjacent_province.type == ProvinceType.SEA
+            adjacent_could_convoy = (adjacent_province.can_convoy
                 and adjacent_province.unit is not None
                 and adjacent_province.unit.unit_type == UnitType.FLEET)
             adjacent_did_convoy = (adjacent_could_convoy
+                and adjacent_province.unit is not None
                 and isinstance(adjacent_province.unit.order, ConvoyTransport)
                 and (adjacent_province.unit.order.source is start)
                 and (adjacent_province.unit.order.destination is end))

@@ -179,6 +179,8 @@ class Parser:
         provinces = copy.deepcopy(self.cache_provinces)
         for province in provinces:
             self.name_to_province[province.name] = province
+            if self.data.get("convoyable_islands") == "enabled" and province.type == ProvinceType.ISLAND:
+                province.can_convoy = True
 
         if self.cache_adjacencies is None:
             # set adjacencies

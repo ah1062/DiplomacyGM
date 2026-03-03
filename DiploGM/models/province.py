@@ -41,6 +41,7 @@ class Province():
         self.primary_unit_coordinates: dict[UnitType | str, tuple[float, float]] = primary_unit_coordinates
         self.retreat_unit_coordinates: dict[UnitType | str, tuple[float, float]] = retreat_unit_coordinates
         self.type: ProvinceType = province_type
+        self.can_convoy: bool = (province_type == ProvinceType.SEA)
         self.has_supply_center: bool = has_supply_center
         self.adjacent: set[Province] = adjacent
         self.fleet_adjacent: set[tuple[Province, str | None]] | dict[str, set[tuple[Province, str | None]]] = fleet_adjacent
