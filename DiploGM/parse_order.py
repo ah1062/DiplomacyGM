@@ -260,6 +260,19 @@ movement_parser = Lark(ebnf, start="order", parser="earley")
 retreats_parser = Lark(ebnf, start="retreat", parser="earley")
 builds_parser   = Lark(ebnf, start="build", parser="earley")
 
+def _check_for_warnings(unit: Unit) -> str | None:
+    if isinstance(unit.order, order.Move):
+        if unit.order.destination not in unit.province.adjacent:
+            return "This move is not to an adjacent province. This will fail unless there is a convoy."
+        if unit.unit_type == UnitType.FLEET and unit.order.destination.get_multiple_coasts() and not unit.order.destination_coast:
+            return "Destination province has multiple coasts. This might cause your order to fail if the fleet can reach more than one."
+    if isinstance(unit.order, order.Support):
+        if unit.order.destination not in unit.province.adjacent:
+            return "This support is not to an adjacent province and will fail."
+        if unit.order.source != unit.order.destination and unit.order.destination not in unit.order.source.adjacent:
+            return "This support is is between two non-adjacent provinces, and will fail unless there is a convoy."
+    return None
+
 def parse_order(message: str, player_restriction: Player | None, board: Board) -> dict[str, ...]:
     ordertext = message.split(maxsplit=1)
     if len(ordertext) == 1:
@@ -272,6 +285,7 @@ def parse_order(message: str, player_restriction: Player | None, board: Board) -
     orderlist = ordertext[1].strip().splitlines()
     movement = []
     orderoutput = []
+    warnings = []
     errors = []
     if board.turn.is_moves():
         parser = movement_parser
@@ -294,12 +308,17 @@ def parse_order(message: str, player_restriction: Player | None, board: Board) -
         try:
             logger.debug(order)
             cmd = parser.parse(order.strip().lower() + " ")
-            ordered_unit = generator.transform(cmd)
+            ordered_unit: Unit = generator.transform(cmd)
             if board.turn.is_builds():
                 orderoutput.append(f"\u001b[0;32m{order}")
             else:
                 movement.append(ordered_unit)
-                orderoutput.append(f"\u001b[0;32m{ordered_unit} {ordered_unit.order}")
+                if (warning:= _check_for_warnings(ordered_unit)) is not None:
+                    warnings.append(f"`{order}`: {warning}")
+                    color = "\u001b[0;33m"
+                else:
+                    color = "\u001b[0;32m"
+                orderoutput.append(f"{color}{ordered_unit} {ordered_unit.order}")
         except VisitError as e:
             orderoutput.append(f"\u001b[0;31m{order}")
             errors.append(f"`{order}`: {str(e).splitlines()[-1]}")
@@ -326,8 +345,11 @@ def parse_order(message: str, player_restriction: Player | None, board: Board) -
         paginator.add_line(line)
 
     output = paginator.pages
+    if warnings:
+        output[-1] += "\n**Warnings (Orders validated, but might fail):**\n" + "\n".join(warnings)
+        output[-1] += "\n" if errors else ""
     if errors:
-        output[-1] += "\n" + "\n".join(errors)
+        output[-1] += "\n**Unable to validate the following orders:**\n" + "\n".join(errors)
         embed_colour = PARTIAL_ERROR_COLOUR if len(movement) > 0 else ERROR_COLOUR
         return {
             "messages": output,
