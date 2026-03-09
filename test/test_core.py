@@ -7,16 +7,16 @@ class TestCore(unittest.TestCase):
     def test_core_1(self):
         """ 
             Coring should fail for non-SCs.
-            Germany: A Rumania Cores
-            Rumania shouldn't be half-cored by Germany.
+            Germany: A Silesia Cores
+            Silesia shouldn't be half-cored by Germany.
         """
         b = BoardBuilder()
-        a_rumania = b.core(b.germany, UnitType.ARMY, "Rumania")
-        p_rumania = b.board.get_province("Rumania")
+        a_silesia = b.core(b.germany, UnitType.ARMY, "Silesia")
+        p_silesia = b.board.get_province("Silesia")
 
-        b.assertIllegal(a_rumania)
+        b.assertIllegal(a_silesia)
         b.moves_adjudicate(self)
-        self.assertFalse(p_rumania.half_core == b.germany, "Rumania shouldn't be cored")
+        self.assertNotEqual(p_silesia.half_core, b.germany, "Silesia shouldn't be cored")
 
     def test_core_2(self):
         """ 
@@ -31,7 +31,7 @@ class TestCore(unittest.TestCase):
 
         b.assertIllegal(a_holland)
         b.moves_adjudicate(self)
-        self.assertFalse(p_holland.half_core == b.germany, "Holland shouldn't be cored")
+        self.assertNotEqual(p_holland.half_core, b.germany, "Holland shouldn't be cored")
 
     def test_core_3(self):
         """ 
@@ -47,7 +47,7 @@ class TestCore(unittest.TestCase):
 
         b.assertSuccess(a_holland)
         b.moves_adjudicate(self)
-        self.assertTrue(p_holland.half_core == b.germany, "Holland should be half-cored")
+        self.assertEqual(p_holland.half_core, b.germany, "Holland should be half-cored")
 
     def test_core_4(self):
         """ 
@@ -64,7 +64,7 @@ class TestCore(unittest.TestCase):
 
         b.assertSuccess(a_holland)
         b.moves_adjudicate(self)
-        self.assertTrue(p_holland.core == b.germany, "Holland should be cored")
+        self.assertEqual(p_holland.core, b.germany, "Holland should be cored")
 
     def test_core_5(self):
         """ 
@@ -85,7 +85,7 @@ class TestCore(unittest.TestCase):
         b.assertNotIllegal(a_holland, a_belgium)
         b.moves_adjudicate(self)
         
-        self.assertFalse(p_holland.core == b.germany, "Holland shouldn't be cored")
+        self.assertNotEqual(p_holland.core, b.germany, "Holland shouldn't be cored")
 
     def test_core_6(self):
         """ 
@@ -106,7 +106,7 @@ class TestCore(unittest.TestCase):
         b.assertNotIllegal(a_holland, a_belgium)
         b.moves_adjudicate(self)
         
-        self.assertFalse(p_holland.core == b.germany, "Holland shouldn't be half-cored")
+        self.assertNotEqual(p_holland.core, b.germany, "Holland shouldn't be cored")
 
     def test_core_7(self):
         """ 
@@ -129,7 +129,7 @@ class TestCore(unittest.TestCase):
         b.assertNotIllegal(a_holland, f_north_sea, a_london)
         b.moves_adjudicate(self)
         
-        self.assertFalse(p_holland.core == b.germany, "Holland shouldn't be half-cored")
+        self.assertNotEqual(p_holland.core, b.germany, "Holland shouldn't be cored")
 
     def test_core_8(self):
         """ 
@@ -152,7 +152,7 @@ class TestCore(unittest.TestCase):
         b.assertNotIllegal(a_holland, f_north_sea, a_london)
         b.moves_adjudicate(self)
         
-        self.assertFalse(p_holland.core == b.germany, "Holland shouldn't be half-cored")
+        self.assertNotEqual(p_holland.core, b.germany, "Holland shouldn't be cored")
 
 
     def test_core_9(self):
@@ -173,4 +173,4 @@ class TestCore(unittest.TestCase):
         b.assertSuccess(a_holland)
         b.moves_adjudicate(self)
         
-        self.assertTrue(p_holland.core == b.germany, "Holland should be half-cored")
+        self.assertEqual(p_holland.core, b.germany, "Holland should be cored")

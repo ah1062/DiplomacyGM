@@ -2,6 +2,7 @@ from DiploGM.models.board import Board
 from DiploGM.manager import Manager
 from DiploGM.models.order import (
     Core,
+    Transform,
     Hold,
     Move,
     RetreatMove,
@@ -124,6 +125,17 @@ class BoardBuilder():
             unit = self.army(place, player)
 
         order = Core()
+        unit.order = order
+
+        return unit
+
+    def transform(self, player: Player, type: UnitType, place: str, coast: str | None = None) -> Unit:
+        if (type == UnitType.FLEET):
+            unit = self.fleet(place, player)
+        else:
+            unit = self.army(place, player)
+
+        order = Transform(coast)
         unit.order = order
 
         return unit
