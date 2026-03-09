@@ -17,6 +17,9 @@ Contributors
 - Added warnings when players do not specify a coast when ordering a fleet to a multi-coastal province
 - Added a safeguard to prevent .adjudicate when orders are missing
 
+# Bugfixes
+- Fixed an issue when trying to change the coast of a build
+
 1.5.3
 =====
 

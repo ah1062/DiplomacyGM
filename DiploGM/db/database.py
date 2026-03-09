@@ -151,7 +151,7 @@ class _DatabaseConnection:
 
     def _load_builds(self, cursor, board_id: int, board: Board):
         builds_data = cursor.execute(
-            "SELECT player, location, order_type, is_army FROM builds WHERE board_id=? and phase=?",
+            "SELECT player, location, order_type, unit_type FROM builds WHERE board_id=? and phase=?",
             (board_id, board.turn.get_indexed_name()),
         ).fetchall()
 
@@ -164,7 +164,7 @@ class _DatabaseConnection:
 
             return player_by_name[player_name]
 
-        for player_name, location, order_type, is_army in builds_data:
+        for player_name, location, order_type, unit_type in builds_data:
             player = get_player_by_name(player_name)
 
             if player is None:
@@ -172,15 +172,15 @@ class _DatabaseConnection:
 
             if order_type == "Build":
                 player_order = Build(
-                    board.get_province_and_coast(location)[0],
-                    UnitType.ARMY if is_army else UnitType.FLEET,
-                    board.get_province_and_coast(location)[1],
+                    board.get_province(location),
+                    UnitType(unit_type[0]),
+                    unit_type[-2:] if len(unit_type) > 1 else None,
                 )
             elif order_type == "Disband":
                 player_order = Disband(board.get_province(location))
             elif order_type == "TransformBuild":
-                player_order = TransformBuild(board.get_province_and_coast(location)[0],
-                                              board.get_province_and_coast(location)[1])
+                player_order = TransformBuild(board.get_province(location),
+                                              unit_type[-2:] if len(unit_type) > 1 else None)
             else:
                 logger.warning(f"Unknown build order type: {order_type}")
                 continue
@@ -500,7 +500,7 @@ class _DatabaseConnection:
             ],
         )
         cursor.executemany(
-            "INSERT INTO builds (board_id, phase, player, location, order_type, is_army) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO builds (board_id, phase, player, location, order_type, unit_type) VALUES (?, ?, ?, ?, ?, ?)",
             [
                 (
                     board_id,
@@ -508,7 +508,8 @@ class _DatabaseConnection:
                     player.name,
                     build_order.province.get_name(build_order.coast),
                     build_order.__class__.__name__,
-                    getattr(build_order, "unit_type", None) == UnitType.ARMY,
+                    ((build_order.unit_type.value if isinstance(build_order, Build) else "")
+                     + ("" if build_order.coast is None else f" {build_order.coast}")),
                 )
                 for player in board.players
                 for build_order in player.build_orders if isinstance(build_order, PlayerOrder)
@@ -606,8 +607,8 @@ class _DatabaseConnection:
             players = {player}
         cursor = self._connection.cursor()
         cursor.executemany(
-            "INSERT INTO builds (board_id, phase, player, location, order_type, is_army) VALUES (?, ?, ?, ?, ?, ?) "
-            "ON CONFLICT (board_id, phase, player, location) DO UPDATE SET order_type=?, is_army=?",
+            "INSERT INTO builds (board_id, phase, player, location, order_type, unit_type) VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT (board_id, phase, player, location) DO UPDATE SET order_type=?, unit_type=?",
             [
                 (
                     board.board_id,
@@ -615,9 +616,11 @@ class _DatabaseConnection:
                     player.name,
                     build_order.province.get_name(build_order.coast),
                     build_order.__class__.__name__,
-                    getattr(build_order, "unit_type", None) == UnitType.ARMY,
+                    ((build_order.unit_type.value if isinstance(build_order, Build) else "")
+                     + ("" if build_order.coast is None else f" {build_order.coast}")),
                     build_order.__class__.__name__,
-                    getattr(build_order, "unit_type", None) == UnitType.ARMY,
+                    ((build_order.unit_type.value if isinstance(build_order, Build) else "")
+                     + ("" if build_order.coast is None else f" {build_order.coast}")),
                 )
                 for player in players
                 for build_order in player.build_orders if isinstance(build_order, PlayerOrder)
