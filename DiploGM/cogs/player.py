@@ -398,6 +398,101 @@ class PlayerCog(commands.Cog):
             channel=ctx.channel, message=", ".join([p.name for p in visible_provinces])
         )
 
+    @commands.command(brief="creates a new private press channel",
+        description="""
+        * create_press_channel {category} {name} {@country1} {@country2} ...
+        Arguments: 
+        * category: the category to create the channel in (#comms-1, #comms-2, etc.)
+        * name: the name of the channel to create (e.g. england-france)
+        * @country1, @country2, ... : the roles of the other countries that should have access to the channel
+        """,)
+    @perms.player("create a private press channel")
+    async def create_press_channel(self, ctx: commands.Context, player: Player | None) -> None:
+        assert ctx.guild is not None
+        if player is None:
+            await send_message_and_file(
+                channel=ctx.channel,
+                message="Only players can create press channels.",
+                embed_colour=config.ERROR_COLOUR,
+            )
+            return
+        arguments = (
+            ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")
+            .strip()
+            .lower()
+            .split()
+        )
+
+        if len(arguments) < 3:
+            await send_message_and_file(
+                channel=ctx.channel,
+                message="Invalid command format. Please use `.create_press_channel {category} {name} {@country1} {@country2} ...`",
+                embed_colour=config.ERROR_COLOUR,
+            )
+            return
+        seed_channel = ctx.message.channel_mentions[0] if ctx.message.channel_mentions else None
+        channel_name = arguments[1]
+        roles = ctx.message.role_mentions
+
+        board = manager.get_board(ctx.guild.id)
+        comms_category_prefix = "comms-"
+        if not seed_channel or not (category:= seed_channel.category):
+            await send_message_and_file(
+                channel=ctx.channel,
+                message="You must select a channel in a press category (e.g. #comms-1, #comms-2, etc.).",
+                embed_colour=config.ERROR_COLOUR,
+            )
+            return
+        has_comms_category = False
+        for channel in category.channels:
+            if channel.name.startswith(comms_category_prefix):
+                has_comms_category = True
+                break
+        if not has_comms_category:
+            await send_message_and_file(
+                channel=ctx.channel,
+                message="You must select a channel in a press category (e.g. #comms-1, #comms-2, etc.).",
+                embed_colour=config.ERROR_COLOUR,
+            )
+            return
+        for role in roles:
+            try:
+                board.get_player(role.name)
+            except ValueError:
+                await send_message_and_file(
+                    channel=ctx.channel,
+                    message=f"{role.mention} does not correspond to a player in this game.",
+                    embed_colour=config.ERROR_COLOUR,
+                )
+                return
+
+        overwrites = {
+            ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            player.find_discord_role(ctx.guild.roles): discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        }
+        for role in roles:
+            overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        try:
+            channel = await category.create_text_channel(channel_name, overwrites=overwrites)
+        except discord.Forbidden:
+            await send_message_and_file(
+                channel=ctx.channel,
+                message="Bot does not have permission to create channels in this category. Please contact the GM Team.",
+                embed_colour=config.ERROR_COLOUR,
+            )
+            return
+        except discord.HTTPException:
+            await send_message_and_file(
+                channel=ctx.channel,
+                message="Failed to create channel, probably because the category is full. If you keep seeing this error, please contact the GM Team.",
+                embed_colour=config.ERROR_COLOUR,
+            )
+            return
+
+        message = f"Created press channel {channel_name}"
+        log_command(logger, ctx, message=message)
+        await send_message_and_file(channel=ctx.channel, message=message)
+
     @commands.command(name="press_directory", brief="outputs a list of press channels")
     @perms.player("generate a press directory")
     async def press_directory(self, ctx: commands.Context, player: Player | None) -> None:
