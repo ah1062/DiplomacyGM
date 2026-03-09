@@ -805,6 +805,33 @@ class GameManagementCog(commands.Cog):
             file, _ = manager.draw_map_for_board(board, draw_moves=True)
             _ = asyncio.create_task(upload_map_to_archive(ctx, guild.id, board, file))
 
+    async def _is_missing_orders(self, board: Board) -> bool:
+        if board.turn.is_moves():
+            for unit in board.units:
+                if unit.order is None:
+                    return True
+        
+        if board.turn.is_retreats():
+            for unit in board.units:
+                if (unit.province.dislodged_unit == unit
+                    and unit.retreat_options and len(unit.retreat_options) > 0
+                    and unit.order is None):
+                    return True
+        
+        if board.turn.is_builds():
+            for player in board.players:
+                count = len(player.centers) - len(player.units)
+                current = player.waived_orders
+                for order in player.build_orders:
+                    if isinstance(order, Disband):
+                        current -= 1
+                    elif isinstance(order, Build):
+                        current += 1
+
+                if current != count:
+                    return True
+        return False
+
     @commands.command(
         brief="Adjudicates the game and outputs the moves and results maps.",
         description="""
@@ -835,16 +862,18 @@ class GameManagementCog(commands.Cog):
         color_arguments = list(config.color_options & set(arguments))
         color_mode = color_arguments[0] if color_arguments else None
         test_adjudicate = "test" in arguments
-        full_adjudicate = "full" in arguments
+        full_adjudicate = "full" in arguments and not test_adjudicate
         movement_adjudicate = "movement" in arguments
+        force_adjudicate = ({"force", "confirm"} & set(arguments)) and not test_adjudicate
 
-        if test_adjudicate and full_adjudicate:
+        if not force_adjudicate and not test_adjudicate and await self._is_missing_orders(board):
             await send_message_and_file(
                 channel=ctx.channel,
-                title="Test and full adjudications are incompatable. Defaulting to test adjudication.",
-                embed_colour=config.PARTIAL_ERROR_COLOUR,
+                title="Missing Orders",
+                message="Game has not been adjudicated due to missing orders. To adjudicate anyway, use `.adjudicate confirm`",
+                embed_colour=config.ERROR_COLOUR,
             )
-            full_adjudicate = False
+            return
 
         if full_adjudicate:
             await self.lock_orders(ctx)
