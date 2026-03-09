@@ -292,6 +292,14 @@ class AdminCog(commands.Cog):
         log_command(logger, ctx, message=message)
         await send_message_and_file(channel=ctx.channel, message=message)
 
+    @commands.command(hidden=True)
+    @perms.superuser_only("Reloads the map parser for a given variant. Useful if a map has been updated.")
+    async def reload_variant(self, ctx: commands.Context, arg) -> None:
+        assert ctx.guild is not None
+        message = manager.reload_variant(arg)
+        log_command(logger, ctx, message=message)
+        await send_message_and_file(channel=ctx.channel, message=message)
+
     @commands.command(
         brief="Execute Arbitrary Python",
         description="Execute a python snippet on the current board state.\nWARNING: Changes made to the board state are saved to the database.",

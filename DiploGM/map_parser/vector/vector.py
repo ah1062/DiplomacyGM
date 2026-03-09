@@ -623,8 +623,8 @@ class Parser:
 parsers = {}
 
 
-def get_parser(name: str) -> Parser:
-    if name not in parsers:
+def get_parser(name: str, force_refresh: bool=False) -> Parser:
+    if force_refresh or name not in parsers:
         logger.info(f"Creating new Parser for board named {name}")
         parsers[name] = Parser(name)
     return parsers[name]
