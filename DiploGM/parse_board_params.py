@@ -52,6 +52,16 @@ def _set_build_options(keywords: list[str], board: Board) -> tuple[str | None, s
     board.data[key_name] = new_value
     return key_name, new_value
 
+def _set_convoyable_islands(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
+    key_name = "convoyable_islands"
+    valid_options = "true", "false", "enabled", "disabled"
+    new_value = keywords[0].lower()
+    if new_value not in valid_options:
+        raise ValueError(f"{new_value} is not a valid convoyable islands option")
+    new_value = "enabled" if new_value in ["true", "enabled"] else "disabled"
+    board.data[key_name] = new_value
+    return key_name, new_value
+
 def _set_supportable_cores(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
     key_name = "supportable_cores"
     valid_options = "true", "false", "enabled", "disabled"
@@ -145,6 +155,7 @@ def _add_player(keywords: list[str], board: Board) -> tuple[str | None, str | No
 
 function_list = {
     "building": _set_build_options,
+    "convoyable islands": _set_convoyable_islands,
     "supportable cores": _set_supportable_cores,
     "transformation": _set_transformation,
     "victory conditions": _set_victory_conditions,

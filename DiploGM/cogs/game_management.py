@@ -1314,7 +1314,10 @@ class GameManagementCog(commands.Cog):
         There must be one and only one command per line.
         Note: you cannot edit immalleable map state (eg. province adjacency, players).
         The following are the supported parameters and possible values:
-        * building ['classic', 'cores', 'anywhere']
+        * building ['classic', 'cores', 'control', 'anywhere']
+        * convoyable_islands ['disabled', 'enabled']
+        * supportable_cores ['disabled', 'enabled']
+        * transformation ['disabled', 'moves', 'builds', 'all']
         * victory_conditions ['classic', 'vscc']
         * victory_count [number] (only used with classic victory conditions)
         * iscc [player] [starting scs]
