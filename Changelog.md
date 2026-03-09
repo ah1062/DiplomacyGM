@@ -1,3 +1,22 @@
+1.6.0
+=====
+
+Contributors
+- Golden Kumquat
+
+# New Features
+- Added an optional "transform" order during moves and/or builds that can change armies into fleets and vice versaq
+- Added an option to allow convoys through islands
+- Added the ability for start of game neutral armies, which can be supported but otherwise hold put
+- Added difficult borders, which cause units to move with strength one less and prevents supports
+- Added a .reload_variant command which forces a refresh of the map, adjacencies, and all boards
+- Implemented .create_press_channel, which will automate channel creation for players
+
+# Quality of Life
+- Added warnings when players order moves or supports to non-adjacent provinces
+- Added warnings when players do not specify a coast when ordering a fleet to a multi-coastal province
+- Added a safeguard to prevent .adjudicate when orders are missing
+
 1.5.3
 =====
 
@@ -34,7 +53,7 @@ Contributors
 =====
 
 Contributors
-- hdwhite
+- Golden Kumquat
 
 # Bugfixes
 - Fixed everyone's ages being negative
@@ -46,7 +65,7 @@ Contributors
 
 Contributors
 - aahoughton
-- hdwhite
+- Golden Kumquat
 
 # New Features
 - Grace/Extension tracking system
@@ -98,7 +117,7 @@ Contributors
 1.4.5
 =====
 Contributors
-- hdwhite
+- Golden Kumquat
 
 Fixed some bugs related to Chaos maps
 
@@ -108,7 +127,7 @@ Fixed some bugs related to Chaos maps
 1.4.4
 =====
 Contributors
-- hdwhite
+- Golden Kumquat
 
 # New Features
 - Added in an .edit_game command which can modify parameters of a game:
@@ -124,7 +143,7 @@ Contributors
 1.4.3
 =====
 Contributors
-- hdwhite
+- Golden Kumquat
 
 # Features
 - Doing .scoreboard now shows SC and unit changes
@@ -151,7 +170,7 @@ Fixed GUI file location
 1.4.1
 =====
 Contributors
-- hdwhite
+- Golden Kumquat
 
 Fixed some bugs with adjacencies of multiple coasts
 
@@ -159,7 +178,7 @@ Fixed some bugs with adjacencies of multiple coasts
 1.4.0
 =====
 Contributors
-- hdwhite
+- Golden Kumquat
 
 # Infrastructure Changes
 - Removed Coasts as a separate Loction from Provinces
