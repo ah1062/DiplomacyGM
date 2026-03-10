@@ -39,7 +39,7 @@ async def send_message_and_file(
     **_,
 ) -> Message:
 
-    if not isinstance(channel, discord.TextChannel):
+    if not isinstance(channel, (discord.TextChannel, discord.Thread)):
         raise ValueError("Can only send messages to text channels")
     if embed_colour is None:
         embed_colour = config.EMBED_STANDARD_COLOUR

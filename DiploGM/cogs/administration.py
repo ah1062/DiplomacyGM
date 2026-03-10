@@ -274,7 +274,7 @@ class AdminCog(commands.Cog):
         )
         server_id = int(arguments[0])
         board = manager.get_board(server_id)
-        season = parse_season(arguments[1:], board.turn.year)
+        season = parse_season(arguments[1:], board.turn)
         file, _ = manager.draw_map(
             server_id,
             draw_moves=True,
@@ -289,6 +289,14 @@ class AdminCog(commands.Cog):
         gametype = arg if arg else "classic"
 
         message = manager.verify_adjacencies(gametype)
+        log_command(logger, ctx, message=message)
+        await send_message_and_file(channel=ctx.channel, message=message)
+
+    @commands.command(hidden=True)
+    @perms.superuser_only("Reloads the map parser for a given variant. Useful if a map has been updated.")
+    async def reload_variant(self, ctx: commands.Context, arg) -> None:
+        assert ctx.guild is not None
+        message = manager.reload_variant(arg)
         log_command(logger, ctx, message=message)
         await send_message_and_file(channel=ctx.channel, message=message)
 

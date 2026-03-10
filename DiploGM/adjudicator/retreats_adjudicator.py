@@ -72,9 +72,17 @@ class RetreatsAdjudicator(Adjudicator):
         retreats_by_destination, units_to_delete = self._validate_orders()
 
         for retreating_units in retreats_by_destination.values():
+            # Handle mutliple units retreating to the same province
+            # If some are crossing difficult adjacencies, they lose to normal retreats
             if len(retreating_units) != 1:
-                units_to_delete.update(retreating_units)
-                continue
+                difficult_units = {u for u in retreating_units
+                                   if isinstance(u.order, RetreatMove)
+                                       and u.order.destination.name in u.province.difficult_adjacencies}
+                units_to_delete.update(difficult_units)
+                retreating_units.difference_update(difficult_units)
+                if len(retreating_units) != 1:
+                    units_to_delete.update(retreating_units)
+                    continue
 
             (unit,) = retreating_units
             if not isinstance(unit.order, RetreatMove):
@@ -91,7 +99,8 @@ class RetreatsAdjudicator(Adjudicator):
                 self._board.change_owner(destination_province, unit.player)
 
         for unit in units_to_delete:
-            unit.player.units.remove(unit)
+            if unit.player is not None:
+                unit.player.units.remove(unit)
             self._board.units.remove(unit)
             unit.province.dislodged_unit = None
 

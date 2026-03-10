@@ -19,12 +19,14 @@ from DiploGM.db.database import logger
 from DiploGM.models.order import (
     Hold,
     Core,
+    Transform,
     ConvoyTransport,
     Support,
     RetreatMove,
     RetreatDisband,
     Build,
     Disband,
+    TransformBuild,
     Move,
     PlayerOrder,
 )
@@ -112,6 +114,8 @@ class Mapper:
     
     def is_moveable(self, unit: Unit):
         if unit.province.name not in self.adjacent_provinces:
+            return False
+        if unit.player is None:
             return False
         if self.player_restriction and unit.player.name != self.player_restriction.name:
             return False
@@ -306,7 +310,8 @@ class Mapper:
 
     def load_colors(self, color_mode: str | None = None) -> None:
         self.player_colors = {
-            "None": "ffffff"
+            "None": "ffffff",
+            "Neutral": self.board.data[SVG_CONFIG_KEY].get("neutral", "ffffff")
         }
         for player in self.board.players:
             if color_mode is not None and player.color_dict and color_mode in player.color_dict:
@@ -314,6 +319,10 @@ class Mapper:
             else:
                 color = player.render_color
             self.player_colors[player.name] = color
+        neutral_color = self.board.data[SVG_CONFIG_KEY].get("neutral", "ffffff")
+        if isinstance(neutral_color, dict):
+            neutral_color = neutral_color.get(color_mode, neutral_color.get("standard", "ffffff"))
+        self.player_colors["Neutral"] = neutral_color
         
         #TODO: draw dual monarchies as stripes
         if color_mode == "empires":
@@ -485,6 +494,8 @@ class Mapper:
             self._draw_hold(coordinate, order.has_failed)
         elif isinstance(order, Core):
             self._draw_core(coordinate, order.has_failed)
+        elif isinstance(order, Transform):
+            self._draw_transform(coordinate, order.has_failed)
         elif isinstance(order, Move):
             # moves are just convoyed moves that have no convoys
             return self._draw_convoyed_move(unit, coordinate, order.has_failed)
@@ -515,6 +526,15 @@ class Mapper:
                 coord_list = order.province.all_locs[disbanding_unit.unit_type]
             for coord in coord_list:
                 self._draw_force_disband(coord, self._moves_svg)
+        elif isinstance(order, TransformBuild):
+            assert order.province.unit is not None
+            transforming_unit: Unit = order.province.unit
+            if transforming_unit.coast:
+                coord_list = order.province.all_locs[transforming_unit.coast]
+            else:
+                coord_list = order.province.all_locs[transforming_unit.unit_type]
+            for coord in coord_list:
+                self._draw_transform(coord, False)
         else:
             logger.error(f"Could not draw player order {order}")
 
@@ -548,6 +568,23 @@ class Mapper:
                 "stroke": "red" if has_failed else "black",
                 "stroke-width": self.board.data[SVG_CONFIG_KEY]["order_stroke_width"],
                 "transform": f"rotate(45 {coordinate[0]} {coordinate[1]})",
+            },
+        )
+        element.append(drawn_order)
+
+    def _draw_transform(self, coordinate: tuple[float, float], has_failed: bool) -> None:
+        element = self._moves_svg.getroot()
+        assert element is not None
+        drawn_order = self.create_element(
+            "rect",
+            {
+                "x": coordinate[0] - self.board.data[SVG_CONFIG_KEY]["unit_radius"],
+                "y": coordinate[1] - self.board.data[SVG_CONFIG_KEY]["unit_radius"],
+                "width": self.board.data[SVG_CONFIG_KEY]["unit_radius"] * 2,
+                "height": self.board.data[SVG_CONFIG_KEY]["unit_radius"] * 2,
+                "fill": "none",
+                "stroke": "red" if has_failed else "black",
+                "stroke-width": self.board.data[SVG_CONFIG_KEY]["order_stroke_width"],
             },
         )
         element.append(drawn_order)
@@ -588,7 +625,7 @@ class Mapper:
                     )
                 ]
             if (
-                possibility.type == ProvinceType.SEA
+                possibility.can_convoy
                 and possibility.unit is not None
                 and (self.player_restriction is None or possibility.unit.player == self.player_restriction)
                 and possibility.unit.unit_type == UnitType.FLEET
@@ -964,7 +1001,7 @@ class Mapper:
         unit_element = self._get_element_for_unit_type(unit.unit_type)
 
         for path in unit_element:
-            self.color_element(path, self.player_colors[unit.player.name])
+            self.color_element(path, self.player_colors["Neutral" if unit.player is None else unit.player.name])
 
         current_coords = get_unit_coordinates(unit_element)
         current_coords = TransGL3(unit_element).transform(current_coords)

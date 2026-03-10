@@ -179,6 +179,8 @@ class Parser:
         provinces = copy.deepcopy(self.cache_provinces)
         for province in provinces:
             self.name_to_province[province.name] = province
+            if self.data.get("convoyable_islands") == "enabled" and province.type == ProvinceType.ISLAND:
+                province.can_convoy = True
 
         if self.cache_adjacencies is None:
             # set adjacencies
@@ -256,6 +258,8 @@ class Parser:
                 province.adjacent.difference_update({self.name_to_province[n] for n in data["remove_adjacencies"]})
             if "remove_adjacent_coasts" in data:
                 province.nonadjacent_coasts.update(data["remove_adjacent_coasts"])
+            if "difficult_adjacency" in data:
+                province.difficult_adjacencies.update(data["difficult_adjacency"])
             if "coasts" in data:
                 province.fleet_adjacent = {}
                 for coast_name, coast_adjacent in data["coasts"].items():
@@ -468,16 +472,14 @@ class Parser:
 
         # assume that all starting units are on provinces colored in to their color
         player = province.owner
-        if player is None:
-            raise Exception(f"{province.name} has a unit, but isn't owned by any country")
 
         # color_data = unit_data.findall(".//svg:path", namespaces=NAMESPACE)[0]
         # player = self.get_element_player(color_data)
 
         unit = Unit(unit_type, player, province, coast, None)
         province.unit = unit
-        unit.player.units.add(unit)
-        return
+        if unit.player is not None:
+            unit.player.units.add(unit)
 
     def _initialize_units_assisted(self) -> None:
         for unit_data in self.layer_data["starting_units"]:
@@ -621,8 +623,8 @@ class Parser:
 parsers = {}
 
 
-def get_parser(name: str) -> Parser:
-    if name not in parsers:
+def get_parser(name: str, force_refresh: bool=False) -> Parser:
+    if force_refresh or name not in parsers:
         logger.info(f"Creating new Parser for board named {name}")
         parsers[name] = Parser(name)
     return parsers[name]

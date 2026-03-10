@@ -269,7 +269,6 @@ class Manager(metaclass=SingletonMeta):
         # mapper.draw_moves_map(None)
         adjudicator = make_adjudicator(old_board)
         adjudicator.save_orders = not test
-        # TODO - use adjudicator.orders() (tells you which ones succeeded and failed) to draw a better moves map
         new_board = adjudicator.run()
         new_board.turn = new_board.turn.get_next_turn()
         logger.info("Adjudicator ran successfully")
@@ -421,6 +420,27 @@ class Manager(metaclass=SingletonMeta):
         message = f"Reloaded board for phase {loaded_board.turn.get_indexed_name()}"
         file, file_name = mapper.draw_current_map()
         return message, file, file_name
+
+    def reload_variant(self, variant: str) -> str:
+        if not os.path.isdir(f"variants/{variant}"):
+            return f"Variant {variant} does not exist."
+        
+        # Remove adjacency cache to force a reload
+        if os.path.isfile(f"assets/{variant}_adjacencies.txt"):
+            os.remove(f"assets/{variant}_adjacencies.txt")
+
+        get_parser(variant, force_refresh=True).parse()
+        for server_id, board in self._boards.items():
+            if board.datafile == variant:
+                logger.info(f"Reloading board for server {server_id}")
+                loaded_board = self._database.get_board(
+                    server_id, board.turn, board.fish, board.name, board.datafile
+                )
+                if loaded_board is None:
+                    logger.warning(f"There is no {board.turn} board for this server")
+                    continue
+                self._boards[board.board_id] = loaded_board
+        return f"Reloaded variant {variant}"
 
     def get_member_player_object(self, member: Member | User) -> Player | None:
         if isinstance(member, User):

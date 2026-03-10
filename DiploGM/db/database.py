@@ -21,6 +21,8 @@ from DiploGM.models.order import (
     PlayerOrder,
     Build,
     Disband,
+    Transform,
+    TransformBuild,
     Vassal,
     Liege,
     DualMonarchy,
@@ -149,7 +151,7 @@ class _DatabaseConnection:
 
     def _load_builds(self, cursor, board_id: int, board: Board):
         builds_data = cursor.execute(
-            "SELECT player, location, is_build, is_army FROM builds WHERE board_id=? and phase=?",
+            "SELECT player, location, order_type, unit_type FROM builds WHERE board_id=? and phase=?",
             (board_id, board.turn.get_indexed_name()),
         ).fetchall()
 
@@ -162,20 +164,26 @@ class _DatabaseConnection:
 
             return player_by_name[player_name]
 
-        for player_name, location, is_build, is_army in builds_data:
+        for player_name, location, order_type, unit_type in builds_data:
             player = get_player_by_name(player_name)
 
             if player is None:
                 continue
 
-            if is_build:
+            if order_type == "Build":
                 player_order = Build(
-                    board.get_province_and_coast(location)[0],
-                    UnitType.ARMY if is_army else UnitType.FLEET,
-                    board.get_province_and_coast(location)[1],
+                    board.get_province(location),
+                    UnitType(unit_type[0]),
+                    unit_type[-2:] if len(unit_type) > 1 else None,
                 )
-            else:
+            elif order_type == "Disband":
                 player_order = Disband(board.get_province(location))
+            elif order_type == "TransformBuild":
+                player_order = TransformBuild(board.get_province(location),
+                                              unit_type[-2:] if len(unit_type) > 1 else None)
+            else:
+                logger.warning(f"Unknown build order type: {order_type}")
+                continue
 
             player.build_orders.add(player_order)
 
@@ -253,8 +261,8 @@ class _DatabaseConnection:
             has_failed,
         ) = unit_info
         province, coast = board.get_province_and_coast(location)
-        owner_player = board.get_player(owner)
-        if owner_player is None:
+        owner_player = None
+        if owner is not None and (owner_player := board.get_player(owner)) is None:
             logger.warning(f"Couldn't find corresponding player for {owner} in DB")
             return
         if is_dislodged:
@@ -278,7 +286,8 @@ class _DatabaseConnection:
             province.dislodged_unit = unit
         else:
             province.unit = unit
-        owner_player.units.add(unit)
+        if owner_player is not None:
+            owner_player.units.add(unit)
         board.units.add(unit)
 
         if order_type is None:
@@ -287,6 +296,7 @@ class _DatabaseConnection:
             NMR,
             Hold,
             Core,
+            Transform,
             Move,
             ConvoyTransport,
             Support,
@@ -301,15 +311,20 @@ class _DatabaseConnection:
             )
             source_province, destination_province, destination_coast = None, None, None
             if order_destination is not None:
-                destination_province, destination_coast = (
-                    board.get_province_and_coast(order_destination)
-                )
+                if len(order_destination) == 2 and order_destination[1] == "c":
+                    destination_coast = order_destination
+                else:
+                    destination_province, destination_coast = (
+                        board.get_province_and_coast(order_destination)
+                    )
             if order_source is not None:
                 source_province = board.get_province(order_source)
             if order_class == NMR:
                 return
             elif order_class in [Hold, Core, RetreatDisband]:
                 order = order_class()
+            elif order_class in [Transform]:
+                order = order_class(destination_coast=destination_coast)
             elif order_class in [Move, RetreatMove]:
                 order = order_class(destination=destination_province, destination_coast=destination_coast)
             elif order_class in [ConvoyTransport, Support]:
@@ -485,15 +500,16 @@ class _DatabaseConnection:
             ],
         )
         cursor.executemany(
-            "INSERT INTO builds (board_id, phase, player, location, is_build, is_army) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO builds (board_id, phase, player, location, order_type, unit_type) VALUES (?, ?, ?, ?, ?, ?)",
             [
                 (
                     board_id,
                     board.turn.get_indexed_name(),
                     player.name,
                     build_order.province.get_name(build_order.coast),
-                    isinstance(build_order, Build),
-                    getattr(build_order, "unit_type", None) == UnitType.ARMY,
+                    build_order.__class__.__name__,
+                    ((build_order.unit_type.value if isinstance(build_order, Build) else "")
+                     + ("" if build_order.coast is None else f" {build_order.coast}")),
                 )
                 for player in board.players
                 for build_order in player.build_orders if isinstance(build_order, PlayerOrder)
@@ -508,7 +524,7 @@ class _DatabaseConnection:
                     board.turn.get_indexed_name(),
                     unit.province.get_name(unit.coast),
                     unit == unit.province.dislodged_unit,
-                    unit.player.name,
+                    unit.player.name if unit.player else None,
                     unit.unit_type == UnitType.ARMY,
                     unit.order.__class__.__name__ if unit.order is not None else None,
                     unit.order.get_destination_str() if unit.order is not None else None,
@@ -591,18 +607,20 @@ class _DatabaseConnection:
             players = {player}
         cursor = self._connection.cursor()
         cursor.executemany(
-            "INSERT INTO builds (board_id, phase, player, location, is_build, is_army) VALUES (?, ?, ?, ?, ?, ?) "
-            "ON CONFLICT (board_id, phase, player, location) DO UPDATE SET is_build=?, is_army=?",
+            "INSERT INTO builds (board_id, phase, player, location, order_type, unit_type) VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT (board_id, phase, player, location) DO UPDATE SET order_type=?, unit_type=?",
             [
                 (
                     board.board_id,
                     board.turn.get_indexed_name(),
                     player.name,
                     build_order.province.get_name(build_order.coast),
-                    isinstance(build_order, Build),
-                    getattr(build_order, "unit_type", None) == UnitType.ARMY,
-                    isinstance(build_order, Build),
-                    getattr(build_order, "unit_type", None) == UnitType.ARMY,
+                    build_order.__class__.__name__,
+                    ((build_order.unit_type.value if isinstance(build_order, Build) else "")
+                     + ("" if build_order.coast is None else f" {build_order.coast}")),
+                    build_order.__class__.__name__,
+                    ((build_order.unit_type.value if isinstance(build_order, Build) else "")
+                     + ("" if build_order.coast is None else f" {build_order.coast}")),
                 )
                 for player in players
                 for build_order in player.build_orders if isinstance(build_order, PlayerOrder)

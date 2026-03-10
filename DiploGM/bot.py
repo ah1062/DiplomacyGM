@@ -263,11 +263,11 @@ class DiploGM(commands.Bot):
         )
 
     async def on_command_error(self, ctx: commands.Context, error):
-        assert ctx.guild is not None and ctx.command is not None
         if isinstance(error, commands.CommandNotFound):
             # we shouldn't do anything if the user says something like "..."
             return
 
+        assert ctx.guild is not None and ctx.command is not None
         try:
             # mark the message as failed
             await ctx.message.add_reaction("❌")
@@ -296,9 +296,10 @@ class DiploGM(commands.Bot):
         else:
             original = error
 
+        channel_name = ctx.channel.name if isinstance(ctx.channel, (discord.TextChannel, discord.Thread)) else ctx.channel.id
         logger.log(
             logging.ERROR,
-            f"[{ctx.guild.name}][#{ctx.channel.name}]({ctx.message.author.name}) - '{ctx.message.content}' - "
+            f"[{ctx.guild.name}][#{channel_name}]({ctx.message.author.name}) - '{ctx.message.content}' - "
             f"errored in {time_spent}s\n"
             f"{''.join(traceback.format_exception(type(error), error, error.__traceback__))}",
         )
@@ -378,9 +379,11 @@ class DiploGM(commands.Bot):
         # Out to Bot Dev Server
         bot_error_channel = self.get_channel(BOT_DEV_UNHANDLED_ERRORS_CHANNEL_ID)
         if bot_error_channel and isinstance(bot_error_channel, discord.TextChannel):
+            channel_category = ctx.channel.category if isinstance(ctx.channel, (discord.TextChannel, discord.Thread)) else ctx.channel.id
+            channel_name = ctx.channel.name if isinstance(ctx.channel, (discord.TextChannel, discord.Thread)) else ctx.channel.id
             unhandled_out_dev = (
                 f"Type: {type(original)}\n"
-                f"Location: {ctx.guild.name} [{ctx.channel.category or ''}]-[{ctx.channel.name}]\n"
+                f"Location: {ctx.guild.name} [{channel_category or ''}]-[{channel_name}]\n"
                 f"Link: {ctx.message.jump_url}\n"
                 f"Time: {str(datetime.datetime.now(datetime.timezone.utc))[:-13]} UTC\n"
                 f"Invoking User: {ctx.author.mention}[{ctx.author.name}]\n"

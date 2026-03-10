@@ -19,13 +19,13 @@ class Unit:
     def __init__(
         self,
         unit_type: UnitType,
-        owner: player.Player,
+        owner: player.Player | None,
         current_province: province.Province,
         coast: str | None,
         retreat_options: set[tuple[province.Province, str | None]] | None,
     ):
         self.unit_type: UnitType = unit_type
-        self.player: player.Player = owner
+        self.player: player.Player | None = owner
         self.province: province.Province = current_province
         self.coast: str | None = coast
 

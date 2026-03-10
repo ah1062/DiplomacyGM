@@ -87,6 +87,9 @@ function rerender_text() {
             case "Core":
                 line = `${order.origin} Cores`;
                 break;
+            case "Transform":
+                line = `${order.origin} Transforms`;
+                break;
             case "Move":
                 line = `${order.origin} -> ${order.destination}`;
                 break;

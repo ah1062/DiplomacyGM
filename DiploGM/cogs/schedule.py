@@ -416,7 +416,7 @@ class ScheduleCog(commands.Cog):
             )
 
             # delete task immediately to prevent long tasks carrying over to new loops
-            del self.scheduled_tasks[id]
+            del self.scheduled_tasks[task_id]
             await self.save_scheduled_tasks()
             try:
                 log_command_no_ctx(

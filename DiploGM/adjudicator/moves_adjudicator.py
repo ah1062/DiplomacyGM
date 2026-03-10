@@ -13,7 +13,8 @@ from DiploGM.adjudicator.defs import (
 )
 from DiploGM.adjudicator.validate_order import OrderValidity, is_valid_result, order_is_valid
 from DiploGM.db import database
-from DiploGM.models.order import NMR, Move, Core, Support
+from DiploGM.models.order import NMR, Move, Core, Transform, Support
+from DiploGM.models.unit import UnitType
 
 if TYPE_CHECKING:
     from DiploGM.models.board import Board
@@ -116,6 +117,14 @@ class MovesAdjudicator(Adjudicator):
     def _update_order(self, order: AdjudicableOrder):
         if order.type == OrderType.CORE and order.resolution == Resolution.SUCCEEDS:
             order.source_province.corer = order.country
+        if order.type == OrderType.TRANSFORM and order.resolution == Resolution.SUCCEEDS:
+            logger.debug(f"Transforming {order.base_unit}")
+            if order.base_unit.unit_type == UnitType.ARMY:
+                order.base_unit.unit_type = UnitType.FLEET
+                order.base_unit.coast = order.destination_coast
+            else:
+                order.base_unit.unit_type = UnitType.ARMY
+                order.base_unit.coast = None
         if order.type == OrderType.MOVE and order.resolution == Resolution.SUCCEEDS:
             logger.debug(f"Moving {order.source_province} to {order.destination_province}")
             if order.source_province.unit == order.base_unit:
@@ -127,7 +136,7 @@ class MovesAdjudicator(Adjudicator):
             # Dislodge whatever is there
             order.destination_province.dislodged_unit = order.destination_province.unit
             # see DATC 4.A.5
-            if order.destination_province.dislodged_unit is not None:
+            if order.destination_province.dislodged_unit is not None and order.destination_province.dislodged_unit.player is not None:
                 order.destination_province.dislodged_unit.add_retreat_options()
                 if not order.is_convoy:
                     order.destination_province.dislodged_unit.remove_retreat_option(order.source_province)
@@ -177,6 +186,9 @@ class MovesAdjudicator(Adjudicator):
         bounces_and_occupied = set()
         for order in self.orders:
             if order.type != OrderType.MOVE:
+                continue
+
+            if not order.is_valid:
                 continue
 
             if order.is_convoy:
@@ -233,8 +245,8 @@ class MovesAdjudicator(Adjudicator):
         if order.type == OrderType.HOLD:
             # Resolution is arbitrary for holds; they don't do anything
             return Resolution.SUCCEEDS
-        elif order.type == OrderType.CORE or order.type == OrderType.SUPPORT:
-            # Both these orders fail if attacked by nation, even if that order isn't successful
+        elif order.type in (OrderType.CORE, OrderType.TRANSFORM, OrderType.SUPPORT):
+            # These orders fail if attacked by nation, even if that order isn't successful
             moves_here = self.moves_by_destination.get(order.current_province.name, set()) - {order}
             for move_here in moves_here:
                 # coring should fail even if the attack comes from the same nation
@@ -269,7 +281,8 @@ class MovesAdjudicator(Adjudicator):
         raise ValueError("Unknown order type for adjudication")
 
     def _count_strength(self, order: AdjudicableOrder, attacked_country: Player | None = None) -> int:
-        strength = 1
+        # Your own unit counts, unless it's a difficult adjacency
+        strength = 0 if order.destination_province.name in order.base_unit.province.difficult_adjacencies else 1
         for support in order.supports:
             if self._resolve_order(support) == Resolution.SUCCEEDS and attacked_country != support.country:
                 strength += 1
@@ -294,12 +307,14 @@ class MovesAdjudicator(Adjudicator):
                 head_on = not attacked_order.is_convoy and not order.is_convoy
 
         attack_strength = 1
+        # Determine if destination unit moved
         attacked_move = (
             attacked_order == None
             or (attacked_order.type == OrderType.MOVE
                 and self._resolve_order(attacked_order) == Resolution.SUCCEEDS)
         )
 
+        # If there is a unit in the destionation and it either didn't move or is a head-on attack, we need to compare supports
         if attacked_order and (head_on or not attacked_move):
             attacked_country = attacked_order.country
 

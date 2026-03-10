@@ -4,7 +4,7 @@ import collections
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from DiploGM.models.order import Order, Hold, Move, Support, ConvoyTransport, Core, RetreatMove, RetreatDisband, NMR
+from DiploGM.models.order import Order, Hold, Move, Support, ConvoyTransport, Core, Transform, RetreatMove, RetreatDisband, NMR
 from DiploGM.models.province import ProvinceType
 from DiploGM.models.unit import Unit, UnitType
 
@@ -32,7 +32,7 @@ def convoy_is_possible(start: Province, end: Province, check_fleet_orders: bool 
     :return: True if there are fleets connecting start -> end
     """
     visited: set[str] = set()
-    to_visit = collections.deque()
+    to_visit: collections.deque[Province] = collections.deque()
     to_visit.append(start)
     while 0 < len(to_visit):
         current = to_visit.popleft()
@@ -44,10 +44,11 @@ def convoy_is_possible(start: Province, end: Province, check_fleet_orders: bool 
         for adjacent_province in current.adjacent:
             if adjacent_province == end:
                 return True
-            adjacent_could_convoy = (adjacent_province.type == ProvinceType.SEA
+            adjacent_could_convoy = (adjacent_province.can_convoy
                 and adjacent_province.unit is not None
                 and adjacent_province.unit.unit_type == UnitType.FLEET)
             adjacent_did_convoy = (adjacent_could_convoy
+                and adjacent_province.unit is not None
                 and isinstance(adjacent_province.unit.order, ConvoyTransport)
                 and (adjacent_province.unit.order.source is start)
                 and (adjacent_province.unit.order.destination is end))
@@ -142,6 +143,8 @@ def _validate_support_order(province: Province, order: Support) -> tuple[OrderVa
     move_valid, _ = order_is_valid(province, Move(order.destination), strict_coast_movement=False)
     if move_valid != OrderValidity.VALID:
         return OrderValidity.INVALID, "Cannot support somewhere you can't move to"
+    if order.destination.name in province.difficult_adjacencies:
+        return OrderValidity.INVALID, f"Cannot support to {order.destination} from {province} due to difficult adjacency"
     is_support_hold = (order.source == order.destination)
     source_to_destination_valid = (
         is_support_hold
@@ -195,6 +198,20 @@ def order_is_valid(province: Province, order: Order, strict_coast_movement=True)
             return OrderValidity.INVALID, f"{province} does not have a supply center to core"
         if province.get_owner() != province.unit.player:
             return OrderValidity.INVALID, "Units can only core in owned supply centers"
+        return OrderValidity.VALID, None
+    elif isinstance(order, Transform):
+        if not province.has_supply_center:
+            return OrderValidity.INVALID, "Transformation must be done in a supply center"
+        if province.get_owner() != province.unit.player:
+            return OrderValidity.INVALID, "Units can only transform in owned supply centers"
+        if province.type == ProvinceType.SEA:
+            return OrderValidity.INVALID, "Fleets cannot transform in sea provinces"
+        if not province.fleet_adjacent:
+            return OrderValidity.INVALID, "Armies cannot transform in inland provinces"
+        if (province.unit.unit_type == UnitType.ARMY
+            and province.get_multiple_coasts()
+            and order.destination_coast not in province.get_multiple_coasts()):
+            return OrderValidity.INVALID, "Unit needs to transform to a valid coast"
         return OrderValidity.VALID, None
     elif isinstance(order, Move) or isinstance(order, RetreatMove):
         valid, reason = _validate_move_order(province, order, strict_coast_movement)
