@@ -188,6 +188,9 @@ class MovesAdjudicator(Adjudicator):
             if order.type != OrderType.MOVE:
                 continue
 
+            if not order.is_valid:
+                continue
+
             if order.is_convoy:
                 # unsuccessful convoys don't bounce
                 if order.resolution == Resolution.SUCCEEDS:

@@ -533,3 +533,49 @@ class TestDATC_H(unittest.TestCase):
 
         b.assertForcedDisband(f_western_mediterranean)
         b.retreats_adjudicate(self)
+
+    def test_6_h_diplogm_1(self):
+        """ 6.H.DIPLOGM.1. TEST CASE, INVALID MOVES DO NOT MAKE A PROVINCE CONTESTED
+            If a move is invalid, it does not make the province contested.
+            England: A London - Prussia
+            Germany: A Berlin - Silesia
+            Germany: A Munich Supports A Berlin - Silesia
+            Russia: A Silesia Hold
+            The Russian army in Silesia can retreat to Prussia
+        """
+        b = BoardBuilder()
+        b.move(b.england, UnitType.ARMY, "London", "Prussia")
+        a_berlin = b.move(b.germany, UnitType.ARMY, "Berlin", "Silesia")
+        b.supportMove(b.germany, UnitType.ARMY, "Munich", a_berlin, "Silesia")
+        a_silesia = b.hold(b.russia, UnitType.ARMY, "Silesia")
+
+        b.moves_adjudicate(self)
+        p_prussia = b.board.get_province("Prussia")
+        self.assertIn((p_prussia, None), a_silesia.retreat_options or [], "Prussia should be a retreat option for Silesia")
+        b.retreat(a_silesia, "Prussia")
+        b.assertNotForcedDisband(a_silesia)
+        b.retreats_adjudicate(self)
+
+    def test_6_h_diplogm_2(self):
+        """ 6.H.DIPLOGM.2. TEST CASE, FAILED CONVOYS DO NOT MAKE A PROVINCE CONTESTED
+            If a move is invalid, it does not make the province contested.
+            England: A London - Belgium
+            England: F English Channel Hold
+            Germany: A Munich - Burgundy
+            Germany: A Ruhr Supports A Munich - Burgundy
+            France: A Burgundy Hold
+            The French army in Burgundy can retreat to Belgium
+        """
+        b = BoardBuilder()
+        b.move(b.england, UnitType.ARMY, "London", "Belgium")
+        b.hold(b.england, UnitType.FLEET, "English Channel")
+        a_munich = b.move(b.germany, UnitType.ARMY, "Munich", "Burgundy")
+        b.supportMove(b.germany, UnitType.ARMY, "Ruhr", a_munich, "Burgundy")
+        a_burgundy = b.hold(b.france, UnitType.ARMY, "Burgundy")
+
+        b.moves_adjudicate(self)
+        p_belgium = b.board.get_province("Belgium")
+        self.assertIn((p_belgium, None), a_burgundy.retreat_options or [], "Belgium should be a retreat option for Burgundy")
+        b.retreat(a_burgundy, "Belgium")
+        b.assertNotForcedDisband(a_burgundy)
+        b.retreats_adjudicate(self)
