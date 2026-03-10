@@ -19,6 +19,7 @@ Contributors
 
 # Bugfixes
 - Fixed an issue when trying to change the coast of a build
+- Fixed invalid orders causing a province to not properly appear as a retreat option
 
 1.5.3
 =====
