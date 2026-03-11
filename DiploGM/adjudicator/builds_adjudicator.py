@@ -53,7 +53,7 @@ class BuildsAdjudicator(Adjudicator):
                         if player in vassal.vassal_orders and isinstance(vassal.vassal_orders[player], Liege):
                             if (not vassal.liege) or (vassal.liege in player.vassal_orders and isinstance(player.vassal_orders[vassal.liege], RebellionMarker)):
                                 new_vassals[player].append(vassal)
-                
+
         for player in self._board.players:
             new_liege = None
             overcommited = False
@@ -73,7 +73,7 @@ class BuildsAdjudicator(Adjudicator):
                     new_vassals[order.player].remove(player)
                     new_liege = None
             new_lieges[player] = new_liege
-            
+
         for player in self._board.players:
             player.liege = new_lieges[player]
             player.vassals = new_vassals[player]

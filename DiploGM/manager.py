@@ -101,7 +101,7 @@ class Manager(metaclass=SingletonMeta):
                 visited_provinces.add(province)
             except ValueError:
                 warnings.append(f"Province {province.name} is named like a high seas province but {province.name[:-1]}1 was not found")
-    
+
         for province in board.provinces:
             if province in visited_provinces:
                 continue
@@ -118,7 +118,7 @@ class Manager(metaclass=SingletonMeta):
                     loop = self._find_province_loop(adj, province, [province], visited_provinces)
                     if loop is not None and loop[1].name > loop[-1].name: # Otherwise we would see each loop in both directions
                         warnings.append(f"Found a loop of provinces {', '.join(p.name for p in loop)}. If they surround an impassible province or the board edge, this is expected")
-                
+
                 # Searching for groups of four provinces that all share a border
                 visited_third = set()
                 for third_province in common_adj - visited_provinces - visited_adjacent:
@@ -424,7 +424,7 @@ class Manager(metaclass=SingletonMeta):
     def reload_variant(self, variant: str) -> str:
         if not os.path.isdir(f"variants/{variant}"):
             return f"Variant {variant} does not exist."
-        
+
         # Remove adjacency cache to force a reload
         if os.path.isfile(f"assets/{variant}_adjacencies.txt"):
             os.remove(f"assets/{variant}_adjacencies.txt")

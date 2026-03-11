@@ -48,7 +48,7 @@ SQL_txt = "BEGIN TRANSACTION;"
 for table, column in db_usages:
     for find, replace in to_rename:
         SQL_txt += SQL_format.format(table_name=table, column_name=column, replace=replace, search=find)
-    
+
 SQL_txt += "\nCOMMIT;\n"
 
 with open("SQL/Rename.out.sql", 'w') as f:

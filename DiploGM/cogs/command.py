@@ -137,7 +137,7 @@ class CommandCog(commands.Cog):
                 response += (
                     f"({'+' if sc_diff >= 0 else ''}"
                     f"{sc_diff} SC{'s' if abs(sc_diff) != 1 else ''}) ")
-            
+
             response += f"[{round(board.get_score(player) * 100, 1)}%]"
         return response
 
@@ -291,7 +291,7 @@ class CommandCog(commands.Cog):
                 message="No information for you.",
             )
             return
-            
+
         province_name = ctx.message.content.removeprefix(
             f"{ctx.prefix}{ctx.invoked_with}"
         ).strip()
@@ -350,7 +350,8 @@ class CommandCog(commands.Cog):
         out = f"Type: {province.type.name}\n" + \
             f"{coast_info}" + \
             f"Owner: {province.owner.name if province.owner else 'None'}\n" + \
-            f"Unit: {(province.unit.player.get_name() + ' ' + province.unit.unit_type.name) if province.unit else 'None'}\n" + \
+            f"Unit: {((province.unit.player.get_name() if province.unit.player is not None else '')
+                      + ' ' + province.unit.unit_type.name if province.unit else 'None')}\n" + \
             f"Center: {province.has_supply_center}\n" + \
             f"Core: {province.core.name if province.core else 'None'}\n" + \
             f"Half-Core: {province.half_core.name if province.half_core else 'None'}\n" + \
@@ -450,7 +451,7 @@ class CommandCog(commands.Cog):
             perms.assert_gm_only(
                 ctx, "call .all_province_data while orders are locked"
             )
-            
+
         # NOTE: Temporary for Meme's Severance event
         if ctx.guild.id in [SEVERENCE_A_ID, SEVERENCE_B_ID]:
             await send_message_and_file(
@@ -459,7 +460,7 @@ class CommandCog(commands.Cog):
                 message="No information for you.",
             )
             return
-            
+
         province_by_owner = defaultdict(list)
         for province in board.provinces:
             owner = province.owner

@@ -20,7 +20,7 @@ class Order:
 class UnitOrder(Order):
     """Unit orders are orders that units execute themselves."""
     display_priority: int = 0
-    
+
     def __init__(self):
         super().__init__()
         self.has_failed = False
@@ -28,7 +28,7 @@ class UnitOrder(Order):
         self.destination_coast = None
         self.source = None
         self.is_support_holdable = True
-    
+
     # Used for DB storage
     def get_source_str(self) -> str | None:
         return None
@@ -65,7 +65,7 @@ class Hold(UnitOrder):
 
 class Core(UnitOrder):
     display_priority: int = 20
-    
+
     def __init__(self):
         super().__init__()
         self.is_support_holdable = False
@@ -75,7 +75,7 @@ class Core(UnitOrder):
 
 class Transform(UnitOrder):
     display_priority: int = 20
-    
+
     def __init__(self, destination_coast: str | None = None):
         super().__init__()
         self.destination_coast = destination_coast
@@ -89,7 +89,7 @@ class Transform(UnitOrder):
 
 class Move(UnitOrder):
     display_priority: int = 30
-    
+
     def __init__(self, destination: Province, destination_coast: str | None = None):
         super().__init__()
         self.destination: Province = destination
@@ -98,10 +98,10 @@ class Move(UnitOrder):
 
     def __str__(self):
         return f"- {self.get_destination_str()}"
-    
+
     def get_destination_and_coast(self) -> tuple[Province, str | None]:
         return (self.destination, self.destination_coast)
-    
+
     def get_destination_str(self) -> str:
         return f"{self.destination}" + (f" {self.destination_coast}" if self.destination_coast else "")
 
@@ -112,17 +112,17 @@ class ConvoyTransport(ComplexOrder):
 
     def __str__(self):
         return f"Convoys {self.source} - {self.destination}"
-    
+
     def get_source_str(self) -> str:
         return f"{self.source}"
-    
+
     def get_destination_str(self) -> str:
         return f"{self.destination}"
 
 
 class Support(ComplexOrder):
     display_priority: int = 10
-    
+
     def __init__(self, source: Province, destination: Province, destination_coast: str | None = None):
         super().__init__(source)
         self.destination: Province = destination
@@ -136,13 +136,13 @@ class Support(ComplexOrder):
             if self.destination_coast:
                 suffix += f" {self.destination_coast}"
         return f"Supports {self.source} {suffix}"
-        
+
     def get_destination_and_coast(self) -> tuple[Province, str | None]:
         return (self.destination, self.destination_coast)
-    
+
     def get_source_str(self) -> str:
         return f"{self.source}"
-    
+
     def get_destination_str(self) -> str:
         return f"{self.destination}" + (f" {self.destination_coast}" if self.destination_coast else "")
 
@@ -155,7 +155,7 @@ class RetreatMove(UnitOrder):
 
     def __str__(self):
         return f"- {self.destination}" + (f" {self.destination_coast}" if self.destination_coast else "")
-        
+
     def get_destination_and_coast(self) -> tuple[Province, str | None]:
         return (self.destination, self.destination_coast)
 
@@ -207,7 +207,7 @@ class Disband(PlayerOrder):
         return f"Disband {self.province}"
 
 class TransformBuild(PlayerOrder):
-    
+
     def __init__(self, province: Province, destination_coast: str | None = None):
         super().__init__(province)
         self.coast = destination_coast
@@ -232,10 +232,10 @@ class RelationshipOrder(Order):
         super().__init__()
         self.player = player
         self.coast = None
-    
+
     def __hash__(self):
         return hash(self.player)
-    
+
     def __eq__(self, other):
         return isinstance(other, type(self)) and self.player == other.player
 

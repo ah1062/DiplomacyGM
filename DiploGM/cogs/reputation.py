@@ -56,7 +56,7 @@ class ReputationCog(commands.Cog):
     )
     async def rep_view(self, ctx: commands.Context, user: discord.User, history_check: str = "none"):
         history = list(self.rep_repo.find_by(lambda d: d.user_id == user.id))
-    
+
         out = f"### Overall Value: {sum(d.delta for d in history)}\n"
         for delta in history:
             out += f"({delta.id}): {delta.created_at}\n"

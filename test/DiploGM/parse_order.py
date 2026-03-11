@@ -8,11 +8,11 @@ from test.utils import BoardBuilder
 class TestParseOrder(unittest.TestCase):
     def test_order(self):
         b = BoardBuilder()
-        f_black_sea = b.fleet("Black Sea", b.russia)
-        a_sevastopol = b.army("Sevastopol", b.russia)
-        a_armenia = b.army("Armenia", b.russia)
-        f_rumania = b.fleet("Rumania", b.russia)
-        a_moscow = b.army("Moscow", b.russia)
+        f_black_sea = b.fleet("Black Sea", b.players["Russia"])
+        a_sevastopol = b.army("Sevastopol", b.players["Russia"])
+        a_armenia = b.army("Armenia", b.players["Russia"])
+        f_rumania = b.fleet("Rumania", b.players["Russia"])
+        a_moscow = b.army("Moscow", b.players["Russia"])
         p_ankara = b.board.get_province("Ankara")
 
         order = ".order\n" + \
@@ -21,9 +21,9 @@ class TestParseOrder(unittest.TestCase):
             "armen s sEvAsToPoL to ankara\n" + \
             "f rumania s black sea holds\n" + \
             "a Moscow h"
-        
-        
-        parse_order(order, b.russia, b.board)
+
+
+        parse_order(order, b.players["Russia"], b.board)
 
         self.assertIsInstance(a_sevastopol.order, Move, "Sevastopol army order not parsed correctly")
         assert isinstance(a_sevastopol.order, Move)
@@ -43,13 +43,13 @@ class TestParseOrder(unittest.TestCase):
         assert isinstance(f_rumania.order, Support)
         self.assertEqual(f_rumania.order.source, f_black_sea.province, "Rumania fleet support source incorrect")
         self.assertEqual(f_rumania.order.destination, f_black_sea.province, "Rumania fleet support destination incorrect")
-        
+
         self.assertIsInstance(a_moscow.order, Hold, "Moscow army order not parsed correctly")
 
     def test_remove_order(self):
         b = BoardBuilder()
-        a_berlin = b.move(b.germany, UnitType.ARMY, "Berlin", "Kiel")
+        a_berlin = b.move(b.players["Germany"], UnitType.ARMY, "Berlin", "Kiel")
 
         order = "Berlin"
-        parse_remove_order(order, b.germany, b.board)
+        parse_remove_order(order, b.players["Germany"], b.board)
         self.assertIsNone(a_berlin.order, "Order removal failed for Berlin army")

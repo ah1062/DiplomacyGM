@@ -76,7 +76,7 @@ class Player:
 
     def __str__(self):
         return self.name
-    
+
     def get_name(self):
         if self.board is None:
             return self.name
@@ -87,7 +87,7 @@ class Player:
 
         units = sorted(self.units, key=lambda u: (u.unit_type.value, u.province.get_name(u.coast)))
         centers = sorted(self.centers, key=lambda c: c.name)
-        
+
         if board.data["players"] == "chaos":
             out = (
                 f"Color: #{self.render_color}\n"
@@ -112,7 +112,7 @@ class Player:
         unit_str = "Units:"
         for unit in units:
             unit_str += f"{bullet}({unit.unit_type.value}) {unit.province}"
-            
+
         out = (
             ""
             + f"Color: {(bullet + bullet.join([k + ': ' + v for k, v in self.color_dict.items()]) if self.color_dict is not None else self.render_color)}\n"

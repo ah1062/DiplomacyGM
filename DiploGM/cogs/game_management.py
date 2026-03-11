@@ -700,7 +700,7 @@ class GameManagementCog(commands.Cog):
                 title="Unknown Error: Please contact your local bot dev",
                 embed_colour=config.ERROR_COLOUR,
             )
-            return
+            return ""
         orders_log_channel = get_orders_log(ctx.guild)
         if not orders_log_channel or not isinstance(orders_log_channel, TextChannel):
             log_command(
@@ -714,7 +714,7 @@ class GameManagementCog(commands.Cog):
                 title="Could not find orders log channel",
                 embed_colour=config.ERROR_COLOUR,
             )
-            return
+            return ""
 
         assert isinstance(order_text, list)
         log = await send_message_and_file(
@@ -810,14 +810,14 @@ class GameManagementCog(commands.Cog):
             for unit in board.units:
                 if unit.order is None:
                     return True
-        
+
         if board.turn.is_retreats():
             for unit in board.units:
                 if (unit.province.dislodged_unit == unit
                     and unit.retreat_options and len(unit.retreat_options) > 0
                     and unit.order is None):
                     return True
-        
+
         if board.turn.is_builds():
             for player in board.players:
                 count = len(player.centers) - len(player.units)
@@ -958,7 +958,7 @@ class GameManagementCog(commands.Cog):
                 await map_message.publish()
             except:
                 pass
-        
+
         if full_adjudicate:
             await self.publish_orders(ctx)
             await self.unlock_orders(ctx)
@@ -967,7 +967,7 @@ class GameManagementCog(commands.Cog):
         if guild.id in [SEVERENCE_A_ID, SEVERENCE_B_ID]:
             seva = self.bot.get_guild(SEVERENCE_A_ID)
             sevb = self.bot.get_guild(SEVERENCE_B_ID)
-            
+
             seva_player = discord.utils.find(lambda r: r.name == "Player", seva.roles)
             aperms = seva_player.permissions
             sevb_player = discord.utils.find(lambda r: r.name == "Player", sevb.roles)

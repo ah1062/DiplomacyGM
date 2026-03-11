@@ -255,7 +255,7 @@ class AdminCog(commands.Cog):
         await send_message_and_file(
             channel=ctx.channel, title="Wave Allocation Info", message=out
         )
-    
+
     @commands.command(hidden=True)
     @perms.superuser_only("Uploads map to archive")
     async def archive_upload(self, ctx: commands.Context) -> None:
@@ -281,7 +281,7 @@ class AdminCog(commands.Cog):
             turn=season,
         )
         await upload_map_to_archive(ctx, server_id, board, file, season)
-    
+
     @commands.command(hidden=True)
     @perms.superuser_only("Checks the adjacencies of a variant to find potential issues")
     async def verify_adjacencies(self, ctx: commands.Context, arg) -> None:

@@ -6,7 +6,6 @@ from lark.exceptions import VisitError
 
 from DiploGM.config import ERROR_COLOUR, PARTIAL_ERROR_COLOUR
 from DiploGM.utils import get_unit_type, _manage_coast_signature
-from DiploGM.models import turn
 from DiploGM.models import order
 from DiploGM.models.board import Board
 from DiploGM.db.database import get_connection
@@ -22,7 +21,7 @@ class TreeToOrder(Transformer):
         self.build_options = board.data.get("build_options", "classic")
         self.transform_options = board.data.get("transformation", "disabled")
         self.player_restriction = player_restriction
-        
+
     def province(self, s) -> tuple[Province, str | None]:
         name = " ".join(s[::2]).replace("_", " ").strip()
         name = _manage_coast_signature(name)
@@ -68,7 +67,7 @@ class TreeToOrder(Transformer):
             raise Exception("Transforming during moves is disabled in this gamemode")
         coast = s[4] if len(s) > 4 else None
         return s[0], order.Transform(coast)
-    
+
     def build_unit(self, s) -> tuple[Province, Player, order.Build]:
         if isinstance(s[2], tuple):
             province, coast = s[2]
@@ -92,7 +91,7 @@ class TreeToOrder(Transformer):
                 raise ValueError(f"You cannot build in {province}.")
 
         return province, province.owner, order.Build(province, unit_type, coast)
-    
+
     def disband_unit(self, s) -> tuple[Province, Player, order.Disband]:
         if isinstance(s[0], Unit):
             u = s[0]
@@ -111,7 +110,7 @@ class TreeToOrder(Transformer):
         if self.player_restriction is None:
             raise ValueError("Please order waives in the appropriate player's orders channel.")
         return None, self.player_restriction, order.Waive(int(s[2]))
-        
+
     def vassal_order(self, s) -> tuple[Player, Player, order.Vassal]:
         if isinstance(s[0], Province):
             l = s[0]
@@ -197,7 +196,7 @@ class TreeToOrder(Transformer):
     # format for all of these is (unit, order)
     def l_hold_order(self, s) -> tuple[Unit, order.Hold]:
         return s[0], order.Hold()
-    
+
     def l_move_order(self, s) -> tuple[Unit, order.Move]:
         return s[0], order.Move(s[-1][0], s[-1][1])
 
@@ -230,7 +229,7 @@ class TreeToOrder(Transformer):
 
     def non_retreat_order(self, s):
         raise Exception("This type of order cannot be issued during retreat phases")
-        
+
     def order(self, order) -> Unit:
         command = order[0]
         unit, order = command
@@ -300,7 +299,7 @@ def parse_order(message: str, player_restriction: Player | None, board: Board) -
                        "Please report this to a gm",
             "embed_colour": ERROR_COLOUR,
         }
-    
+
     generator.set_state(board, player_restriction)
     for order in orderlist:
         if not order.strip():

@@ -144,7 +144,7 @@ class Board:
 
         if "abbreviations" in self.data and name in self.data["abbreviations"]:
             name = self.data["abbreviations"][name].lower()
-        
+
         if name in self.name_to_coast:
             return self.name_to_coast[name]
         elif name in self.name_to_province:
@@ -215,7 +215,7 @@ class Board:
     def create_unit(
         self,
         unit_type: UnitType,
-        player: Player,
+        player: Player | None,
         province: Province,
         coast: str | None,
         retreat_options: set[tuple[Province, str | None]] | None,
@@ -233,7 +233,8 @@ class Board:
             if province.unit:
                 raise RuntimeError(f"{province.name} already has a unit")
             province.unit = unit
-        player.units.add(unit)
+        if player is not None:
+            player.units.add(unit)
         self.units.add(unit)
         return unit
 
@@ -251,7 +252,8 @@ class Board:
         if not unit:
             return None
         province.unit = None
-        unit.player.units.remove(unit)
+        if unit.player is not None:
+            unit.player.units.remove(unit)
         self.units.remove(unit)
         return unit
 
@@ -260,7 +262,8 @@ class Board:
         if not unit:
             return None
         province.dislodged_unit = None
-        unit.player.units.remove(unit)
+        if unit.player is not None:
+            unit.player.units.remove(unit)
         self.units.remove(unit)
         return unit
 
@@ -281,7 +284,8 @@ class Board:
 
         for unit in dislodged_units:
             unit.province.dislodged_unit = None
-            unit.player.units.remove(unit)
+            if unit.player is not None:
+                unit.player.units.remove(unit)
             self.units.remove(unit)
 
     def clear_failed_orders(self) -> None:
@@ -306,7 +310,7 @@ class Board:
             return f"{str(1-self.turn.year)} BC"
         else:
             return str(self.turn.year)
-        
+
     def is_chaos(self) -> bool:
         return self.data["players"] == "chaos"
 

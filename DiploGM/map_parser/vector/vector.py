@@ -139,7 +139,7 @@ class Parser:
                 if province.get_retreat_unit_coordinates(UnitType.ARMY) == (0, 0):
                     logger.warning(f"{self.datafile}: Province {province.name} has no army retreat coord. Setting to 0,0 ...")
                     province.set_unit_coordinate(None, False, UnitType.ARMY)
-        
+
         initial_turn = Turn(self.year_offset, PhaseName.SPRING_MOVES, self.year_offset)
         if self.data.get("first_season") == "winter":
             initial_turn = initial_turn.get_previous_turn()
@@ -240,7 +240,7 @@ class Parser:
 
         if "loc_x_offset" in self.data[SVG_CONFIG_KEY]:
             x_offset = self.data[SVG_CONFIG_KEY]["loc_x_offset"]
-        
+
         if "loc_y_offset" in self.data[SVG_CONFIG_KEY]:
             x_offset = self.data[SVG_CONFIG_KEY]["loc_y_offset"]
 
@@ -368,7 +368,7 @@ class Parser:
                 # import matplotlib.pyplot as plt
 
                 # if not poly.is_valid:
-                #     print(f"MULTIPOLYGON IS NOT VALID (name: {self._get_province_name(province_data)})")
+                #     print(f"MULTIPOLYGON IS NOT VALID (name: {self.get_province_name(province_data)})")
                 #     for subpoly in poly.geoms:
                 #         plt.plot(*subpoly.exterior.xy)
                 #     plt.show()
@@ -377,7 +377,7 @@ class Parser:
 
             name = ""
             if self.layers["province_labels"]:
-                name = self._get_province_name(province_data)
+                name = self.get_province_name(province_data)
                 if name == "":
                     raise RuntimeError(f"Province name not found in province with data {province_data}")
 
@@ -400,7 +400,7 @@ class Parser:
 
     def _initialize_province_owners(self, provinces_layer: Element) -> None:
         for province_data in provinces_layer:
-            name = self._get_province_name(province_data)
+            name = self.get_province_name(province_data)
             self.name_to_province[name].owner = self.get_element_player(province_data, province_name=name)
 
     # Sets province names given the names layer
@@ -421,7 +421,7 @@ class Parser:
 
     def _initialize_supply_centers_assisted(self) -> None:
         for center_data in self.layer_data["supply_center_icons"]:
-            name = self._get_province_name(center_data)
+            name = self.get_province_name(center_data)
             province = self.name_to_province[name]
 
             if province.has_supply_center:
@@ -483,7 +483,7 @@ class Parser:
 
     def _initialize_units_assisted(self) -> None:
         for unit_data in self.layer_data["starting_units"]:
-            province_name = self._get_province_name(unit_data)
+            province_name = self.get_province_name(unit_data)
             if self.data[SVG_CONFIG_KEY]["unit_type_labeled"]:
                 province_name = province_name[1:]
             province, coast = self._get_province_and_coast(province_name)
@@ -524,7 +524,7 @@ class Parser:
             for unit_data in list(layer):
                 unit_translation = TransGL3(unit_data)
                 # This could either be a sea province or a land coast
-                province_name = self._get_province_name(unit_data)
+                province_name = self.get_province_name(unit_data)
                 # this is me writing bad code to get this out faster, will fix later when we clean up this file
                 province, coast = self._get_province_and_coast(province_name)
                 coordinate = get_unit_coordinates(unit_data)
@@ -532,12 +532,12 @@ class Parser:
                 province.set_unit_coordinate(translated_coordinate, is_primary, UnitType.FLEET, coast)
 
     @staticmethod
-    def _get_province_name(province_data: Element) -> str:
+    def get_province_name(province_data: Element) -> str:
         province_name = province_data.get(f"{NAMESPACE.get('inkscape')}label")
         return province_name or ""
 
     def _get_province(self, province_data: Element) -> Province:
-        return self.name_to_province[self._get_province_name(province_data)]
+        return self.name_to_province[self.get_province_name(province_data)]
 
     def _get_province_and_coast(self, province_name: str) -> tuple[Province, str | None]:
         coast_suffix: str | None = None
@@ -592,7 +592,7 @@ class Parser:
 
     def _get_unit_type(self, unit_data: Element) -> UnitType:
         if self.data[SVG_CONFIG_KEY]["unit_type_labeled"]:
-            name = self._get_province_name(unit_data).lower()
+            name = self.get_province_name(unit_data).lower()
             if name[0] == "f":
                 return UnitType.FLEET
             if name[0] == "a":

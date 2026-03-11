@@ -60,7 +60,7 @@ class RetreatsAdjudicator(Adjudicator):
                     for p in (player, other):
                         p.vassals = []
                         p.liege = None
-            
+
             elif player.liege:
                 if player.liege.get_class().value <= player.get_class().value:
                     liege = player.liege

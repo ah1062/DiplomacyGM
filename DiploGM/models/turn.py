@@ -27,7 +27,7 @@ class Turn:
         self.year: int = year
         self.phase: PhaseName = phase if phase in PhaseName else PhaseName.SPRING_MOVES
         self.start_year: int = start_year
-    
+
     def __str__(self):
         if self.year < 0:
             year_str =  f"{str(1-self.year)} BCE"
@@ -37,24 +37,24 @@ class Turn:
 
     def get_indexed_name(self) -> str:
         return f"{self.get_year_index()} {self.phase_names[self.phase]}"
-    
+
     def get_short_name(self) -> str:
         return f"{str(self.year % 100)}{self.short_names[self.phase]}"
-        
+
     def get_phase(self) -> str:
         return self.phase_names[self.phase]
-    
+
     def get_short_phase(self) -> str:
         return self.short_names[self.phase]
-    
+
     def get_year_index(self) -> int:
         return self.year - self.start_year
-    
+
     def get_next_turn(self) -> Turn:
         if self.phase == PhaseName.WINTER_BUILDS:
             return Turn(self.year + 1, PhaseName.SPRING_MOVES, self.start_year)
         return Turn(self.year, PhaseName(self.phase.value + 1), self.start_year)
-    
+
     def get_previous_turn(self):
         if self.phase == PhaseName.SPRING_MOVES:
             return Turn(self.year - 1, PhaseName.WINTER_BUILDS, self.start_year)
@@ -62,13 +62,13 @@ class Turn:
 
     def is_moves(self) -> bool:
         return "Moves" in self.phase_names[self.phase]
-        
+
     def is_retreats(self) -> bool:
         return "Retreats" in self.phase_names[self.phase]
-        
+
     def is_builds(self) -> bool:
         return "Builds" in self.phase_names[self.phase]
-        
+
     def is_fall(self) -> bool:
         return "Fall" in self.phase_names[self.phase]
 

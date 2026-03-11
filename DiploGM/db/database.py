@@ -333,7 +333,7 @@ class _DatabaseConnection:
                 )
             else:
                 raise ValueError(f"Could not parse {order_class}")
-            
+
             order.has_failed = has_failed
 
             province, coast = board.get_province_and_coast(location)
@@ -420,11 +420,11 @@ class _DatabaseConnection:
             province_name: (owner, core, half_core)
             for province_name, owner, core, half_core in province_data
         }
-        
+
         if clear_status:
             cursor.execute("UPDATE units SET failed_order=False WHERE board_id=? and phase=?",
                 (board_id, board.turn.get_indexed_name()))
-        
+
         unit_data = cursor.execute(
             "SELECT location, is_dislodged, owner, is_army, order_type, order_destination, order_source, failed_order FROM units WHERE board_id=? and phase=?",
             (board_id, board.turn.get_indexed_name()),

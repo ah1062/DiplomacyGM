@@ -174,7 +174,7 @@ class PlayerCog(commands.Cog):
         movement_only = "movement" in arguments
         board = manager.get_board(ctx.guild.id)
         turn = parse_season(arguments, board.turn)
-        
+
         if player and not board.orders_enabled:
             log_command(logger, ctx, "Orders locked - not processing")
             await send_message_and_file(
@@ -259,7 +259,7 @@ class PlayerCog(commands.Cog):
         color_mode = color_arguments[0] if color_arguments else None
         board = manager.get_board(ctx.guild.id)
         turn = parse_season(arguments, board.turn)
-        
+
         try:
             if not board.fow:
                 file, file_name = manager.draw_map(

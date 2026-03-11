@@ -6,7 +6,7 @@ order: (move_order
       | convoy_order
       | core_order
       | transform_order) WS
-   
+
 retreat: (retreat_order
        | disband_order
 	| non_retreat_order) WS

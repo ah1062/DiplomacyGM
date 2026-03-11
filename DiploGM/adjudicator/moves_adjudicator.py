@@ -27,7 +27,7 @@ class MovesAdjudicator(Adjudicator):
     # Algorithm from https://diplom.org/Zine/S2009M/Kruijswijk/DipMath_Chp6.htm
     def __init__(self, board: Board):
         super().__init__(board)
- 
+
         self.orders: set[AdjudicableOrder] = set()
 
         # run supports after everything else since illegal cores / moves should be treated as holds
@@ -57,7 +57,7 @@ class MovesAdjudicator(Adjudicator):
         # Replace invalid orders with holds
         # Importantly, this includes supports for which the corresponding unit didn't make the same move
         # Same for convoys
-        
+
         if unit.order is None:
             unit.order = NMR()
 
@@ -362,7 +362,7 @@ class MovesAdjudicator(Adjudicator):
             if order not in self._dependencies:
                 self._dependencies.append(order)
             return order.resolution
-            
+
         if not order.is_valid:
             order.resolution = Resolution.FAILS
             order.state = ResolutionState.RESOLVED

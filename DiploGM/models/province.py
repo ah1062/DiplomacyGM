@@ -71,12 +71,12 @@ class Province():
 
     def __repr__(self):
         return f"Province {self.name}"
-    
+
     def get_name(self, coast: str | None = None):
         if coast in self.fleet_adjacent:
             return f"{self.name} {coast}"
         return self.name
-    
+
     def get_primary_unit_coordinates(self, unit_type: UnitType, coast = None) -> tuple[float, float]:
         if coast in self.primary_unit_coordinates:
             return self.primary_unit_coordinates[coast]
@@ -90,7 +90,7 @@ class Province():
         elif unit_type in self.retreat_unit_coordinates:
             return self.retreat_unit_coordinates[unit_type]
         return (0, 0)
-    
+
     def set_unit_coordinate(self, coord, is_primary, unit_type, coast = None):
         # Set default cooordinate if none are found
         if coord is None:
@@ -110,7 +110,7 @@ class Province():
 
     def get_unit(self) -> unit.Unit | None:
         return self.unit
-    
+
     def can_build(self, build_options) -> bool:
         if not self.has_supply_center or self.owner is None or self.unit is not None:
             return False
@@ -128,7 +128,7 @@ class Province():
         if self.fleet_adjacent and isinstance(self.fleet_adjacent, dict):
             return set(self.fleet_adjacent.keys())
         return set()
-    
+
     # Gets all provinces adjacent via fleet, optionally from a given coast
     # If there are multiple coasts, coast must be specified
     def get_coastal_adjacent(self, coast: str | None = None) -> set[tuple[Province, str | None]]:
@@ -141,7 +141,7 @@ class Province():
         if isinstance(self.fleet_adjacent, dict):
             raise ValueError(f"Province {self.name} has multiple coasts.")
         return self.fleet_adjacent
-    
+
     # Checks if other province (and optionally coast) is adjacent via fleet
     def is_coastally_adjacent(self, other: Province | tuple[Province, str | None], coast: str | None = None) -> bool:
         if isinstance(other, tuple) and other[1] == None:
@@ -149,7 +149,7 @@ class Province():
         else:
             dest = other
         adjacencies = self.get_coastal_adjacent(coast)
-        
+
         for province in adjacencies:
             if province == dest or (isinstance(province, tuple) and province[0] == dest):
                 return True
@@ -170,7 +170,7 @@ class Province():
         # Externally set, i. e. by json_cheats()
         if self.fleet_adjacent:
             return
-        
+
         if isinstance(self.fleet_adjacent, dict):
             raise ValueError(f"Province {self.name} has multiple coasts and should have manually-assigned fleet adjacencies.")
 
@@ -178,7 +178,7 @@ class Province():
             for province in self.adjacent:
                 self.fleet_adjacent.add((province, None))
             return
-        
+
         self.fleet_adjacent = set()
         for province in self.adjacent:
             if province.type == ProvinceType.SEA or province.type == ProvinceType.ISLAND:
@@ -231,7 +231,7 @@ class Province():
             # connect all adjacent to the three provinces as possible
             # if they all connect, they form a ring around forcing connection
             # if not, they must form rings inside and outside, meaning there is no connection
-            
+
             # initialise the process queue and the connection sets
             procqueue: list[Province] = []
             connected_sets: set[frozenset[Province]] = set()
@@ -242,7 +242,7 @@ class Province():
                 if adjacent not in (p1, p2, possible_tripoint):
                     procqueue.append(adjacent)
                     connected_sets.add(frozenset({adjacent}))
-            
+
             def find_set_with_element(element):
                 for subgraph in connected_sets:
                     if element in subgraph:
@@ -255,7 +255,7 @@ class Province():
                     # going further into or out of rings won't help us
                     if neighbor not in procqueue:
                         continue
-                    
+
                     # Now that we have found two connected subgraphs,
                     # we remove them and merge them
                     this = find_set_with_element(to_process)

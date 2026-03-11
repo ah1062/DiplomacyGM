@@ -45,7 +45,7 @@ class EventBus(metaclass=SingletonMeta):
 
         if ln not in self.listeners:
             self.listeners[ln] = []
-            
+
         self.subscribers[event_type].append(ln)
         self.listeners[ln].append(event_type)
 

@@ -36,7 +36,7 @@ class Unit:
 
     def __str__(self):
         return f"{self.unit_type.value} {self.province.get_name(self.coast)}"
-    
+
     # Adds all valid retreat options based on unit type and current province
     def add_retreat_options(self):
         if self.retreat_options is None:
@@ -51,7 +51,7 @@ class Unit:
                     self.retreat_options.add(province)
                 else:
                     self.retreat_options.add((province, None))
-    
+
     # Removes a specific retreat option
     def remove_retreat_option(self, province: province.Province):
         if self.retreat_options is None:

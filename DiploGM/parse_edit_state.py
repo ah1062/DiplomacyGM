@@ -285,7 +285,7 @@ def _move_unit(keywords: list[str], board: Board) -> None:
             board.turn.get_indexed_name(),
             new_province.get_name(new_coast),
             False,
-            unit.player.name,
+            unit.player.name if unit.player is not None else None,
             unit.unit_type == UnitType.ARMY,
         ),
     )
@@ -326,7 +326,7 @@ def _make_units_claim_provinces(keywords: list[str], board: Board) -> None:
             get_connection().execute_arbitrary_sql(
                 "UPDATE provinces SET owner=? WHERE board_id=? and phase=? and province_name=?",
                 (
-                    unit.player.name,
+                    unit.player.name if unit.player is not None else None,
                     board.board_id,
                     board.turn.get_indexed_name(),
                     unit.province.name,

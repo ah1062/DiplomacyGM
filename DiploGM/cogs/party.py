@@ -45,7 +45,7 @@ def fish_pop_model(Fish, t, growth_rate, carrying_capacity):
 
 class PartyCog(commands.Cog):
     """A Cog for fun, non-consequential commands
-    
+
     Args:
         bot (DiploGM): A reference to the running discord bot instance
 
