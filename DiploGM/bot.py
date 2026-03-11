@@ -297,6 +297,19 @@ class DiploGM(commands.Bot):
             original = error
 
         channel_name = ctx.channel.name if isinstance(ctx.channel, (discord.TextChannel, discord.Thread)) else ctx.channel.id
+
+        if isinstance(original, CommandPermissionError):
+            logger.info(
+                f"[{ctx.guild.name}][#{channel_name}]({ctx.message.author.name}) - '{ctx.message.content}' - "
+                f"permission denied in {time_spent}s: {original}",
+            )
+            await send_message_and_file(
+                channel=ctx.channel,
+                message=str(original),
+                embed_colour=ERROR_COLOUR,
+            )
+            return
+
         logger.log(
             logging.ERROR,
             f"[{ctx.guild.name}][#{channel_name}]({ctx.message.author.name}) - '{ctx.message.content}' - "
@@ -313,14 +326,6 @@ class DiploGM(commands.Bot):
                 "https://discord.com/channels/1201167737163104376/1286027175048253573"
                 " or "
                 "https://discord.com/channels/1201167737163104376/1280587781638459528",
-                embed_colour=ERROR_COLOUR,
-            )
-            return
-
-        if isinstance(original, CommandPermissionError):
-            await send_message_and_file(
-                channel=ctx.channel,
-                message=str(original),
                 embed_colour=ERROR_COLOUR,
             )
             return
