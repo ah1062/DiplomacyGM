@@ -135,11 +135,12 @@ class MovesAdjudicator(Adjudicator):
                 order.base_unit.retreat_options = None
             # Dislodge whatever is there
             order.destination_province.dislodged_unit = order.destination_province.unit
+            dislodged_unit = order.destination_province.dislodged_unit
             # see DATC 4.A.5
-            if order.destination_province.dislodged_unit is not None and order.destination_province.dislodged_unit.player is not None:
-                order.destination_province.dislodged_unit.add_retreat_options()
+            if dislodged_unit is not None and dislodged_unit.player is not None:
+                dislodged_unit.add_retreat_options()
                 if not order.is_convoy:
-                    order.destination_province.dislodged_unit.remove_retreat_option(order.source_province)
+                    dislodged_unit.remove_retreat_option(order.source_province)
             # Move us there
             order.base_unit.province = order.destination_province
             order.base_unit.coast = order.destination_coast
@@ -309,12 +310,13 @@ class MovesAdjudicator(Adjudicator):
         attack_strength = 1
         # Determine if destination unit moved
         attacked_move = (
-            attacked_order == None
+            attacked_order is None
             or (attacked_order.type == OrderType.MOVE
                 and self._resolve_order(attacked_order) == Resolution.SUCCEEDS)
         )
 
-        # If there is a unit in the destionation and it either didn't move or is a head-on attack, we need to compare supports
+        # If there is a unit in the destionation and it either didn't move or is a head-on attack,
+        # we need to compare supports
         if attacked_order and (head_on or not attacked_move):
             attacked_country = attacked_order.country
 

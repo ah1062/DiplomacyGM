@@ -1,10 +1,14 @@
+"""This module contains validation logic for orders during movement phases."""
 from __future__ import annotations
 
 import collections
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from DiploGM.models.order import Order, Hold, Move, Support, ConvoyTransport, Core, Transform, RetreatMove, RetreatDisband, NMR
+from DiploGM.models.order import (
+    Order, Hold, Move, Support, ConvoyTransport,
+    Core, Transform, RetreatMove, RetreatDisband, NMR
+)
 from DiploGM.models.province import ProvinceType
 from DiploGM.models.unit import Unit, UnitType
 
@@ -12,12 +16,16 @@ if TYPE_CHECKING:
     from DiploGM.models.province import Province
 
 class OrderValidity(Enum):
+    """How valid an order is.
+    Could be valid, valid but requires a convoy, invalid due to mismatched orders
+    (e.g. support order doesn't match move order), or invalid."""
     VALID = 0
     VALID_WITH_CONVOY = 1
     MISMATCHED_ORDER = 2
     INVALID = 3
 
 def is_valid_result(result: OrderValidity | tuple[OrderValidity, str | None]) -> bool:
+    """Helper function to check if result of order_is_valid is valid or would be with a convoy."""
     if isinstance(result, tuple):
         result = result[0]
     return result == OrderValidity.VALID or result == OrderValidity.VALID_WITH_CONVOY
@@ -65,19 +73,22 @@ def _validate_move_army(province: Province, destination_province: Province) -> t
     return OrderValidity.VALID, None
 
 
-def _validate_move_fleet(province: Province, order: Move | RetreatMove, unit: Unit, strict_coast_movement: bool) -> tuple[OrderValidity, str | None]:
+def _validate_move_fleet(province: Province, order: Move | RetreatMove,
+                         unit: Unit, strict_coast_movement: bool) -> tuple[OrderValidity, str | None]:
     destination_coast = order.destination_coast if strict_coast_movement else None
     if not province.is_coastally_adjacent(order.get_destination_and_coast(), unit.coast):
         return OrderValidity.INVALID, f"{province.get_name(unit.coast)} does not border {order.get_destination_str()}"
     if strict_coast_movement and not destination_coast:
-        reachable_coasts = {c for c in order.destination.get_multiple_coasts() if province.is_coastally_adjacent((order.destination, c), unit.coast)}
+        reachable_coasts = {c for c in order.destination.get_multiple_coasts()
+                            if province.is_coastally_adjacent((order.destination, c), unit.coast)}
         if len(reachable_coasts) > 1:
             return OrderValidity.INVALID, f"{province} and {order.destination} have multiple coastal paths"
         if reachable_coasts:
             order.destination_coast = reachable_coasts.pop()
     return OrderValidity.VALID, None
 
-def _validate_move_order(province: Province, order: Move | RetreatMove, strict_coast_movement: bool) -> tuple[OrderValidity, str | None]:
+def _validate_move_order(province: Province, order: Move | RetreatMove,
+                         strict_coast_movement: bool) -> tuple[OrderValidity, str | None]:
     unit = province.unit
     assert unit is not None
     destination_province = order.destination
@@ -109,7 +120,8 @@ def _validate_convoymove_order(province: Province, order: Move) -> tuple[OrderVa
     if convoy_is_possible(province, destination_province, check_fleet_orders=True):
         return OrderValidity.VALID_WITH_CONVOY, None
     if convoy_is_possible(destination_province, province, check_fleet_orders=False):
-        return OrderValidity.MISMATCHED_ORDER, f"A convoy path exists from {destination_province} to {province}, but fleets did not convoy"
+        return OrderValidity.MISMATCHED_ORDER, \
+            f"A convoy path exists from {destination_province} to {province}, but fleets did not convoy"
     if not convoy_is_possible(province, destination_province):
         return OrderValidity.INVALID, f"No valid convoy path from {province} to {order.destination}"
     return OrderValidity.VALID, None
@@ -144,8 +156,9 @@ def _validate_support_order(province: Province, order: Support) -> tuple[OrderVa
     if move_valid != OrderValidity.VALID:
         return OrderValidity.INVALID, "Cannot support somewhere you can't move to"
     if order.destination.name in province.difficult_adjacencies:
-        return OrderValidity.INVALID, f"Cannot support to {order.destination} from {province} due to difficult adjacency"
-    is_support_hold = (order.source == order.destination)
+        return OrderValidity.INVALID, \
+            f"Cannot support to {order.destination} from {province} due to difficult adjacency"
+    is_support_hold = order.source == order.destination
     source_to_destination_valid = (
         is_support_hold
         or is_valid_result(order_is_valid(order.source, Move(order.destination), strict_coast_movement=False))

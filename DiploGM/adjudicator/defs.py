@@ -1,3 +1,5 @@
+"""Enums and AdjudicatableOrder helper class for adjudication."""
+
 from enum import Enum
 
 from DiploGM.models.order import NMR, Hold, Core, Move, Support, ConvoyTransport, Transform, UnitOrder
@@ -6,17 +8,20 @@ from DiploGM.models.unit import Unit, UnitType
 
 
 class Resolution(Enum):
+    """Whether an order succeeds or fails."""
     SUCCEEDS = 0
     FAILS = 1
 
 
 class ResolutionState(Enum):
+    """Resolution status for an order (unresolved, guessing, resolved)."""
     UNRESOLVED = 0
     GUESSING = 1
     RESOLVED = 2
 
 
 class OrderType(Enum):
+    """The type of order."""
     HOLD = 0
     CORE = 1
     MOVE = 2
@@ -26,6 +31,8 @@ class OrderType(Enum):
 
 
 class AdjudicableOrder:
+    """Helper class for adjudicating orders.
+    Contains order information and information about the unit's adjudication state."""
     def __init__(self, unit: Unit):
         self.state = ResolutionState.UNRESOLVED
         self.resolution = Resolution.FAILS
@@ -49,7 +56,7 @@ class AdjudicableOrder:
         # indicates that a move is also a convoy that failed, so no support holds
         self.not_supportable = False
         self.is_valid = True
-        if isinstance(unit.order, Hold) or isinstance(unit.order, NMR):
+        if isinstance(unit.order, (Hold, NMR)):
             self.type = OrderType.HOLD
         elif isinstance(unit.order, Core):
             self.type = OrderType.CORE
@@ -74,9 +81,12 @@ class AdjudicableOrder:
 
     def __str__(self):
         # This could be improved
-        return f"{self.current_province} {self.type} {self.source_province if self.source_province else ''} {self.destination_province} [{self.state}:{self.resolution}]"
+        return f"{self.current_province} {self.type} " + \
+               f"{self.source_province if self.source_province else ''} " + \
+               f"{self.destination_province} [{self.state}:{self.resolution}]"
 
     def get_original_order(self) -> UnitOrder:
+        """Get the original order."""
         if self.base_unit.order is None:
             raise ValueError("AdjudicableOrder can't find source order somehow")
         return self.base_unit.order

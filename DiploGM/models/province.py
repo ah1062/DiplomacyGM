@@ -265,7 +265,8 @@ class Province():
 
             l = 0
 
-            # find connected sets which are adjacent to tripoint and two provinces (so portugal is eliminated from contention if MAO, Gascony, and Spain nc are the locations being tested)
+            # find connected sets which are adjacent to tripoint and two provinces(so portugal is eliminated
+            # from contention if MAO, Gascony, and Spain nc are the locations being tested)
             # FIXME: this leads to false positives
             for candidate in connected_sets:
                 needed_neighbors = set([p1, p2, possible_tripoint])

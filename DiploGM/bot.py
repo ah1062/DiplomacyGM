@@ -1,4 +1,3 @@
-import aiohttp.client_exceptions
 import datetime
 import inspect
 import importlib
@@ -7,11 +6,12 @@ import os
 import random
 import traceback
 from typing import Optional
+import aiohttp.client_exceptions
 
-from DiploGM.events.base_listener import BaseListener
 import discord
 from discord.ext import commands
 
+from DiploGM.events.base_listener import BaseListener
 from DiploGM.config import (
     BOT_DEV_UNHANDLED_ERRORS_CHANNEL_ID,
     EMBED_STANDARD_COLOUR,
