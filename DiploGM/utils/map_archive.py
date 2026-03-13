@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 import asyncio
 import os
 import logging
 
 from subprocess import PIPE
+from typing import TYPE_CHECKING
 from discord.ext import commands
 from DiploGM.adjudicator.utils import svg_to_png
 from DiploGM.config import MAP_ARCHIVE_SAS_TOKEN, MAP_ARCHIVE_UPLOAD_URL
 from DiploGM.models.turn import Turn
-from DiploGM.models.board import Board
+
+if TYPE_CHECKING:
+    from DiploGM.models.board import Board
 
 from DiploGM.utils import log_command, send_message_and_file
 

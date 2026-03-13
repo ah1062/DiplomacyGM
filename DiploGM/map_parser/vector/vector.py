@@ -10,7 +10,10 @@ import shapely
 from lxml import etree
 
 from DiploGM.map_parser.vector.transform import TransGL3
-from DiploGM.map_parser.vector.utils import get_element_color, get_unit_coordinates, get_svg_element, parse_path, initialize_province_resident_data
+from DiploGM.map_parser.vector.utils import (
+    get_element_color, get_unit_coordinates, get_svg_element,
+    parse_path, initialize_province_resident_data
+)
 from DiploGM.models.turn import PhaseName, Turn
 from DiploGM.models.board import Board
 from DiploGM.models.player import Player
@@ -33,8 +36,6 @@ logger = logging.getLogger(__name__)
 class Parser:
     def __init__(self, data: str):
         self.datafile = data
-
-
 
         with open(f"variants/{data}/config.json", "r") as f:
             self.data = json.load(f)
@@ -64,7 +65,7 @@ class Parser:
         if "impassibles_layer" in self.layers:
             impassibles_layer = get_svg_element(svg_root, self.layers["impassibles_layer"])
             if impassibles_layer is None:
-                raise ValueError(f"Layer impassibles_layer not found in SVG")
+                raise ValueError("Layer impassibles_layer not found in SVG")
             self.layer_data["impassibles_layer"] = impassibles_layer
 
         self.fow = self.layers.get("fow", False)
@@ -76,11 +77,16 @@ class Parser:
         self.cache_provinces: set[Province] | None = None
         self.cache_adjacencies: set[tuple[str, str]] | None = None
 
+        self.players: set[Player] = set()
+        self.autodetect_players = False
+
     def parse(self) -> Board:
         logger.debug("map_parser.vector.parse.start")
         start = time.time()
 
-        self.players: set[Player] = set()
+        self.players = set()
+        self.color_to_player = {}
+        self.name_to_province = {}
 
         self.autodetect_players = self.data["players"] == "chaos"
 
@@ -148,13 +154,14 @@ class Parser:
             self.data["victory_count"] = int((len([1 for p in provinces if p.has_supply_center]) + 1) / 2)
 
         game_data = copy.deepcopy(self.data)
-        if (is_chaos := (self.data["players"] == "chaos")):
+        if (is_chaos := self.data["players"] == "chaos"):
             game_data["players"] = {}
         for player in self.players:
             if is_chaos:
                 game_data["players"][player.name] = {}
             if "iscc" not in game_data["players"][player.name]:
-                game_data["players"][player.name]["iscc"] = len([1 for p in provinces if p.has_supply_center and p.owner == player])
+                game_data["players"][player.name]["iscc"] = \
+                    len([1 for p in provinces if p.has_supply_center and p.owner == player])
             if "vscc" not in game_data["players"][player.name]:
                 game_data["players"][player.name]["vscc"] = game_data["victory_count"]
 
@@ -461,7 +468,10 @@ class Parser:
                 raise RuntimeError(f"{province.name} already has a supply center")
             province.has_supply_center = True
 
-        initialize_province_resident_data(provinces, self.layer_data["supply_center_icons"], get_coordinates, set_province_supply_center)
+        initialize_province_resident_data(provinces,
+                                          self.layer_data["supply_center_icons"],
+                                          get_coordinates,
+                                          set_province_supply_center)
 
     def _set_province_unit(self, province: Province, unit_data: Element, coast: str | None = None) -> None:
         if province.unit:
@@ -476,7 +486,7 @@ class Parser:
         # color_data = unit_data.findall(".//svg:path", namespaces=NAMESPACE)[0]
         # player = self.get_element_player(color_data)
 
-        unit = Unit(unit_type, player, province, coast, None)
+        unit = Unit(unit_type, player, province, coast)
         province.unit = unit
         if unit.player is not None:
             unit.player.units.add(unit)
@@ -499,7 +509,10 @@ class Parser:
             trans = TransGL3(unit_data)
             return trans.transform(base_coordinates)
 
-        initialize_province_resident_data(provinces, self.layer_data["starting_units"], get_coordinates, self._set_province_unit)
+        initialize_province_resident_data(provinces,
+                                          self.layer_data["starting_units"],
+                                          get_coordinates,
+                                          self._set_province_unit)
 
     def _set_phantom_unit_coordinates(self) -> None:
         army_layer_to_key = [
@@ -512,7 +525,9 @@ class Parser:
                 unit_translation = TransGL3(unit_data)
                 province = self._get_province(unit_data)
                 coordinate = get_unit_coordinates(unit_data)
-                province.set_unit_coordinate(layer_translation.transform(unit_translation.transform(coordinate)), is_primary, UnitType.ARMY)
+                province.set_unit_coordinate(
+                    layer_translation.transform(unit_translation.transform(coordinate)),
+                    is_primary, UnitType.ARMY)
 
         fleet_layer_to_key = [
             (self.layer_data["fleet"], True),
@@ -557,9 +572,9 @@ class Parser:
     def _get_adjacencies(self, provinces: set[Province]) -> set[tuple[str, str]]:
         adjacencies = set()
         try:
-            f = open(f"assets/{self.datafile}_adjacencies.txt", "r")
+            f = open(f"assets/{self.datafile}_adjacencies.txt", "r", encoding="utf-8")
         except FileNotFoundError:
-            f = open(f"assets/{self.datafile}_adjacencies.txt", "w")
+            f = open(f"assets/{self.datafile}_adjacencies.txt", "w", encoding="utf-8")
             # Combinations so that we only have (A, B) and not (B, A) or (A, A)
             for province1, province2 in itertools.combinations(provinces, 2):
                 if shapely.distance(province1.geometry, province2.geometry) < self.layers["border_margin_hint"]:
@@ -586,7 +601,7 @@ class Parser:
             self.color_to_player[color] = player
             return player
         elif color in self.color_to_player:
-           return self.color_to_player[color]
+            return self.color_to_player[color]
         else:
             raise Exception(f"Unknown player color: {color} (in object {tostring(element)})")
 

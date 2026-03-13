@@ -59,7 +59,8 @@ class _DatabaseConnection:
             cursor.executescript(sql_file.read())
             cursor.close()
 
-    def get_boards(self, board_ids:Optional[list[int]]=None) -> dict[int, Board]:
+    def get_boards(self, board_ids:Optional[list[int]] = None) -> dict[int, Board]:
+        """Gets all boards from the database, or a subset if board_ids is provided."""
         cursor = self._connection.cursor()
 
         if board_ids is not None:
@@ -96,6 +97,7 @@ class _DatabaseConnection:
         return boards
 
     def get_old_board(self, board: Board, turn: Turn) -> Board | None:
+        """Finds an older board from that same game"""
         return self.get_board(board.board_id, turn, board.fish, board.name, board.datafile)
 
     def get_board(
@@ -107,6 +109,9 @@ class _DatabaseConnection:
         data_file: str,
         clear_status: bool = False,
     ) -> Board | None:
+        """Gets a board from the database.
+        clear_status is used to wipe out failed order information, which we need to do for rollbacks."""
+        # TODO: Stuff like fish and name should be board parameters
         cursor = self._connection.cursor()
 
         board_data = cursor.execute(
@@ -118,34 +123,6 @@ class _DatabaseConnection:
             return None
 
         board = self._get_board(board_id, turn, fish, name, data_file, cursor, clear_status=clear_status)
-        cursor.close()
-        return board
-
-
-    def get_latest_board(self, server_id: int) -> Optional[Board]:
-        """ Such a bad function I hate it, but it should do its purpose """
-        raise DeprecationWarning
-
-        cursor = self._connection.cursor()
-        board_data = cursor.execute("SELECT * FROM boards WHERE board_id=?", (server_id,)).fetchall()
-        if len(board_data) == 0 or board_data is None:
-            return None
-
-        season_priority = {"Spring": 1, "Fall": 2, "Winter": 3}
-        phase_priority = {"Moves": 1, "Retreats": 2, "Builds": 3}
-
-        def parse_phase(string):
-            y, season, phase = string.split()
-            return int(y), season_priority[season], phase_priority[phase]
-
-        board_data.sort(key= lambda r: parse_phase(r[1]), reverse=True)
-        _, phase_str, data_file, fish, name = board_data[0]
-        phase_features = parse_phase(phase_str)
-        phaseobj = phase.get(f"{phase_features[1]} {phase_features[2]}")
-
-        init = get_parser(data_file).parse()
-
-        board = self._get_board(server_id, phaseobj, init.year+phase_features[0], fish, name, data_file, cursor)
         cursor.close()
         return board
 
@@ -280,10 +257,10 @@ class _DatabaseConnection:
             owner_player,
             province,
             coast,
-            retreat_options,
         )
         if is_dislodged:
             province.dislodged_unit = unit
+            unit.retreat_options = retreat_options
         else:
             province.unit = unit
         if owner_player is not None:
@@ -321,7 +298,7 @@ class _DatabaseConnection:
                 source_province = board.get_province(order_source)
             if order_class == NMR:
                 return
-            elif order_class in [Hold, Core, RetreatDisband]:
+            if order_class in [Hold, Core, RetreatDisband]:
                 order = order_class()
             elif order_class in [Transform]:
                 order = order_class(destination_coast=destination_coast)
@@ -335,14 +312,7 @@ class _DatabaseConnection:
                 raise ValueError(f"Could not parse {order_class}")
 
             order.has_failed = has_failed
-
-            province, coast = board.get_province_and_coast(location)
-            if is_dislodged:
-                assert province.dislodged_unit is not None
-                province.dislodged_unit.order = order
-            else:
-                assert province.unit is not None
-                province.unit.order = order
+            unit.order = order
         except:
             logger.warning("BAD UNIT INFO: replacing with hold")
 

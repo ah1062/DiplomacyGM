@@ -1,3 +1,4 @@
+"""The board for a given turn, containing all the game state information."""
 from __future__ import annotations
 import re
 import logging
@@ -5,12 +6,11 @@ import time
 from typing import Dict, Optional, TYPE_CHECKING
 
 from discord import Thread, TextChannel
-from discord.ext import commands
 
 from DiploGM.config import player_channel_suffix, is_player_category
 from DiploGM.models.unit import Unit, UnitType
 from DiploGM.utils.sanitise import sanitise_name
-from DiploGM.utils import simple_player_name
+from DiploGM.utils.sanitise import simple_player_name
 
 if TYPE_CHECKING:
     from discord.abc import Messageable
@@ -22,8 +22,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 class Board:
+    """The board for a given turn, containing all the game state information."""
     def __init__(
-        self, players: set[Player], provinces: set[Province], units: set[Unit], turn: Turn, data, datafile: str, fow: bool, year_offset: int = 1642
+        self,
+        players: set[Player],
+        provinces: set[Province],
+        units: set[Unit],
+        turn: Turn,
+        data: dict,
+        datafile: str,
+        fow: bool = False,
+        year_offset: int = 1642
     ):
         self.players: set[Player] = players
         self.provinces: set[Province] = provinces
@@ -59,6 +68,7 @@ class Board:
             player.board = self
 
     def add_new_player(self, name: str, color: str):
+        """Adds a new player to the board with a given color."""
         from DiploGM.models.player import Player
         new_player = Player(name, color, set(), set())
         new_player.board = self
@@ -74,6 +84,7 @@ class Board:
             self.data["players"][name]["vscc"] = self.data["victory_count"]
 
     def update_players(self):
+        """Goes through the datafile and adds any missing players/nicknames."""
         for player_name, player_data in self.data["players"].items():
             if player_name.lower() not in self.name_to_player:
                 self.add_new_player(player_name, player_data["color"])
@@ -82,6 +93,7 @@ class Board:
                 self.add_nickname(player, nickname)
 
     def get_player(self, name: str) -> Optional[Player]:
+        """Gets a player by their name or nickname."""
         name = sanitise_name(name)
         if name.lower() == "none":
             return None
@@ -90,6 +102,7 @@ class Board:
         return self.name_to_player.get(name.lower())
 
     def add_nickname(self, player: Player, nickname: str):
+        """Adds or updates a player's nickname."""
         cleaned_name = sanitise_name(nickname.lower())
         simple_name = simple_player_name(nickname)
         if (nickname.lower() in self.name_to_player
@@ -108,29 +121,34 @@ class Board:
         self.name_to_player[simple_name] = player
 
     def get_score(self, player: Player) -> float:
+        """Gets the player's score as a percentage towards victory, depending on the victory conditions."""
         if self.data["victory_conditions"] == "classic":
             return len(player.centers) / int(self.data["victory_count"])
-        elif self.data["victory_conditions"] == "vscc":
+        if self.data["victory_conditions"] == "vscc":
             if (centers:= len(player.centers)) > (iscc := int(self.data["players"][player.name]["iscc"])):
                 return (centers - iscc) / (int(self.data["players"][player.name]["vscc"]) - iscc)
-            else:
-                return (centers / iscc) - 1
+            return (centers / iscc) - 1
         raise ValueError("Unknown scoring system found")
 
     def get_players_sorted_by_score(self) -> list[Player]:
-        return sorted(self.players, 
+        """Gets a list of players sorted by their score."""
+        return sorted(self.players,
             key=lambda sort_player: (self.data["players"][sort_player.name].get("hidden", "false"),
                                     -self.get_score(sort_player),
                                     sort_player.get_name().lower()))
 
     def get_players_sorted_by_points(self) -> list[Player]:
+        """Gets a list of players sorted by their points."""
         return sorted(self.players, key=lambda sort_player: (-sort_player.points, -len(sort_player.centers), sort_player.get_name().lower()))
 
     def get_province(self, name: str) -> Province:
+        """Gets a province by its name, ignoring coasts."""
         province, _ = self.get_province_and_coast(name)
         return province
 
     def get_province_and_coast(self, name: str) -> tuple[Province, str | None]:
+        """Given a string, attempts to find a matching province and coast.
+        If an exact match is not found, will see if any provinces being with the string."""
         # FIXME: This should not be raising exceptions many places already assume it returns None on failure.
         # TODO: (BETA) we build this everywhere, let's just have one live on the Board on init
         # we ignore capitalization because this is primarily used for user input
@@ -151,12 +169,13 @@ class Board:
             return self.name_to_province[name], None
 
         # failed to match, try to get possible locations
-        potential_locations = self.get_possible_locations(name)
+        potential_locations = self._get_possible_locations(name)
         if len(potential_locations) > 5:
             raise ValueError(f"The location {name} is ambiguous. Please type out the full name.")
         elif len(potential_locations) > 1:
             raise ValueError(
-                f'The location {name} is ambiguous. Possible matches: {", ".join([loc[0].name for loc in potential_locations])}.'
+                f'The location {name} is ambiguous. Possible matches: ' +
+                f'{", ".join([loc[0].name for loc in potential_locations])}.'
             )
         elif len(potential_locations) == 0:
             raise ValueError(f"The location {name} does not match any known provinces.")
@@ -164,6 +183,7 @@ class Board:
             return potential_locations[0]
 
     def get_visible_provinces(self, player: Player) -> set[Province]:
+        """Gets a set of provinces that a player can see in Fog of War games."""
         visible: set[Province] = set()
         for province in self.provinces:
             for unit in player.units:
@@ -186,7 +206,7 @@ class Board:
 
         return visible
 
-    def get_possible_locations(self, name: str) -> list[tuple[Province, str | None]]:
+    def _get_possible_locations(self, name: str) -> list[tuple[Province, str | None]]:
         pattern = r"^{}.*$".format(re.escape(name.strip()).replace("\\ ", r"\S*\s*"))
         matches = []
         for province in self.provinces:
@@ -197,14 +217,8 @@ class Board:
                             if re.search(pattern, province.get_name(coast).lower())]
         return matches
 
-    def get_build_counts(self) -> list[tuple[str, int]]:
-        build_counts = []
-        for player in self.players:
-            build_counts.append((player.get_name(), len(player.centers) - len(player.units)))
-        build_counts = sorted(build_counts, key=lambda counts: counts[1])
-        return build_counts
-
     def change_owner(self, province: Province, player: Player | None):
+        """Changes the owner of a province, including supply center, if applicable."""
         if province.has_supply_center:
             if province.owner:
                 province.owner.centers.remove(province)
@@ -220,14 +234,18 @@ class Board:
         coast: str | None,
         retreat_options: set[tuple[Province, str | None]] | None,
     ) -> Unit:
-        if unit_type == UnitType.FLEET and province.get_multiple_coasts() and coast not in province.get_multiple_coasts():
+        """Creates a new unit on the board."""
+        if (unit_type == UnitType.FLEET
+            and province.get_multiple_coasts()
+            and coast not in province.get_multiple_coasts()):
             raise RuntimeError(f"Cannot create unit. Province '{province.name}' requires a valid coast.")
         if not province.get_multiple_coasts():
             coast = None
-        unit = Unit(unit_type, player, province, coast, retreat_options)
+        unit = Unit(unit_type, player, province, coast)
         if retreat_options is not None:
             if province.dislodged_unit:
                 raise RuntimeError(f"{province.name} already has a dislodged unit")
+            unit.retreat_options = retreat_options
             province.dislodged_unit = unit
         else:
             if province.unit:
@@ -239,6 +257,7 @@ class Board:
         return unit
 
     def move_unit(self, unit: Unit, new_province: Province, new_coast: str | None = None) -> Unit:
+        """Moves an existing unit to a new province"""
         if new_province.unit:
             raise RuntimeError(f"{new_province.name} already has a unit")
         new_province.unit = unit
@@ -248,6 +267,7 @@ class Board:
         return unit
 
     def delete_unit(self, province: Province) -> Unit | None:
+        """Deletes a unit from the board."""
         unit = province.unit
         if not unit:
             return None
@@ -258,6 +278,7 @@ class Board:
         return unit
 
     def delete_dislodged_unit(self, province: Province) -> Unit | None:
+        """Deletes a dislodged unit from the board."""
         unit = province.dislodged_unit
         if not unit:
             return None
@@ -268,6 +289,7 @@ class Board:
         return unit
 
     def delete_all_units(self) -> None:
+        """Deletes all units from the board."""
         for unit in self.units:
             unit.province.unit = None
 
@@ -277,6 +299,7 @@ class Board:
         self.units = set()
 
     def delete_dislodged_units(self) -> None:
+        """Deletes all dislodged units from the board."""
         dislodged_units = set()
         for unit in self.units:
             if unit.retreat_options:
@@ -288,30 +311,14 @@ class Board:
                 unit.player.units.remove(unit)
             self.units.remove(unit)
 
-    def clear_failed_orders(self) -> None:
-        for unit in self.units:
-            unit.province.unit = None
-
-        for player in self.players:
-            player.units = set()
-
-        self.units = set()
-
-    @staticmethod
-    def convert_year_int_to_str(year: int) -> str:
-        # No 0 AD / BC
-        if year <= 0:
-            return f"{str(1-year)} BC"
-        else:
-            return str(year)
-
     def get_year_str(self) -> str:
+        """Gets the string representation of the current year, accounting for BC/AD."""
         if self.turn.year <= 0:
             return f"{str(1-self.turn.year)} BC"
-        else:
-            return str(self.turn.year)
+        return str(self.turn.year)
 
     def is_chaos(self) -> bool:
+        """Checks to see if this is a Chaos game."""
         return self.data["players"] == "chaos"
 
     def get_player_by_channel(
@@ -319,6 +326,7 @@ class Board:
             channel: Messageable,
             ignore_category=False,
     ) -> Player | None:
+        """Given a Discord channel, tries to find a matching Player."""
         # thread -> main channel
         if isinstance(channel, Thread):
             assert isinstance(channel.parent, TextChannel)

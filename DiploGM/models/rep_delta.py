@@ -65,9 +65,9 @@ class SQLiteReputationDeltaRepository(Repository):
         )
         return entity
 
-    def load(self, id: int) -> Optional[ReputationDelta]:
+    def load(self, server_id: int) -> Optional[ReputationDelta]:
         cursor = self.conn.cursor()
-        cursor.execute("SELECT (id, user_id, delta, reason, created_at) FROM reputation_deltas WHERE id = ?", (id,))
+        cursor.execute("SELECT (id, user_id, delta, reason, created_at) FROM reputation_deltas WHERE id = ?", (server_id,))
         row = cursor.fetchone()
         if not row:
             return None
@@ -80,9 +80,9 @@ class SQLiteReputationDeltaRepository(Repository):
             created_at=datetime.datetime.fromisoformat(row[4])
         )
 
-    def delete(self, id: int) -> None:
+    def delete(self, server_id: int) -> None:
         cursor = self.conn.cursor()
-        cursor.execute("DELETE FROM reputation_deltas WHERE id = ?", (id,))
+        cursor.execute("DELETE FROM reputation_deltas WHERE id = ?", (server_id,))
         self.conn.commit()
 
     def clear(self) -> None:

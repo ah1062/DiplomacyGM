@@ -1,3 +1,4 @@
+"""Armies and fleets and so forth."""
 from __future__ import annotations
 
 from enum import Enum
@@ -11,18 +12,19 @@ if TYPE_CHECKING:
 
 # TODO: rename to Type and import as unit.Type
 class UnitType(Enum):
+    """Type of unit."""
     ARMY = "A"
     FLEET = "F"
 
 
 class Unit:
+    """Units information. They don't have a lot of logic to them aside from retreat options at the moment."""
     def __init__(
         self,
         unit_type: UnitType,
         owner: player.Player | None,
         current_province: province.Province,
         coast: str | None,
-        retreat_options: set[tuple[province.Province, str | None]] | None,
     ):
         self.unit_type: UnitType = unit_type
         self.player: player.Player | None = owner
@@ -31,14 +33,14 @@ class Unit:
 
         # retreat_options is None when not dislodged and {} when dislodged without retreat options
         # When there are retreat options, they are stored as a set of (Province, coast) tuples
-        self.retreat_options: set[tuple[province.Province, str | None]] | None = retreat_options
+        self.retreat_options: set[tuple[province.Province, str | None]] | None = None
         self.order: order.UnitOrder | None = None
 
     def __str__(self):
         return f"{self.unit_type.value} {self.province.get_name(self.coast)}"
 
-    # Adds all valid retreat options based on unit type and current province
     def add_retreat_options(self):
+        """Adds all valid retreat options based on unit type and current province."""
         if self.retreat_options is None:
             self.retreat_options = set()
         if self.unit_type == UnitType.ARMY:
@@ -52,8 +54,8 @@ class Unit:
                 else:
                     self.retreat_options.add((province, None))
 
-    # Removes a specific retreat option
     def remove_retreat_option(self, province: province.Province):
+        """Removes a specific retreat option."""
         if self.retreat_options is None:
             return
         # Use discard to avoid KeyError if an option is not present
@@ -61,9 +63,10 @@ class Unit:
         for coast in province.get_multiple_coasts():
             self.retreat_options.discard((province, coast))
 
-    # Removes multiple retreat options
-    # Since the set is relatively large compared to retreat_options, we iterate over a copy of retreat_options instead
     def remove_many_retreat_options(self, provinces: set[province.Province]):
+        """Removes multiple retreat options.
+        Since the set is relatively large compared to retreat_options,
+        we iterate over a copy of retreat_options instead."""
         if self.retreat_options is None:
             return
         for retreat in set(self.retreat_options):

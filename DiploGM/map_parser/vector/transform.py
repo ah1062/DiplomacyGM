@@ -62,7 +62,7 @@ class TransGL3:
             ])
             self.matrix = self.matrix @ m
 
-        if ("matrix" not in transform_string 
+        if ("matrix" not in transform_string
             and "translate" not in transform_string
             and "rotate" not in transform_string
             and transform_string != ""):

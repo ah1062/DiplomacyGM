@@ -80,7 +80,6 @@ class BoardBuilder():
             UnitType.ARMY,
             player,
             province,
-            None,
             None
         )
 
@@ -108,8 +107,7 @@ class BoardBuilder():
             UnitType.FLEET,
             player,
             province,
-            coast,
-            None
+            coast
         )
 
         province.unit = unit
