@@ -17,7 +17,7 @@ from DiploGM.map_parser.vector.utils import (
 from DiploGM.models.turn import PhaseName, Turn
 from DiploGM.models.board import Board
 from DiploGM.models.player import Player
-from DiploGM.models.province import Province, ProvinceType
+from DiploGM.models.province import Province, ProvinceType, UnitLocation
 from DiploGM.models.unit import Unit, UnitType
 
 # TODO: (BETA) all attribute getting should be in utils which we import and call utils.my_unit()
@@ -124,27 +124,7 @@ class Parser:
         # plt.show()
 
         for province in provinces:
-            for coast in province.get_multiple_coasts():
-                if province.get_primary_unit_coordinates(UnitType.FLEET, coast) == (0, 0):
-                    logger.warning(f"{self.datafile}: Province {province.get_name(coast)} has no fleet coord. Setting to 0,0 ...")
-                    province.set_unit_coordinate(None, True, UnitType.FLEET, coast)
-                if province.get_retreat_unit_coordinates(UnitType.FLEET, coast) == (0, 0):
-                    logger.warning(f"{self.datafile}: Province {province.get_name(coast)} has no fleet retreat coord. Setting to 0,0 ...")
-                    province.set_unit_coordinate(None, False, UnitType.FLEET, coast)
-            if not province.get_multiple_coasts() and province.get_coastal_adjacent():
-                if province.get_primary_unit_coordinates(UnitType.FLEET) == (0, 0):
-                    logger.warning(f"{self.datafile}: Province {province.name} has no fleet coord. Setting to 0,0 ...")
-                    province.set_unit_coordinate(None, True, UnitType.FLEET)
-                if province.get_retreat_unit_coordinates(UnitType.FLEET) == (0, 0):
-                    logger.warning(f"{self.datafile}: Province {province.name} has no fleet retreat coord. Setting to 0,0 ...")
-                    province.set_unit_coordinate(None, False, UnitType.FLEET)
-            if province.type != ProvinceType.SEA:
-                if province.get_primary_unit_coordinates(UnitType.ARMY) == (0, 0):
-                    logger.warning(f"{self.datafile}: Province {province.name} has no army coord. Setting to 0,0 ...")
-                    province.set_unit_coordinate(None, True, UnitType.ARMY)
-                if province.get_retreat_unit_coordinates(UnitType.ARMY) == (0, 0):
-                    logger.warning(f"{self.datafile}: Province {province.name} has no army retreat coord. Setting to 0,0 ...")
-                    province.set_unit_coordinate(None, False, UnitType.ARMY)
+            self._warn_missing_coordinates(province)
 
         initial_turn = Turn(self.year_offset, PhaseName.SPRING_MOVES, self.year_offset)
         if self.data.get("first_season") == "winter":
@@ -166,6 +146,28 @@ class Parser:
                 game_data["players"][player.name]["vscc"] = game_data["victory_count"]
 
         return Board(self.players, provinces, units, initial_turn, game_data, self.datafile, self.fow, self.year_offset)
+
+    def _warn_missing_coordinates(self, province: Province) -> None:
+        """Log a warning and reset any (0, 0) unit coordinates on a province."""
+        checks: list[tuple[UnitType, str | None]] = []
+
+        for coast in province.get_multiple_coasts():
+            checks.append((UnitType.FLEET, coast))
+        if not province.get_multiple_coasts() and province.get_coastal_adjacent():
+            checks.append((UnitType.FLEET, None))
+        if province.type != ProvinceType.SEA:
+            checks.append((UnitType.ARMY, None))
+
+        for unit_type, coast in checks:
+            for is_retreat in (False, True):
+                if province.get_unit_coordinates(unit_type, coast, is_retreat) == (0, 0):
+                    kind = "retreat " if is_retreat else ""
+                    name = province.get_name(coast) if coast else province.name
+                    logger.warning(
+                        f"{self.datafile}: Province {name} has no "
+                        f"{unit_type.name.lower()} {kind}coord. Setting to 0,0 ..."
+                    )
+                    province.set_unit_coordinate(None, unit_type, is_retreat, coast)
 
     def read_map(self) -> tuple[set[Province], set[tuple[str, str]]]:
         if self.cache_provinces is None:
@@ -209,7 +211,6 @@ class Parser:
                 province = Province(
                     name + str(index),
                     shapely.Polygon(),
-                    dict(),
                     dict(),
                     getattr(ProvinceType, data["type"]),
                     False,
@@ -273,21 +274,15 @@ class Parser:
                     province.fleet_adjacent[coast_name] = {self._get_province_and_coast(n) for n in coast_adjacent}
             # For compatability reasons, we assume these are sea tiles
             # TODO: Add support for armies/multicoastal tiles
-            for coordinate in data.get("unit_loc", []):
-                coordinate = tuple((tuple(coordinate) + offset).tolist())
-                if UnitType.FLEET not in province.all_locs:
-                    province.all_locs[UnitType.FLEET] = {coordinate}
-                else:
-                    province.all_locs[UnitType.FLEET].add(coordinate)
-                province.primary_unit_coordinates[UnitType.FLEET] = coordinate
-            for coordinate in data.get("retreat_unit_loc", []):
-                coordinate = tuple((tuple(coordinate) + offset).tolist())
-                if UnitType.FLEET not in province.all_rets:
-                    province.all_rets[UnitType.FLEET] = {coordinate}
-                else:
-                    province.all_rets[UnitType.FLEET].add(coordinate)
-                province.retreat_unit_coordinates[UnitType.FLEET] = coordinate
-
+            unit_locs = data.get("unit_loc", [])
+            retreat_locs = data.get("retreat_unit_loc", [])
+            for index, coordinate in enumerate(unit_locs):
+                primary = tuple((np.array(coordinate) + offset).tolist())
+                retreat_coord = retreat_locs[index] if index < len(retreat_locs) else coordinate
+                retreat = tuple((np.array(retreat_coord) + offset).tolist())
+                loc = UnitLocation(primary, retreat)
+                province.all_coordinates.setdefault(UnitType.FLEET.name, set()).add(loc)
+                province.unit_coordinates[UnitType.FLEET.name] = loc
         return provinces
 
     def _get_provinces(self) -> set[Province]:
@@ -331,9 +326,8 @@ class Parser:
         self._set_phantom_unit_coordinates()
 
         for province in provinces:
-            for unit in province.primary_unit_coordinates.keys():
-                province.all_locs.setdefault(unit, set()).add(province.primary_unit_coordinates[unit])
-                province.all_rets.setdefault(unit, set()).add(province.retreat_unit_coordinates[unit])
+            for unit in province.unit_coordinates.keys():
+                province.all_coordinates.setdefault(unit, set()).add(province.unit_coordinates[unit])
 
         return provinces
 
@@ -391,7 +385,6 @@ class Parser:
             province = Province(
                 name,
                 poly,
-                dict(),
                 dict(),
                 province_type,
                 False,
@@ -527,7 +520,7 @@ class Parser:
                 coordinate = get_unit_coordinates(unit_data)
                 province.set_unit_coordinate(
                     layer_translation.transform(unit_translation.transform(coordinate)),
-                    is_primary, UnitType.ARMY)
+                    UnitType.ARMY, not is_primary)
 
         fleet_layer_to_key = [
             (self.layer_data["fleet"], True),
@@ -544,7 +537,7 @@ class Parser:
                 province, coast = self._get_province_and_coast(province_name)
                 coordinate = get_unit_coordinates(unit_data)
                 translated_coordinate = layer_translation.transform(unit_translation.transform(coordinate))
-                province.set_unit_coordinate(translated_coordinate, is_primary, UnitType.FLEET, coast)
+                province.set_unit_coordinate(translated_coordinate, UnitType.FLEET, not is_primary, coast)
 
     @staticmethod
     def get_province_name(province_data: Element) -> str:

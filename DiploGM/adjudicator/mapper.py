@@ -24,7 +24,7 @@ from DiploGM.models.order import (
     RetreatMove, RetreatDisband, Build, Disband, TransformBuild, PlayerOrder
 )
 from DiploGM.models.player import Player
-from DiploGM.models.province import ProvinceType, Province
+from DiploGM.models.province import ProvinceType, Province, UnitLocation
 from DiploGM.models.unit import Unit, UnitType
 
 from DiploGM.map_parser.vector.transform import TransGL3
@@ -131,24 +131,21 @@ class Mapper:
                 isinstance(unit.order, (RetreatMove, Move)) and not unit.order.has_failed):
                 continue
 
-            unit_locs = unit.province.all_rets if current_turn.is_retreats() else unit.province.all_locs
-            unit_locs = self._get_unit_coordinates(unit, unit_locs)
+            unit_locs = self._get_unit_coordinates(unit, current_turn.is_retreats())
 
             # TODO: Maybe there's a better way to handle convoys?
             if isinstance(unit.order, (RetreatMove, Move, Support)):
                 new_locs = []
-                if unit.unit_type not in unit.order.destination.all_locs:
-                    e_list = next(iter(unit.order.destination.all_locs.values()))
+                dest_coords = unit.order.destination.all_coordinates
+                if unit.unit_type.name not in dest_coords:
+                    e_list = next(iter(dest_coords.values()))
                 elif unit.order.destination_coast:
-                    e_list = unit.order.destination.all_locs[unit.order.destination_coast]
+                    e_list = dest_coords[unit.order.destination_coast]
                 else:
-                    e_list = unit.order.destination.all_locs[unit.unit_type]
+                    e_list = dest_coords.get(unit.unit_type.name, dest_coords.get(UnitType.ARMY.name, {UnitLocation((0, 0), (0, 0))}))
 
-                # Unspecified coast, so default to army location
-                if isinstance(e_list, dict):
-                    e_list = unit.order.destination.all_locs[UnitType.ARMY]
                 for endpoint in e_list:
-                    new_locs += [self._normalize(self.get_closest_loc(unit_locs, endpoint))]
+                    new_locs += [self._normalize(self.get_closest_loc(unit_locs, endpoint.primary_coordinate))]
                 unit_locs = new_locs
             try:
                 for loc in unit_locs:
@@ -224,9 +221,9 @@ class Mapper:
                 coast = province.unit.coast
             else:
                 unit_type = UnitType.FLEET if province.type == ProvinceType.SEA else UnitType.ARMY
-            locdict[province.name] = list(province.get_primary_unit_coordinates(unit_type, coast))
+            locdict[province.name] = list(province.get_unit_coordinates(unit_type, coast))
             for coast in province.get_multiple_coasts():
-                locdict[province.get_name(coast)] = list(province.get_primary_unit_coordinates(UnitType.FLEET, coast))
+                locdict[province.get_name(coast)] = list(province.get_unit_coordinates(UnitType.FLEET, coast))
 
         script = etree.Element("script")
 
@@ -534,20 +531,20 @@ class Mapper:
             assert order.province.unit is not None
             disbanding_unit: Unit = order.province.unit
             if disbanding_unit.coast:
-                coord_list = order.province.all_locs[disbanding_unit.coast]
+                coord_list = order.province.all_coordinates[disbanding_unit.coast]
             else:
-                coord_list = order.province.all_locs[disbanding_unit.unit_type]
+                coord_list = order.province.all_coordinates[disbanding_unit.unit_type.name]
             for coord in coord_list:
-                self._draw_force_disband(coord, self._moves_svg)
+                self._draw_force_disband(coord.primary_coordinate, self._moves_svg)
         elif isinstance(order, TransformBuild):
             assert order.province.unit is not None
             transforming_unit: Unit = order.province.unit
             if transforming_unit.coast:
-                coord_list = order.province.all_locs[transforming_unit.coast]
+                coord_list = order.province.all_coordinates[transforming_unit.coast]
             else:
-                coord_list = order.province.all_locs[transforming_unit.unit_type]
+                coord_list = order.province.all_coordinates[transforming_unit.unit_type.name]
             for coord in coord_list:
-                self._draw_transform(coord, False)
+                self._draw_transform(coord.primary_coordinate, False)
         else:
             logger.error("Could not draw player order %s", order)
 
@@ -752,8 +749,8 @@ class Mapper:
             if (order.source == order.destination
                 and isinstance(source.unit.order, (ConvoyTransport, Support))
                 and self.is_moveable(source.unit)):
-                for coord in source.all_locs[source.unit.coast if source.unit.coast else source.unit.unit_type]:
-                    self._draw_hold(coord, False)
+                for coord in source.all_coordinates[source.unit.coast if source.unit.coast else source.unit.unit_type.name]:
+                    self._draw_hold(coord.primary_coordinate, False)
 
             # if two units are support-holding each other
             destorder = order.destination.unit.order
@@ -812,7 +809,7 @@ class Mapper:
     def _draw_build(self, player, order: Build) -> None:
         element = self._moves_svg.getroot()
         assert element is not None
-        build_location = order.province.get_primary_unit_coordinates(order.unit_type, order.coast)
+        build_location = order.province.get_unit_coordinates(order.unit_type, order.coast)
         drawn_order = self._create_element(
             "circle",
             {
@@ -825,7 +822,7 @@ class Mapper:
             },
         )
 
-        self._draw_unit(Unit(order.unit_type, player, order.province, order.coast, None), use_moves_svg=True)
+        self._draw_unit(Unit(order.unit_type, player, order.province, order.coast), use_moves_svg=True)
         element.append(drawn_order)
 
     def _draw_disband(self, coordinate: tuple[float, float], svg) -> None:
@@ -991,16 +988,14 @@ class Mapper:
             if unit.province.name in self.adjacent_provinces:
                 self._draw_unit(unit)
 
-    def _get_unit_coordinates(self,
-                              unit: Unit,
-                              province_coordinates: dict[UnitType | str, set[tuple[float, float]]]
-                             ) -> set[tuple[float, float]]:
+    def _get_unit_coordinates(self, unit: Unit, is_retreats: bool) -> set[tuple[float, float]]:
+        province_coordinates = unit.province.all_coordinates
         if unit.coast:
             if unit.coast in province_coordinates:
-                return province_coordinates[unit.coast]
+                return {loc.retreat_coordinate if is_retreats else loc.primary_coordinate for loc in province_coordinates[unit.coast]}
         else:
-            if unit.unit_type in province_coordinates:
-                return province_coordinates[unit.unit_type]
+            if unit.unit_type.name in province_coordinates:
+                return {loc.retreat_coordinate if is_retreats else loc.primary_coordinate for loc in province_coordinates[unit.unit_type.name]}
 
         logger.warning(
             "Could not find coordinates for %s in province %s. Trying to find another coordinate to use",
@@ -1008,7 +1003,7 @@ class Mapper:
             unit.province.name,
         )
         if len(province_coordinates) > 0:
-            return next(iter(province_coordinates.values()))
+            return {loc.retreat_coordinate if is_retreats else loc.primary_coordinate for loc in next(iter(province_coordinates.values()))}
         logger.warning("No coordinates found for province %s, using (0, 0) as fallback", unit.province.name)
         return {(0, 0)}
 
@@ -1022,8 +1017,7 @@ class Mapper:
         current_coords = get_unit_coordinates(unit_element)
         current_coords = TransGL3(unit_element).transform(current_coords)
 
-        province_coordinates = province.all_rets if unit == province.dislodged_unit else province.all_locs
-        coord_list = self._get_unit_coordinates(unit, province_coordinates)
+        coord_list = self._get_unit_coordinates(unit, unit == province.dislodged_unit)
 
         for desired_coords in coord_list:
             elem = copy.deepcopy(unit_element)
@@ -1062,27 +1056,24 @@ class Mapper:
     def _draw_retreat_options(self, unit: Unit, svg):
         root = svg.getroot()
         if not unit.retreat_options:
-            self._draw_force_disband(unit.province.get_retreat_unit_coordinates(unit.unit_type, unit.coast), svg)
+            self._draw_force_disband(unit.province.get_unit_coordinates(unit.unit_type, unit.coast, True), svg)
             return
 
         # TODO: Move into helper function along with logic in draw_moves_and_retreats
-        unit_locs = unit.province.all_rets
-        unit_locs = self._get_unit_coordinates(unit, unit_locs)
+        unit_locs = self._get_unit_coordinates(unit, True)
 
         for retreat_province, retreat_coast in unit.retreat_options:
             new_locs = []
-            if unit.unit_type not in retreat_province.all_locs:
-                e_list = next(iter(retreat_province.all_locs.values()))
+            if unit.unit_type not in retreat_province.all_coordinates:
+                e_list = next(iter(retreat_province.all_coordinates.values()))
             elif retreat_coast:
-                e_list = retreat_province.all_locs[retreat_coast]
+                e_list = retreat_province.all_coordinates[retreat_coast]
             else:
-                e_list = retreat_province.all_locs[unit.unit_type]
+                e_list = retreat_province.all_coordinates.get(unit.unit_type.name, retreat_province.all_coordinates.get(UnitType.ARMY.name, {UnitLocation((0, 0), (0, 0))}))
 
             # Unspecified coast, so default to army location
-            if isinstance(e_list, dict):
-                e_list = retreat_province.all_locs[UnitType.ARMY]
             for endpoint in e_list:
-                new_locs += [self._normalize(self.get_closest_loc(unit_locs, endpoint))]
+                new_locs += [self._normalize(self.get_closest_loc(unit_locs, endpoint.primary_coordinate))]
 
             for loc in new_locs:
                 root.append(
@@ -1275,13 +1266,13 @@ class Mapper:
             unit_type = loc.unit.unit_type
             coast = loc.unit.coast
 
-        coord_list = loc.all_rets if use_retreats else loc.all_locs
-        if coast and coast in coord_list:
-            coords = coord_list[coast]
-        elif unit_type in coord_list:
-            coords = coord_list[unit_type]
+        if coast and coast in loc.all_coordinates:
+            coords = loc.all_coordinates[coast]
+        elif unit_type.name in loc.all_coordinates:
+            coords = loc.all_coordinates[unit_type.name]
         else:
-            coords = next(iter(coord_list.values()))
+            coords = next(iter(loc.all_coordinates.values()))
+        coords = {c.retreat_coordinate if use_retreats else c.primary_coordinate for c in coords}
 
         return self.get_closest_loc(coords, current)
 

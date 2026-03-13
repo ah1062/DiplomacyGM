@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 import logging
@@ -20,14 +21,17 @@ class ProvinceType(Enum):
     SEA = 3
     IMPASSIBLE = 4
 
+@dataclass(frozen=True)
+class UnitLocation:
+    primary_coordinate: tuple[float, float]
+    retreat_coordinate: tuple[float, float]
 
 class Province():
     def __init__(
         self,
         name: str,
         coordinates: Polygon | MultiPolygon,
-        primary_unit_coordinates: dict[UnitType | str, tuple[float, float]],
-        retreat_unit_coordinates: dict[UnitType | str, tuple[float, float]],
+        unit_coordinates: dict[str, UnitLocation],
         province_type: ProvinceType,
         has_supply_center: bool,
         adjacent: set[Province],
@@ -38,10 +42,9 @@ class Province():
     ):
         self.name: str = name
         self.geometry: Polygon | MultiPolygon = coordinates
-        self.primary_unit_coordinates: dict[UnitType | str, tuple[float, float]] = primary_unit_coordinates
-        self.retreat_unit_coordinates: dict[UnitType | str, tuple[float, float]] = retreat_unit_coordinates
+        self.unit_coordinates: dict[str, UnitLocation] = unit_coordinates
         self.type: ProvinceType = province_type
-        self.can_convoy: bool = (province_type == ProvinceType.SEA)
+        self.can_convoy: bool = province_type == ProvinceType.SEA
         self.has_supply_center: bool = has_supply_center
         self.adjacent: set[Province] = adjacent
         self.fleet_adjacent: set[tuple[Province, str | None]] | dict[str, set[tuple[Province, str | None]]] = fleet_adjacent
@@ -59,12 +62,9 @@ class Province():
         # all_locs/all_rets are of the form {unit_type/coast: set((x, y), (x2, y2), ...)}
         # This assumes that only fleet units have to deal with multiple coasts
         # TODO: Bundle primary and retreat coordinates into a single structure
-        self.all_locs = {}
-        self.all_rets = {}
-        if primary_unit_coordinates:
-            self.all_locs = {key: {value} for key, value in self.primary_unit_coordinates.items()}
-        if retreat_unit_coordinates:
-            self.all_rets = {key: {value} for key, value in self.retreat_unit_coordinates.items()}
+        self.all_coordinates: dict[str, set[UnitLocation]] = {}
+        if unit_coordinates:
+            self.all_coordinates = {key: {value} for key, value in unit_coordinates.items()}
 
     def __str__(self):
         return self.name
@@ -77,33 +77,27 @@ class Province():
             return f"{self.name} {coast}"
         return self.name
 
-    def get_primary_unit_coordinates(self, unit_type: UnitType, coast = None) -> tuple[float, float]:
-        if coast in self.primary_unit_coordinates:
-            return self.primary_unit_coordinates[coast]
-        elif unit_type in self.primary_unit_coordinates:
-            return self.primary_unit_coordinates[unit_type]
-        return (0, 0)
+    def get_unit_coordinates(self, unit_type: UnitType, coast = None, is_retreat = False) -> tuple[float, float]:
+        index = coast if coast in self.unit_coordinates else unit_type.name
+        if is_retreat:
+            return self.unit_coordinates[index].retreat_coordinate if index in self.unit_coordinates else (0, 0)
+        return self.unit_coordinates[index].primary_coordinate if index in self.unit_coordinates else (0, 0)
 
-    def get_retreat_unit_coordinates(self, unit_type: UnitType, coast = None) -> tuple[float, float]:
-        if coast in self.retreat_unit_coordinates:
-            return self.retreat_unit_coordinates[coast]
-        elif unit_type in self.retreat_unit_coordinates:
-            return self.retreat_unit_coordinates[unit_type]
-        return (0, 0)
-
-    def set_unit_coordinate(self, coord, is_primary, unit_type, coast = None):
+    def set_unit_coordinate(self, coord: tuple[float, float] | None, unit_type: UnitType, is_retreat: bool = False, coast: str | None = None):
         # Set default cooordinate if none are found
-        if coord is None:
-            coord = (0, 0)
+        coord = coord if coord else (0, 0)
+        index = coast if coast else unit_type.name
 
-        if is_primary:
-            unit_coords = self.primary_unit_coordinates
+        if is_retreat:
+            self.unit_coordinates[index] = UnitLocation(
+                primary_coordinate=self.unit_coordinates[index].primary_coordinate if index in self.unit_coordinates else (0, 0),
+                retreat_coordinate=coord
+            )
         else:
-            unit_coords = self.retreat_unit_coordinates
-        if coast:
-            unit_coords[coast] = coord
-        else:
-            unit_coords[unit_type] = coord
+            self.unit_coordinates[index] = UnitLocation(
+                primary_coordinate=coord,
+                retreat_coordinate=self.unit_coordinates[index].retreat_coordinate if index in self.unit_coordinates else (0, 0)
+            )
 
     def get_owner(self) -> player.Player | None:
         return self.owner

@@ -1,7 +1,7 @@
 import unittest
 
-from DiploGM.models.unit import UnitType
 from test.utils import BoardBuilder
+from DiploGM.models.unit import UnitType
 
 class TestTransform(unittest.TestCase):
     def test_transform_1(self):
@@ -186,7 +186,7 @@ class TestTransform(unittest.TestCase):
         b = BoardBuilder()
         f_st_petersburg = b.transform(b.players["Russia"], UnitType.FLEET, "St. Petersburg sc")
         b.assert_success(f_st_petersburg)
-        b.moves_adjudicate(self)    
+        b.moves_adjudicate(self)
         self.assertEqual(f_st_petersburg.unit_type, UnitType.ARMY, "St. Petersburg should be an army")
 
     def test_transform_12(self):
@@ -199,7 +199,7 @@ class TestTransform(unittest.TestCase):
         b = BoardBuilder()
         a_st_petersburg = b.transform(b.players["Russia"], UnitType.ARMY, "St. Petersburg", "sc")
         b.assert_success(a_st_petersburg)
-        b.moves_adjudicate(self)    
+        b.moves_adjudicate(self)
         self.assertEqual(a_st_petersburg.unit_type, UnitType.FLEET, "St. Petersburg should be a fleet")
         self.assertEqual(a_st_petersburg.coast, "sc", "F St. Petersburg should be on the south coast")
 
@@ -213,5 +213,5 @@ class TestTransform(unittest.TestCase):
         b = BoardBuilder()
         a_st_petersburg = b.transform(b.players["Russia"], UnitType.ARMY, "St. Petersburg")
         b.assert_illegal(a_st_petersburg)
-        b.moves_adjudicate(self)    
+        b.moves_adjudicate(self)
         self.assertEqual(a_st_petersburg.unit_type, UnitType.ARMY, "St. Petersburg shouldn't be a fleet")
