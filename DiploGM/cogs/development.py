@@ -53,13 +53,13 @@ class DevelopmentCog(commands.Cog):
             [f"Rather upset at {bot_wizard.nick} >:(" for bot_wizard in bot_wizards]
             + [
                 f"eolhc keeps {random.choice(['murdering', 'stabbing'])} me",
-                f"aahoughton, I don't recognise your union!",
+                "aahoughton, I don't recognise your union!",
             ]
         )
 
         await send_message_and_file(
             channel=ctx.channel,
-            title=f"DiplomacyGM Dashboard",
+            title="DiplomacyGM Dashboard",
             fields=[("Extensions", extensions_body), ("Loaded Cogs", cogs_body)],
             footer_content=footer,
         )
@@ -68,7 +68,7 @@ class DevelopmentCog(commands.Cog):
     @perms.superuser_only("shutdown the bot")
     async def shutdown_the_bot_yes_i_want_to_do_this(self, ctx: commands.Context):
         await send_message_and_file(
-            channel=ctx.channel, title=f"Why would you do this to me?", message=f"Shutting down"
+            channel=ctx.channel, title="Why would you do this to me?", message="Shutting down"
         )
         channel = self.bot.get_channel(IMPDIP_SERVER_BOT_STATUS_CHANNEL_ID)
         if channel and isinstance(channel, TextChannel):

@@ -20,7 +20,7 @@ class ReputationCog(commands.Cog):
         await send_message_and_file(channel=ctx.channel, message="Valid commands are: *add*, *delete*, and *view*")
 
     @rep.command(
-        name="add", 
+        name="add",
         brief="Add a reputation delta",
         description="",
         help="Usage: .rep add <user> <hours> <reason>"
@@ -38,7 +38,7 @@ class ReputationCog(commands.Cog):
         await send_message_and_file(channel=ctx.channel, title="Reputation Logged!", message=out)
 
     @rep.command(
-        name="delete", 
+        name="delete",
         brief="Delete a reputation delta",
         description="Provide a rep delta id to delete.",
         help="Usage: .rep delete <id>"

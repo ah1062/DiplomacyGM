@@ -42,16 +42,16 @@ class ExtensionManagementCog(commands.Cog):
         try:
             await self.bot.unload_diplogm_extension(extension)
         except ExtensionNotFound:
-            status=f"Extension was not found"
+            status="Extension was not found"
             colour=ERROR_COLOUR
         except ExtensionNotLoaded:
-            status = f"Extension was not loaded"
+            status = "Extension was not loaded"
             colour=PARTIAL_ERROR_COLOUR
         except:
-            status = f"Extension failed to unload for an unknown reason"
+            status = "Extension failed to unload for an unknown reason"
             colour = ERROR_COLOUR
         else:
-            status = f"Unloaded Extension"
+            status = "Unloaded Extension"
             colour = None
         finally:
             await send_message_and_file(
@@ -78,7 +78,7 @@ class ExtensionManagementCog(commands.Cog):
             status = "Extension failed to load"
             colour = ERROR_COLOUR
         except:
-            status = f"Extension failed to load for an unknown reason"
+            status = "Extension failed to load for an unknown reason"
             colour = ERROR_COLOUR
         else:
             status = "Loaded extension"
@@ -96,25 +96,25 @@ class ExtensionManagementCog(commands.Cog):
         try:
             await self.bot.reload_diplogm_extension(extension)
         except ExtensionNotFound:
-            status=f"Extension was not found"
+            status="Extension was not found"
             colour=ERROR_COLOUR
         except ExtensionNotLoaded:
-            status=f"Extension was not loaded",
+            status="Extension was not loaded"
             colour=PARTIAL_ERROR_COLOUR
         except ExtensionAlreadyLoaded:
-            status=f"Extension was unload but could not be loaded as it was already loaded",
+            status="Extension was unload but could not be loaded as it was already loaded"
             colour=PARTIAL_ERROR_COLOUR
         except NoEntryPointError:
-            status=f"Extension was unloaded but now has no setup function",
+            status="Extension was unloaded but now has no setup function"
             colour=ERROR_COLOUR
         except ExtensionFailed:
-            status=f"Extension failed to load",
+            status="Extension failed to load"
             colour=ERROR_COLOUR
         except:
-            status = f"Extension failed to reload for an unknown reason"
+            status = "Extension failed to reload for an unknown reason"
             colour = ERROR_COLOUR
         else:
-            status=f"Reloaded Extension"
+            status="Reloaded Extension"
             colour=None
         finally:
             await send_message_and_file(

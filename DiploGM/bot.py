@@ -267,7 +267,7 @@ class DiploGM(commands.Bot):
             # we shouldn't do anything if the user says something like "..."
             return
 
-        assert ctx.guild is not None and ctx.command is not None
+        assert ctx.guild is not None and ctx.command is not None and self.user is not None
         try:
             # mark the message as failed
             await ctx.message.add_reaction("❌")
@@ -384,8 +384,12 @@ class DiploGM(commands.Bot):
         # Out to Bot Dev Server
         bot_error_channel = self.get_channel(BOT_DEV_UNHANDLED_ERRORS_CHANNEL_ID)
         if bot_error_channel and isinstance(bot_error_channel, discord.TextChannel):
-            channel_category = ctx.channel.category if isinstance(ctx.channel, (discord.TextChannel, discord.Thread)) else ctx.channel.id
-            channel_name = ctx.channel.name if isinstance(ctx.channel, (discord.TextChannel, discord.Thread)) else ctx.channel.id
+            channel_category = (ctx.channel.category
+                                if isinstance(ctx.channel, (discord.TextChannel, discord.Thread))
+                                else ctx.channel.id)
+            channel_name = (ctx.channel.name
+                            if isinstance(ctx.channel, (discord.TextChannel, discord.Thread))
+                            else ctx.channel.id)
             unhandled_out_dev = (
                 f"Type: {type(original)}\n"
                 f"Location: {ctx.guild.name} [{channel_category or ''}]-[{channel_name}]\n"

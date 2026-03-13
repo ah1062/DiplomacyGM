@@ -20,7 +20,7 @@ class PlayerCog(commands.Cog):
 
     @commands.command(
         brief="Submits orders; there must be one and only one order per line.",
-        description="""Submits orders: 
+        description="""Submits orders:
     There must be one and only one order per line.
     A variety of keywords are supported: e.g. '-', '->', 'move', and 'm' are all supported for a move command.
     Supplying the unit type is fine but not required: e.g. 'A Ghent -> Normandy' and 'Ghent -> Normandy' are the same

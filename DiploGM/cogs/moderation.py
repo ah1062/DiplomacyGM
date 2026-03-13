@@ -67,9 +67,8 @@ class ModerationCog(commands.Cog):
             return
 
         modchannel = discord.utils.find(lambda c: c.name == "mod-log", hub.text_channels)
-        modrole = discord.utils.find(lambda r: r.name == "Moderator", hub.roles)
         msg = (
-            f"{modrole.mention} - Somebody to watch/interrogate:\n"
+            f"Somebody to watch/interrogate:\n"
             f"User: {member} (ID: {member.id})\n"
             f"Joined: {guild.name} [ID: {guild.id}]\n"
             f"**Problems:**\n"
