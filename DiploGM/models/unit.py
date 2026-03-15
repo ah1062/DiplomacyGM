@@ -44,7 +44,7 @@ class Unit:
         if self.retreat_options is None:
             self.retreat_options = set()
         if self.unit_type == UnitType.ARMY:
-            for province in self.province.adjacent:
+            for province in self.province.adjacency_data.adjacent:
                 if province.type != ProvinceType.SEA:
                     self.retreat_options.add((province, None))
         else:

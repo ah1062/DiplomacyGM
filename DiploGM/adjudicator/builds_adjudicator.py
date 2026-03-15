@@ -109,7 +109,7 @@ class BuildsAdjudicator(Adjudicator):
 
     def _adjudicate_build(self, order: Build, player: Player) -> int:
         # ignore coast specifications for army
-        if (order.unit_type == UnitType.FLEET and not order.province.fleet_adjacent):
+        if (order.unit_type == UnitType.FLEET and order.province.is_landlocked()):
             logger.warning(f"Skipping {order}; tried building an inland fleet")
             return 0
         if (order.unit_type == UnitType.FLEET
@@ -136,7 +136,7 @@ class BuildsAdjudicator(Adjudicator):
             logger.warning(f"Skipping {order}; tried to transform in a province without a supply center")
         elif order.province.type == ProvinceType.SEA:
             logger.warning(f"Skipping {order}; tried to transform in a sea province")
-        elif not order.province.fleet_adjacent:
+        elif order.province.is_landlocked():
             logger.warning(f"Skipping {order}; tried to transform in an inland province")
         elif (order.province.unit.unit_type == UnitType.ARMY
                 and order.province.get_multiple_coasts()

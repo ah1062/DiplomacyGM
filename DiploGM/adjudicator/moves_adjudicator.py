@@ -116,7 +116,7 @@ class MovesAdjudicator(Adjudicator):
 
     def _update_order(self, order: AdjudicableOrder):
         if order.type == OrderType.CORE and order.resolution == Resolution.SUCCEEDS:
-            order.source_province.corer = order.country
+            order.source_province.core_data.corer = order.country
         if order.type == OrderType.TRANSFORM and order.resolution == Resolution.SUCCEEDS:
             logger.debug(f"Transforming {order.base_unit}")
             if order.base_unit.unit_type == UnitType.ARMY:
@@ -161,15 +161,15 @@ class MovesAdjudicator(Adjudicator):
             self._update_order(order)
 
         for province in self._board.provinces:
-            if province.corer:
-                if province.half_core == province.corer:
-                    province.core = province.corer
-                    province.half_core = None
+            if province.core_data.corer:
+                if province.core_data.half_core == province.core_data.corer:
+                    province.core_data.core = province.core_data.corer
+                    province.core_data.half_core = None
                 else:
-                    province.half_core = province.corer
+                    province.core_data.half_core = province.core_data.corer
             else:
-                province.half_core = None
-            province.corer = None
+                province.core_data.half_core = None
+            province.core_data.corer = None
 
         contested = self._find_contested_areas()
 
@@ -227,13 +227,13 @@ class MovesAdjudicator(Adjudicator):
         while 0 < len(to_visit):
             current = to_visit.popleft()
             # Have to pass through at least one convoying fleet
-            if current != order.source_province and order.destination_province in current.adjacent:
+            if current != order.source_province and order.destination_province in current.adjacency_data.adjacent:
                 return Resolution.SUCCEEDS
 
             visited.add(current.name)
 
             adjacent_convoys = {
-                convoy_order for convoy_order in order.convoys if convoy_order.current_province in current.adjacent
+                convoy_order for convoy_order in order.convoys if convoy_order.current_province in current.adjacency_data.adjacent
             }
             for convoy in adjacent_convoys:
                 if convoy.current_province.name in visited:
@@ -283,7 +283,7 @@ class MovesAdjudicator(Adjudicator):
 
     def _count_strength(self, order: AdjudicableOrder, attacked_country: Player | None = None) -> int:
         # Your own unit counts, unless it's a difficult adjacency
-        strength = 0 if order.destination_province.name in order.base_unit.province.difficult_adjacencies else 1
+        strength = 0 if order.destination_province.name in order.base_unit.province.adjacency_data.difficult_adjacencies else 1
         for support in order.supports:
             if self._resolve_order(support) == Resolution.SUCCEEDS and attacked_country != support.country:
                 strength += 1

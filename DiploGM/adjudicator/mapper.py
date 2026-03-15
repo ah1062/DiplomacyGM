@@ -623,7 +623,7 @@ class Mapper:
             return []
         options = []
         new_checked = already_checked + (current,)
-        for possibility in current.adjacent:
+        for possibility in current.adjacency_data.adjacent:
             if possibility.name not in self.adjacent_provinces:
                 continue
 
@@ -942,8 +942,8 @@ class Mapper:
                 core_color = self.board_svg_data["unknown"]
                 half_color = core_color
             else:
-                core_color = self.player_colors[province.core.name] if province.core else "#ffffff"
-                half_color = self.player_colors[province.half_core.name] if province.half_core else core_color
+                core_color = self.player_colors[province.core_data.core.name] if province.core_data.core else "#ffffff"
+                half_color = self.player_colors[province.core_data.half_core.name] if province.core_data.half_core else core_color
             # color = "#ffffff"
             # if province.core:
             #     color = province.core.color
@@ -968,8 +968,8 @@ class Mapper:
                     elif elem.attrib[f"{NAMESPACE['inkscape']}label"] == "Core Marker":
                         self._color_element(elem, core_color)
                 elif half_color != core_color:
-                    corename = "None" if not province.core else province.core.name
-                    halfname = "None" if not province.half_core else province.half_core.name
+                    corename = "None" if not province.core_data.core else province.core_data.core.name
+                    halfname = "None" if not province.core_data.half_core else province.core_data.half_core.name
                     self._color_element(elem, f"url(#{halfname}_{corename})")
                 else:
                     self._color_element(elem, core_color)
@@ -1191,9 +1191,9 @@ class Mapper:
             created_defs = set()
 
             for province in self.board.provinces:
-                if not province.has_supply_center or province.half_core is None:
+                if not province.has_supply_center or province.core_data.half_core is None:
                     continue
-                mapping = (province.half_core.name, "None" if province.core is None else province.core.name)
+                mapping = (province.core_data.half_core.name, "None" if province.core_data.core is None else province.core_data.core.name)
                 if mapping in created_defs:
                     continue
 

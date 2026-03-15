@@ -217,12 +217,12 @@ class _DatabaseConnection:
         core_player = None
         if core is not None:
             core_player = board.get_player(core)
-        province.core = core_player
+        province.core_data.core = core_player
 
         half_core_player = None
         if half_core is not None:
             half_core_player = board.get_player(half_core)
-        province.half_core = half_core_player
+        province.core_data.half_core = half_core_player
         province.unit = None
         province.dislodged_unit = None
 
@@ -463,8 +463,8 @@ class _DatabaseConnection:
                     board.turn.get_indexed_name(),
                     province.name,
                     province.owner.name if province.owner else None,
-                    province.core.name if province.core else None,
-                    province.half_core.name if province.half_core else None,
+                    province.core_data.core.name if province.core_data.core else None,
+                    province.core_data.half_core.name if province.core_data.half_core else None,
                 )
                 for province in board.provinces
             ],

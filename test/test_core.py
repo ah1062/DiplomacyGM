@@ -16,7 +16,7 @@ class TestCore(unittest.TestCase):
 
         b.assert_illegal(a_silesia)
         b.moves_adjudicate(self)
-        self.assertNotEqual(p_silesia.half_core, b.players["Germany"], "Silesia shouldn't be cored")
+        self.assertNotEqual(p_silesia.core_data.half_core, b.players["Germany"], "Silesia shouldn't be cored")
 
     def test_core_2(self):
         """ 
@@ -31,7 +31,7 @@ class TestCore(unittest.TestCase):
 
         b.assert_illegal(a_holland)
         b.moves_adjudicate(self)
-        self.assertNotEqual(p_holland.half_core, b.players["Germany"], "Holland shouldn't be cored")
+        self.assertNotEqual(p_holland.core_data.half_core, b.players["Germany"], "Holland shouldn't be cored")
 
     def test_core_3(self):
         """ 
@@ -47,7 +47,7 @@ class TestCore(unittest.TestCase):
 
         b.assert_success(a_holland)
         b.moves_adjudicate(self)
-        self.assertEqual(p_holland.half_core, b.players["Germany"], "Holland should be half-cored")
+        self.assertEqual(p_holland.core_data.half_core, b.players["Germany"], "Holland should be half-cored")
 
     def test_core_4(self):
         """ 
@@ -59,12 +59,12 @@ class TestCore(unittest.TestCase):
         b = BoardBuilder()
         p_holland = b.board.get_province("Holland")
         p_holland.owner = b.players["Germany"]
-        p_holland.half_core = b.players["Germany"]
+        p_holland.core_data.half_core = b.players["Germany"]
         a_holland = b.core(b.players["Germany"], UnitType.ARMY, "Holland")
 
         b.assert_success(a_holland)
         b.moves_adjudicate(self)
-        self.assertEqual(p_holland.core, b.players["Germany"], "Holland should be cored")
+        self.assertEqual(p_holland.core_data.core, b.players["Germany"], "Holland should be cored")
 
     def test_core_5(self):
         """ 
@@ -77,7 +77,7 @@ class TestCore(unittest.TestCase):
         b = BoardBuilder()
         p_holland = b.board.get_province("Holland")
         p_holland.owner = b.players["Germany"]
-        p_holland.half_core = b.players["Germany"]
+        p_holland.core_data.half_core = b.players["Germany"]
         a_holland = b.core(b.players["Germany"], UnitType.ARMY, "Holland")
         a_belgium = b.move(b.players["France"], UnitType.ARMY, "Belgium", "Holland")
 
@@ -85,7 +85,7 @@ class TestCore(unittest.TestCase):
         b.assert_not_illegal(a_holland, a_belgium)
         b.moves_adjudicate(self)
 
-        self.assertNotEqual(p_holland.core, b.players["Germany"], "Holland shouldn't be cored")
+        self.assertNotEqual(p_holland.core_data.core, b.players["Germany"], "Holland shouldn't be cored")
 
     def test_core_6(self):
         """ 
@@ -98,7 +98,7 @@ class TestCore(unittest.TestCase):
         b = BoardBuilder()
         p_holland = b.board.get_province("Holland")
         p_holland.owner = b.players["Germany"]
-        p_holland.half_core = b.players["Germany"]
+        p_holland.core_data.half_core = b.players["Germany"]
         a_holland = b.core(b.players["Germany"], UnitType.ARMY, "Holland")
         a_belgium = b.move(b.players["Germany"], UnitType.ARMY, "Belgium", "Holland")
 
@@ -106,7 +106,7 @@ class TestCore(unittest.TestCase):
         b.assert_not_illegal(a_holland, a_belgium)
         b.moves_adjudicate(self)
 
-        self.assertNotEqual(p_holland.core, b.players["Germany"], "Holland shouldn't be cored")
+        self.assertNotEqual(p_holland.core_data.core, b.players["Germany"], "Holland shouldn't be cored")
 
     def test_core_7(self):
         """ 
@@ -120,7 +120,7 @@ class TestCore(unittest.TestCase):
         b = BoardBuilder()
         p_holland = b.board.get_province("Holland")
         p_holland.owner = b.players["Germany"]
-        p_holland.half_core = b.players["Germany"]
+        p_holland.core_data.half_core = b.players["Germany"]
         a_holland = b.core(b.players["Germany"], UnitType.ARMY, "Holland")
         a_london = b.move(b.players["England"], UnitType.ARMY, "London", "Holland")
         f_north_sea = b.convoy(b.players["England"], "North Sea", a_london, "Holland")
@@ -129,7 +129,7 @@ class TestCore(unittest.TestCase):
         b.assert_not_illegal(a_holland, f_north_sea, a_london)
         b.moves_adjudicate(self)
 
-        self.assertNotEqual(p_holland.core, b.players["Germany"], "Holland shouldn't be cored")
+        self.assertNotEqual(p_holland.core_data.core, b.players["Germany"], "Holland shouldn't be cored")
 
     def test_core_8(self):
         """ 
@@ -143,7 +143,7 @@ class TestCore(unittest.TestCase):
         b = BoardBuilder()
         p_holland = b.board.get_province("Holland")
         p_holland.owner = b.players["Germany"]
-        p_holland.half_core = b.players["Germany"]
+        p_holland.core_data.half_core = b.players["Germany"]
         a_holland = b.core(b.players["Germany"], UnitType.ARMY, "Holland")
         a_london = b.move(b.players["Germany"], UnitType.ARMY, "London", "Holland")
         f_north_sea = b.convoy(b.players["England"], "North Sea", a_london, "Holland")
@@ -152,7 +152,7 @@ class TestCore(unittest.TestCase):
         b.assert_not_illegal(a_holland, f_north_sea, a_london)
         b.moves_adjudicate(self)
 
-        self.assertNotEqual(p_holland.core, b.players["Germany"], "Holland shouldn't be cored")
+        self.assertNotEqual(p_holland.core_data.core, b.players["Germany"], "Holland shouldn't be cored")
 
 
     def test_core_9(self):
@@ -166,11 +166,11 @@ class TestCore(unittest.TestCase):
         b = BoardBuilder()
         p_holland = b.board.get_province("Holland")
         p_holland.owner = b.players["Germany"]
-        p_holland.half_core = b.players["Germany"]
+        p_holland.core_data.half_core = b.players["Germany"]
         a_holland = b.core(b.players["Germany"], UnitType.ARMY, "Holland")
         b.move(b.players["England"], UnitType.ARMY, "London", "Holland")
 
         b.assert_success(a_holland)
         b.moves_adjudicate(self)
 
-        self.assertEqual(p_holland.core, b.players["Germany"], "Holland should be cored")
+        self.assertEqual(p_holland.core_data.core, b.players["Germany"], "Holland should be cored")

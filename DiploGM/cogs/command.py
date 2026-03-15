@@ -353,9 +353,9 @@ class CommandCog(commands.Cog):
             f"Unit: {((province.unit.player.get_name() if province.unit.player is not None else '')
                       + ' ' + province.unit.unit_type.name if province.unit else 'None')}\n" + \
             f"Center: {province.has_supply_center}\n" + \
-            f"Core: {province.core.name if province.core else 'None'}\n" + \
-            f"Half-Core: {province.half_core.name if province.half_core else 'None'}\n" + \
-            f"Adjacent Provinces:\n- " + "\n- ".join(sorted([adjacent.name for adjacent in province.adjacent | province.impassible_adjacent])) + "\n" + \
+            f"Core: {province.core_data.core.name if province.core_data.core else 'None'}\n" + \
+            f"Half-Core: {province.core_data.half_core.name if province.core_data.half_core else 'None'}\n" + \
+            "Adjacent Provinces:\n- " + "\n- ".join(sorted([adjacent.name for adjacent in province.adjacency_data.adjacent | province.adjacency_data.impassible_adjacent])) + "\n" + \
             f"{adjacent_coasts}"
         # fmt: on
         log_command(logger, ctx, message=f"Got info for {province_name}")

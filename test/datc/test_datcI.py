@@ -80,7 +80,7 @@ class TestDATC_I(unittest.TestCase):
         b = BoardBuilder()
         p_berlin = b.board.get_province("Berlin")
         p_berlin.owner = b.players["Russia"]
-        p_berlin.core = b.players["Germany"]
+        p_berlin.core_data.core = b.players["Germany"]
         b.build(b.players["Germany"], (UnitType.ARMY, "Berlin"))
         b.assert_build_count(0)
         b.builds_adjudicate(self)
@@ -97,7 +97,7 @@ class TestDATC_I(unittest.TestCase):
         b = BoardBuilder()
         p_warsaw = b.board.get_province("Warsaw")
         p_warsaw.owner = b.players["Germany"]
-        p_warsaw.core = b.players["Russia"]
+        p_warsaw.core_data.core = b.players["Russia"]
         b.build(b.players["Germany"], (UnitType.ARMY, "Warsaw"))
         b.assert_build_count(0)
         b.builds_adjudicate(self)
@@ -112,7 +112,7 @@ class TestDATC_I(unittest.TestCase):
         """
         b = BoardBuilder()
         b.player_core(b.players["Russia"], "Moscow")
-        b.board.get_province("Moscow").core = b.players["Russia"]
+        b.board.get_province("Moscow").core_data.core = b.players["Russia"]
         b.build(b.players["Russia"], (UnitType.ARMY, "Moscow"), (UnitType.ARMY, "Moscow"))
         b.assert_build_count(1)
         b.builds_adjudicate(self)

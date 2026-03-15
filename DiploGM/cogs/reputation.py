@@ -1,3 +1,4 @@
+"""Cog for managing user reputation."""
 import logging
 
 import discord
@@ -11,12 +12,14 @@ logger = logging.getLogger(__name__)
 
 
 class ReputationCog(commands.Cog):
+    """Cog for managing user reputation."""
     def __init__(self, bot):
         self.bot = bot
         self.rep_repo = SQLiteReputationDeltaRepository()
 
     @commands.group(name="rep")
     async def rep(self, ctx: commands.Context):
+        """Base command for .rep without arguments."""
         await send_message_and_file(channel=ctx.channel, message="Valid commands are: *add*, *delete*, and *view*")
 
     @rep.command(
@@ -27,6 +30,7 @@ class ReputationCog(commands.Cog):
     )
     @mod_only("add a reputation delta")
     async def rep_add(self, ctx: commands.Context, user: discord.User, amount: int, *, reason: str = "unspecified"):
+        """Adds a reputation delta for a user."""
         delta = ReputationDelta(user.id, amount, reason=reason)
         self.rep_repo.save(delta)
 
@@ -44,17 +48,20 @@ class ReputationCog(commands.Cog):
         help="Usage: .rep delete <id>"
     )
     @mod_only("delete a reputation delta")
-    async def rep_delete(self, ctx: commands.Context, id: int):
-        self.rep_repo.delete(id)
-        await send_message_and_file(channel=ctx.channel, message=f"Deleted Reputation Delta with ID of {id}")
+    async def rep_delete(self, ctx: commands.Context, delta_id: int):
+        """Deletes a reputation delta by ID."""
+        self.rep_repo.delete(delta_id)
+        await send_message_and_file(channel=ctx.channel, message=f"Deleted Reputation Delta with ID of {delta_id}")
 
     @rep.command(
         name="view",
         brief="View a user's rep history",
         description="",
-        help="Usage: .rep view <user> <history_check>\nHistory check default = 'none', Moderators can use 'all' to fetch reasons"
+        help="Usage: .rep view <user> <history_check>\n" +
+             "History check default = 'none', Moderators can use 'all' to fetch reasons"
     )
     async def rep_view(self, ctx: commands.Context, user: discord.User, history_check: str = "none"):
+        """Views a user's reputation history."""
         history = list(self.rep_repo.find_by(lambda d: d.user_id == user.id))
 
         out = f"### Overall Value: {sum(d.delta for d in history)}\n"
@@ -68,5 +75,6 @@ class ReputationCog(commands.Cog):
 
 
 async def setup(bot):
+    """Setup function for the Reputation cog."""
     cog = ReputationCog(bot)
     await bot.add_cog(cog)

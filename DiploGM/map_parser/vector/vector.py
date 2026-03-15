@@ -208,33 +208,22 @@ class Parser:
         for name, data in self.data["overrides"][HIGH_PROVINCES_KEY].items():
             high_provinces: list[Province] = []
             for index in range(1, data["num"] + 1):
-                province = Province(
-                    name + str(index),
-                    shapely.Polygon(),
-                    dict(),
-                    getattr(ProvinceType, data["type"]),
-                    False,
-                    set(),
-                    set(),
-                    None,
-                    None,
-                    None,
-                )
+                province = Province(name + str(index), shapely.Polygon(), getattr(ProvinceType, data["type"]))
                 provinces = self.add_province_to_board(provinces, province)
                 high_provinces.append(province)
 
             # Add connections between each high province
             for provinceA in high_provinces:
-                provinceA.adjacent.update(provinceB for provinceB in high_provinces
+                provinceA.adjacency_data.adjacent.update(provinceB for provinceB in high_provinces
                                         if provinceA.name != provinceB.name)
 
         for name, data in self.data["overrides"][HIGH_PROVINCES_KEY].items():
             adjacent = {self.name_to_province[n] for n in data["adjacencies"]}
             for index in range(1, data["num"] + 1):
                 high_province = self.name_to_province[name + str(index)]
-                high_province.adjacent.update(adjacent)
+                high_province.adjacency_data.adjacent.update(adjacent)
                 for ad in adjacent:
-                    ad.adjacent.add(high_province)
+                    ad.adjacency_data.adjacent.add(high_province)
         return provinces
 
     def json_cheats(self, provinces: set[Province]) -> set[Province]:
@@ -261,17 +250,17 @@ class Parser:
             province = self.name_to_province[name]
             # TODO: Some way to specify whether or not to clear other adjacencies?
             if "adjacencies" in data:
-                province.adjacent.update({self.name_to_province[n] for n in data["adjacencies"]})
+                province.adjacency_data.adjacent.update({self.name_to_province[n] for n in data["adjacencies"]})
             if "remove_adjacencies" in data:
-                province.adjacent.difference_update({self.name_to_province[n] for n in data["remove_adjacencies"]})
+                province.adjacency_data.adjacent.difference_update({self.name_to_province[n] for n in data["remove_adjacencies"]})
             if "remove_adjacent_coasts" in data:
-                province.nonadjacent_coasts.update(data["remove_adjacent_coasts"])
+                province.adjacency_data.nonadjacent_coasts.update(data["remove_adjacent_coasts"])
             if "difficult_adjacency" in data:
-                province.difficult_adjacencies.update(data["difficult_adjacency"])
+                province.adjacency_data.difficult_adjacencies.update(data["difficult_adjacency"])
             if "coasts" in data:
-                province.fleet_adjacent = {}
+                province.adjacency_data.fleet_adjacent = {}
                 for coast_name, coast_adjacent in data["coasts"].items():
-                    province.fleet_adjacent[coast_name] = {self._get_province_and_coast(n) for n in coast_adjacent}
+                    province.adjacency_data.fleet_adjacent[coast_name] = {self._get_province_and_coast(n) for n in coast_adjacent}
             # For compatability reasons, we assume these are sea tiles
             # TODO: Add support for armies/multicoastal tiles
             unit_locs = data.get("unit_loc", [])
@@ -382,18 +371,7 @@ class Parser:
                 if name == "":
                     raise RuntimeError(f"Province name not found in province with data {province_data}")
 
-            province = Province(
-                name,
-                poly,
-                dict(),
-                province_type,
-                False,
-                set(),
-                set(),
-                None,
-                None,
-                None,
-            )
+            province = Province(name, poly, province_type)
 
             provinces.add(province)
         return provinces
@@ -438,7 +416,7 @@ class Parser:
                 core_data = center_data.findall(".//svg:circle", namespaces=NAMESPACE)
                 if len(core_data) >= 2:
                     core = self.get_element_player(core_data[1], province_name=province.name)
-            province.core = core
+            province.core_data.core = core
 
     # Sets province supply center values
     def _initialize_supply_centers(self, provinces: set[Province]) -> None:

@@ -77,7 +77,7 @@ class RetreatsAdjudicator(Adjudicator):
             if len(retreating_units) != 1:
                 difficult_units = {u for u in retreating_units
                                    if isinstance(u.order, RetreatMove)
-                                       and u.order.destination.name in u.province.difficult_adjacencies}
+                                       and u.order.destination.name in u.province.adjacency_data.difficult_adjacencies}
                 units_to_delete.update(difficult_units)
                 retreating_units.difference_update(difficult_units)
                 if len(retreating_units) != 1:

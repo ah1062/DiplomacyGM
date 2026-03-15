@@ -15,16 +15,16 @@ class TestParseEditState(unittest.TestCase):
     def test_set_core(self):
         b = BoardBuilder()
         _parse_command("set_core Belgium England", b.board)
-        self.assertEqual(b.board.get_province("Belgium").core, b.players["England"], "Failed to set core ownership for Belgium")
+        self.assertEqual(b.board.get_province("Belgium").core_data.core, b.players["England"], "Failed to set core ownership for Belgium")
         _parse_command("set_core Belgium None", b.board)
-        self.assertIsNone(b.board.get_province("Belgium").core, "Failed to remove core ownership for Belgium")
+        self.assertIsNone(b.board.get_province("Belgium").core_data.core, "Failed to remove core ownership for Belgium")
 
     def test_set_half_core(self):
         b = BoardBuilder()
         _parse_command("set_half_core Spain France", b.board)
-        self.assertEqual(b.board.get_province("Spain").half_core, b.players["France"], "Failed to add half-core ownership for Spain")
+        self.assertEqual(b.board.get_province("Spain").core_data.half_core, b.players["France"], "Failed to add half-core ownership for Spain")
         _parse_command("set_half_core Spain None", b.board)
-        self.assertIsNone(b.board.get_province("Spain").half_core, "Failed to remove half-core ownership for Spain")
+        self.assertIsNone(b.board.get_province("Spain").core_data.half_core, "Failed to remove half-core ownership for Spain")
 
     def test_set_player_color(self):
         b = BoardBuilder()
@@ -42,10 +42,10 @@ class TestParseEditState(unittest.TestCase):
         b = BoardBuilder()
         _parse_command("set_total_owner Vienna Germany", b.board)
         self.assertEqual(b.board.get_province("Vienna").owner, b.players["Germany"], "Failed to set owner of Vienna to Germany")
-        self.assertEqual(b.board.get_province("Vienna").core, b.players["Germany"], "Failed to set core of Vienna to Germany")
+        self.assertEqual(b.board.get_province("Vienna").core_data.core, b.players["Germany"], "Failed to set core of Vienna to Germany")
         _parse_command("set_total_owner Vienna None", b.board)
         self.assertIsNone(b.board.get_province("Vienna").owner, "Failed to remove owner of Vienna")
-        self.assertIsNone(b.board.get_province("Vienna").core, "Failed to remove core of Vienna")
+        self.assertIsNone(b.board.get_province("Vienna").core_data.core, "Failed to remove core of Vienna")
 
     def test_create_unit(self):
         b = BoardBuilder()

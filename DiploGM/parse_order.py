@@ -261,14 +261,14 @@ builds_parser   = Lark(ebnf, start="build", parser="earley")
 
 def _check_for_warnings(unit: Unit) -> str | None:
     if isinstance(unit.order, order.Move):
-        if unit.order.destination not in unit.province.adjacent:
+        if unit.order.destination not in unit.province.adjacency_data.adjacent:
             return "This move is not to an adjacent province. This will fail unless there is a convoy."
         if unit.unit_type == UnitType.FLEET and unit.order.destination.get_multiple_coasts() and not unit.order.destination_coast:
             return "Destination province has multiple coasts. This might cause your order to fail if the fleet can reach more than one."
     if isinstance(unit.order, order.Support):
-        if unit.order.destination not in unit.province.adjacent:
+        if unit.order.destination not in unit.province.adjacency_data.adjacent:
             return "This support is not to an adjacent province and will fail."
-        if unit.order.source != unit.order.destination and unit.order.destination not in unit.order.source.adjacent:
+        if unit.order.source != unit.order.destination and unit.order.destination not in unit.order.source.adjacency_data.adjacent:
             return "This support is is between two non-adjacent provinces, and will fail unless there is a convoy."
     return None
 

@@ -188,7 +188,7 @@ class Board:
         for province in self.provinces:
             for unit in player.units:
                 if (unit.unit_type == UnitType.ARMY
-                    and province in unit.province.adjacent
+                    and province in unit.province.adjacency_data.adjacent
                     and province.type != ProvinceType.SEA):
                     visible.add(province)
 
@@ -200,8 +200,8 @@ class Board:
             visible.add(unit.province)
 
         for province in player.centers:
-            if province.core == player:
-                visible.update(province.adjacent)
+            if province.core_data.core == player:
+                visible.update(province.adjacency_data.adjacent)
             visible.add(province)
 
         return visible

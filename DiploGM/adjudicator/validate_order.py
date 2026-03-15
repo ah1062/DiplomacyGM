@@ -49,7 +49,7 @@ def convoy_is_possible(start: Province, end: Province, check_fleet_orders: bool 
             continue
         visited.add(current.name)
 
-        for adjacent_province in current.adjacent:
+        for adjacent_province in current.adjacency_data.adjacent:
             if adjacent_province == end:
                 return True
             adjacent_could_convoy = (adjacent_province.can_convoy
@@ -66,7 +66,7 @@ def convoy_is_possible(start: Province, end: Province, check_fleet_orders: bool 
     return False
 
 def _validate_move_army(province: Province, destination_province: Province) -> tuple[OrderValidity, str | None]:
-    if destination_province not in province.adjacent:
+    if destination_province not in province.adjacency_data.adjacent:
         return OrderValidity.INVALID, f"{province} does not border {destination_province}"
     if destination_province.type == ProvinceType.SEA:
         return OrderValidity.INVALID, "Armies cannot move to sea provinces"
@@ -155,7 +155,7 @@ def _validate_support_order(province: Province, order: Support) -> tuple[OrderVa
     move_valid, _ = order_is_valid(province, Move(order.destination), strict_coast_movement=False)
     if move_valid != OrderValidity.VALID:
         return OrderValidity.INVALID, "Cannot support somewhere you can't move to"
-    if order.destination.name in province.difficult_adjacencies:
+    if order.destination.name in province.adjacency_data.difficult_adjacencies:
         return OrderValidity.INVALID, \
             f"Cannot support to {order.destination} from {province} due to difficult adjacency"
     is_support_hold = order.source == order.destination
@@ -209,17 +209,17 @@ def order_is_valid(province: Province, order: Order, strict_coast_movement=True)
     elif isinstance(order, Core):
         if not province.has_supply_center:
             return OrderValidity.INVALID, f"{province} does not have a supply center to core"
-        if province.get_owner() != province.unit.player:
+        if province.owner != province.unit.player:
             return OrderValidity.INVALID, "Units can only core in owned supply centers"
         return OrderValidity.VALID, None
     elif isinstance(order, Transform):
         if not province.has_supply_center:
             return OrderValidity.INVALID, "Transformation must be done in a supply center"
-        if province.get_owner() != province.unit.player:
+        if province.owner != province.unit.player:
             return OrderValidity.INVALID, "Units can only transform in owned supply centers"
         if province.type == ProvinceType.SEA:
             return OrderValidity.INVALID, "Fleets cannot transform in sea provinces"
-        if not province.fleet_adjacent:
+        if province.is_landlocked():
             return OrderValidity.INVALID, "Armies cannot transform in inland provinces"
         if (province.unit.unit_type == UnitType.ARMY
             and province.get_multiple_coasts()

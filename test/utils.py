@@ -307,7 +307,7 @@ class BoardBuilder():
         for place in places:
             province = self.board.get_province(place)
             province.owner = player
-            province.core = player
+            province.core_data.core = player
             province.unit = None
 
     def assert_illegal(self, *units: Unit):

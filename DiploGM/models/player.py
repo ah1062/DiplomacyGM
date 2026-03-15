@@ -110,9 +110,9 @@ class Player:
         center_str = "Centers:"
         for center in centers:
             center_str += bullet
-            if center.core == self:
+            if center.core_data.core == self:
                 center_str += f"{center.name} (core)"
-            elif center.half_core == self:
+            elif center.core_data.half_core == self:
                 center_str += f"{center.name} (half-core)"
             else:
                 center_str += f"{center.name}"

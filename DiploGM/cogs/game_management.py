@@ -218,7 +218,7 @@ class GameManagementCog(commands.Cog):
             center
             for center in player.centers
             if center.unit is None
-            and (center.core == player or build_anywhere)
+            and (center.core_data.core == player or build_anywhere)
         ]
         available = min(len(available_centers), count)
 
