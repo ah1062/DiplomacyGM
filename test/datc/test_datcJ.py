@@ -21,13 +21,13 @@ class TestDATC_J(unittest.TestCase):
             the removal of the army in Paris fails (too many disbands).
         """
         b = BoardBuilder()
-        b.army("Paris", b.france)
-        b.army("Picardy", b.france)
+        b.army("Paris", b.players["France"])
+        b.army("Picardy", b.players["France"])
         # technically the order parser will notice that france doesn't own a unit in gulf of lyon so the order 
         # wouldn't reach this point.
-        b.disband(b.france, "Gulf of Lyon", "Picardy", "Paris")
+        b.disband(b.players["France"], "Gulf of Lyon", "Picardy", "Paris")
         b.builds_adjudicate(self)
-        b.assertBuildCount(-1)
+        b.assert_build_count(-1)
 
     # NOT APPLICABLE; 6_j_2 through 6_j_11
 

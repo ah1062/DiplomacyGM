@@ -19,11 +19,11 @@ class TestDATC_G(unittest.TestCase):
             I prefer the 2000 rules, so the units are swapped.
         """
         b = BoardBuilder()
-        a_norway = b.move(b.england, UnitType.ARMY, "Norway", "Sweden")
-        f_skagerrak = b.convoy(b.england, "Skagerrak", a_norway, "Sweden")
-        a_sweden = b.move(b.russia, UnitType.ARMY, "Sweden", "Norway")
+        a_norway = b.move(b.players["England"], UnitType.ARMY, "Norway", "Sweden")
+        f_skagerrak = b.convoy(b.players["England"], "Skagerrak", a_norway, "Sweden")
+        a_sweden = b.move(b.players["Russia"], UnitType.ARMY, "Sweden", "Norway")
 
-        b.assertSuccess(a_norway, f_skagerrak, a_sweden)
+        b.assert_success(a_norway, f_skagerrak, a_sweden)
         b.moves_adjudicate(self)
 
     def test_6_g_2(self):
@@ -41,11 +41,11 @@ class TestDATC_G(unittest.TestCase):
             Sweden.
         """
         b = BoardBuilder()
-        a_norway = b.move(b.england, UnitType.ARMY, "Norway", "Sweden")
-        b.convoy(b.germany, "Skagerrak", a_norway, "Sweden")
-        b.move(b.russia, UnitType.ARMY, "Sweden", "Norway")
-        
-        b.assertSuccess(a_norway, a_norway)
+        a_norway = b.move(b.players["England"], UnitType.ARMY, "Norway", "Sweden")
+        b.convoy(b.players["Germany"], "Skagerrak", a_norway, "Sweden")
+        b.move(b.players["Russia"], UnitType.ARMY, "Sweden", "Norway")
+
+        b.assert_success(a_norway, a_norway)
         b.moves_adjudicate(self)
 
     def test_6_g_3(self):
@@ -69,15 +69,15 @@ class TestDATC_G(unittest.TestCase):
             According to these rules the move from Picardy succeeds.
         """
         b = BoardBuilder()
-        f_brest = b.move(b.france, UnitType.FLEET, "Brest", "English Channel")
-        a_picardy = b.move(b.france, UnitType.ARMY, "Picardy", "Belgium")
-        a_burgundy = b.supportMove(b.france, UnitType.ARMY, "Burgundy", a_picardy, "Belgium")
-        a_mid_atlantic_ocean = b.supportMove(b.france, UnitType.FLEET, "Mid-Atlantic Ocean", f_brest, "English Channel")
-        f_english_channel = b.convoy(b.england, "English Channel", a_picardy, "Belgium")
-        
-        b.assertSuccess(f_brest, a_picardy, a_burgundy, a_mid_atlantic_ocean)
-        b.assertFail(f_english_channel)
-        b.assertDislodge(f_english_channel)
+        f_brest = b.move(b.players["France"], UnitType.FLEET, "Brest", "English Channel")
+        a_picardy = b.move(b.players["France"], UnitType.ARMY, "Picardy", "Belgium")
+        a_burgundy = b.support_move(b.players["France"], UnitType.ARMY, "Burgundy", a_picardy, "Belgium")
+        a_mid_atlantic_ocean = b.support_move(b.players["France"], UnitType.FLEET, "Mid-Atlantic Ocean", f_brest, "English Channel")
+        f_english_channel = b.convoy(b.players["England"], "English Channel", a_picardy, "Belgium")
+
+        b.assert_success(f_brest, a_picardy, a_burgundy, a_mid_atlantic_ocean)
+        b.assert_fail(f_english_channel)
+        b.assert_dislodge(f_english_channel)
         b.moves_adjudicate(self)
 
     def test_6_g_4(self):
@@ -105,16 +105,16 @@ class TestDATC_G(unittest.TestCase):
             the 2000 clarification. According to these rules the move from Picardy succeeds.
         """
         b = BoardBuilder()
-        f_brest = b.move(b.france, UnitType.FLEET, "Brest", "English Channel")
-        a_picardy = b.move(b.france, UnitType.ARMY, "Picardy", "Belgium")
-        a_burgundy = b.supportMove(b.france, UnitType.ARMY, "Burgundy", a_picardy, "Belgium")
-        a_mid_atlantic_ocean = b.supportMove(b.france, UnitType.FLEET, "Mid-Atlantic Ocean", f_brest, "English Channel")
-        f_english_channel = b.convoy(b.england, "English Channel", a_picardy, "Belgium")
-        a_belgium = b.move(b.england, UnitType.ARMY, "Belgium", "Picardy")
+        f_brest = b.move(b.players["France"], UnitType.FLEET, "Brest", "English Channel")
+        a_picardy = b.move(b.players["France"], UnitType.ARMY, "Picardy", "Belgium")
+        a_burgundy = b.support_move(b.players["France"], UnitType.ARMY, "Burgundy", a_picardy, "Belgium")
+        a_mid_atlantic_ocean = b.support_move(b.players["France"], UnitType.FLEET, "Mid-Atlantic Ocean", f_brest, "English Channel")
+        f_english_channel = b.convoy(b.players["England"], "English Channel", a_picardy, "Belgium")
+        a_belgium = b.move(b.players["England"], UnitType.ARMY, "Belgium", "Picardy")
 
-        b.assertSuccess(f_brest, a_picardy, a_burgundy, a_mid_atlantic_ocean)
-        b.assertFail(f_english_channel, a_belgium)
-        b.assertDislodge(f_english_channel, a_belgium)
+        b.assert_success(f_brest, a_picardy, a_burgundy, a_mid_atlantic_ocean)
+        b.assert_fail(f_english_channel, a_belgium)
+        b.assert_dislodge(f_english_channel, a_belgium)
         b.moves_adjudicate(self)
 
     def test_6_g_5(self):
@@ -131,12 +131,12 @@ class TestDATC_G(unittest.TestCase):
             to move by convoy. So, it is just a head to head battle and both the army in Rome and Apulia will not move.
         """
         b = BoardBuilder()
-        a_rome = b.move(b.italy, UnitType.ARMY, "Rome", "Apulia")
-        a_apulia = b.move(b.turkey, UnitType.ARMY, "Apulia", "Rome")
-        b.convoy(b.turkey, "Ionian Sea", a_apulia, "Rome")
-        b.convoy(b.italy, "Tyrrhenian Sea", a_apulia, "Rome")
+        a_rome = b.move(b.players["Italy"], UnitType.ARMY, "Rome", "Apulia")
+        a_apulia = b.move(b.players["Turkey"], UnitType.ARMY, "Apulia", "Rome")
+        b.convoy(b.players["Turkey"], "Ionian Sea", a_apulia, "Rome")
+        b.convoy(b.players["Italy"], "Tyrrhenian Sea", a_apulia, "Rome")
 
-        b.assertSuccess(a_rome, a_apulia)
+        b.assert_success(a_rome, a_apulia)
         b.moves_adjudicate(self)
 
     def test_6_g_6(self):
@@ -162,15 +162,15 @@ class TestDATC_G(unittest.TestCase):
             army in Edinburgh and Liverpool will not move.
         """
         b = BoardBuilder()
-        a_liverpool = b.move(b.england, UnitType.ARMY, "Liverpool", "Edinburgh")
-        b.convoy(b.england, "English Channel", a_liverpool, "Edinburgh")
-        b.hold(b.france, UnitType.FLEET, "Irish Sea")
-        b.hold(b.france, UnitType.FLEET, "North Sea")
-        a_edinburgh = b.move(b.germany, UnitType.ARMY, "Edinburgh", "Liverpool")
-        b.convoy(b.russia, "Norwegian Sea", a_liverpool, "Edinburgh")
-        b.convoy(b.russia, "North Atlantic Ocean", a_liverpool, "Edinburgh")
-        
-        b.assertSuccess(a_liverpool, a_edinburgh)
+        a_liverpool = b.move(b.players["England"], UnitType.ARMY, "Liverpool", "Edinburgh")
+        b.convoy(b.players["England"], "English Channel", a_liverpool, "Edinburgh")
+        b.hold(b.players["France"], UnitType.FLEET, "Irish Sea")
+        b.hold(b.players["France"], UnitType.FLEET, "North Sea")
+        a_edinburgh = b.move(b.players["Germany"], UnitType.ARMY, "Edinburgh", "Liverpool")
+        b.convoy(b.players["Russia"], "Norwegian Sea", a_liverpool, "Edinburgh")
+        b.convoy(b.players["Russia"], "North Atlantic Ocean", a_liverpool, "Edinburgh")
+
+        b.assert_success(a_liverpool, a_edinburgh)
         b.moves_adjudicate(self)
 
     def test_6_g_7(self):
@@ -192,11 +192,11 @@ class TestDATC_G(unittest.TestCase):
             in the Gulf of Bothnia is ignored and can not show the intent. There is no convoy, so no unit will move.
         """
         b = BoardBuilder()
-        f_norway = b.move(b.england, UnitType.FLEET, "Norway", "Sweden")
-        a_sweden = b.move(b.russia, UnitType.ARMY, "Sweden", "Norway")
-        b.convoy(b.england, "Skagerrak", a_sweden, "Norway")
-        b.convoy(b.russia, "Gulf of Bothnia", a_sweden, "Norway")
-        b.assertSuccess(f_norway, a_sweden)
+        f_norway = b.move(b.players["England"], UnitType.FLEET, "Norway", "Sweden")
+        a_sweden = b.move(b.players["Russia"], UnitType.ARMY, "Sweden", "Norway")
+        b.convoy(b.players["England"], "Skagerrak", a_sweden, "Norway")
+        b.convoy(b.players["Russia"], "Gulf of Bothnia", a_sweden, "Norway")
+        b.assert_success(f_norway, a_sweden)
         b.moves_adjudicate(self)
 
     def test_6_g_8(self):
@@ -216,10 +216,10 @@ class TestDATC_G(unittest.TestCase):
             is no convoy, the move from Belgium to Holland fails.
         """
         b = BoardBuilder()
-        a_belgium = b.move(b.france, UnitType.ARMY, "Belgium", "Holland")
-        f_north_sea = b.move(b.england, UnitType.FLEET, "North Sea", "Heligoland Bight")
-        a_holland = b.move(b.england, UnitType.ARMY, "Holland", "Kiel")
-        b.assertSuccess(a_belgium, f_north_sea, a_holland)
+        a_belgium = b.move(b.players["France"], UnitType.ARMY, "Belgium", "Holland")
+        f_north_sea = b.move(b.players["England"], UnitType.FLEET, "North Sea", "Heligoland Bight")
+        a_holland = b.move(b.players["England"], UnitType.ARMY, "Holland", "Kiel")
+        b.assert_success(a_belgium, f_north_sea, a_holland)
         b.moves_adjudicate(self)
 
     def test_6_g_9(self):
@@ -242,13 +242,13 @@ class TestDATC_G(unittest.TestCase):
             considered. The Russian army in Sweden is dislodged.
         """
         b = BoardBuilder()
-        
-        a_norway = b.move(b.england, UnitType.ARMY, "Norway", "Sweden")
-        b.convoy(b.england, "Skagerrak", a_norway, "Sweden")
-        b.supportMove(b.england, UnitType.FLEET, "Finland", a_norway, "Sweden")
-        a_sweden = b.move(b.russia, UnitType.ARMY, "Sweden", "Norway")
 
-        b.assertSuccess(a_norway, a_sweden)
+        a_norway = b.move(b.players["England"], UnitType.ARMY, "Norway", "Sweden")
+        b.convoy(b.players["England"], "Skagerrak", a_norway, "Sweden")
+        b.support_move(b.players["England"], UnitType.FLEET, "Finland", a_norway, "Sweden")
+        a_sweden = b.move(b.players["Russia"], UnitType.ARMY, "Sweden", "Norway")
+
+        b.assert_success(a_norway, a_sweden)
         b.moves_adjudicate(self)
 
     def test_6_g_10(self):
@@ -275,18 +275,18 @@ class TestDATC_G(unittest.TestCase):
             the Norwegian Sea will fail to move.
         """
         b = BoardBuilder()
-        a_norway = b.move(b.england, UnitType.ARMY, "Norway", "Sweden")
-        f_denmark = b.supportMove(b.england, UnitType.FLEET, "Denmark", a_norway, "Sweden")
-        f_finland = b.supportMove(b.england, UnitType.FLEET, "Finland", a_norway, "Sweden")
-        f_skagerrak = b.convoy(b.germany, "Skagerrak", a_norway, "Sweden")
-        a_sweden = b.move(b.russia, UnitType.ARMY, "Sweden", "Norway");
-        b.supportMove(b.russia, UnitType.FLEET, "Barents Sea", a_sweden, "Norway")
-        f_norwegian_sea = b.move(b.france, UnitType.FLEET, "Norwegian Sea", "Norway")
-        b.supportMove(b.france, UnitType.FLEET, "North Sea", f_norwegian_sea, "Norway")
+        a_norway = b.move(b.players["England"], UnitType.ARMY, "Norway", "Sweden")
+        f_denmark = b.support_move(b.players["England"], UnitType.FLEET, "Denmark", a_norway, "Sweden")
+        f_finland = b.support_move(b.players["England"], UnitType.FLEET, "Finland", a_norway, "Sweden")
+        f_skagerrak = b.convoy(b.players["Germany"], "Skagerrak", a_norway, "Sweden")
+        a_sweden = b.move(b.players["Russia"], UnitType.ARMY, "Sweden", "Norway");
+        b.support_move(b.players["Russia"], UnitType.FLEET, "Barents Sea", a_sweden, "Norway")
+        f_norwegian_sea = b.move(b.players["France"], UnitType.FLEET, "Norwegian Sea", "Norway")
+        b.support_move(b.players["France"], UnitType.FLEET, "North Sea", f_norwegian_sea, "Norway")
 
-        b.assertDislodge(a_sweden)
-        b.assertSuccess(f_denmark, f_finland, f_skagerrak, a_norway)
-        b.assertFail(f_norwegian_sea, a_sweden)
+        b.assert_dislodge(a_sweden)
+        b.assert_success(f_denmark, f_finland, f_skagerrak, a_norway)
+        b.assert_fail(f_norwegian_sea, a_sweden)
         b.moves_adjudicate(self)
 
     def test_6_g_11(self):
@@ -311,16 +311,16 @@ class TestDATC_G(unittest.TestCase):
             in the North Sea will dislodge the Russian fleet in Skagerrak and the army in Sweden will not advance.
         """
         b = BoardBuilder()
-        f_north_sea = b.move(b.england, UnitType.FLEET, "North Sea", "Skagerrak")
-        f_norway = b.supportMove(b.england, UnitType.FLEET, "Norway", f_north_sea, "Skagerrak")
-        a_sweden = b.move(b.russia, UnitType.ARMY, "Sweden", "Norway")
-        f_skagerrak = b.convoy(b.russia, "Skagerrak", a_sweden, "Norway")
-        b.supportMove(b.russia, UnitType.FLEET, "Barents Sea", a_sweden, "Norway")
-        
-        b.assertDislodge(f_norway)
-        b.assertSuccess(a_sweden)
-        b.assertFail(f_norway)
-        b.assertNotDislodge(f_skagerrak)
+        f_north_sea = b.move(b.players["England"], UnitType.FLEET, "North Sea", "Skagerrak")
+        f_norway = b.support_move(b.players["England"], UnitType.FLEET, "Norway", f_north_sea, "Skagerrak")
+        a_sweden = b.move(b.players["Russia"], UnitType.ARMY, "Sweden", "Norway")
+        f_skagerrak = b.convoy(b.players["Russia"], "Skagerrak", a_sweden, "Norway")
+        b.support_move(b.players["Russia"], UnitType.FLEET, "Barents Sea", a_sweden, "Norway")
+
+        b.assert_dislodge(f_norway)
+        b.assert_success(a_sweden)
+        b.assert_fail(f_norway)
+        b.assert_not_dislodge(f_skagerrak)
         b.moves_adjudicate(self)
 
     def test_6_g_12(self):
@@ -336,18 +336,18 @@ class TestDATC_G(unittest.TestCase):
             The armies in Liverpool and Edinburgh are swapped.
         """
         b = BoardBuilder()
-        a_liverpool = b.move(b.england, UnitType.ARMY, "Liverpool", "Edinburgh")
-        f_north_atlantic = b.convoy(b.england, "North Atlantic Ocean", a_liverpool, "Edinburgh")
-        f_norwegian_sea = b.convoy(b.england, "Norwegian Sea", a_liverpool, "Edinburgh")
-        
-        a_edinburgh = b.move(b.germany, UnitType.ARMY, "Edinburgh", "Liverpool")
-        f_north_sea = b.convoy(b.germany, "North Sea", a_edinburgh, "Liverpool")
-        f_english_channel = b.convoy(b.germany, "English Channel", a_edinburgh, "Liverpool")
-        f_irish_sea = b.convoy(b.germany, "Irish Sea", a_edinburgh, "Liverpool")
+        a_liverpool = b.move(b.players["England"], UnitType.ARMY, "Liverpool", "Edinburgh")
+        f_north_atlantic = b.convoy(b.players["England"], "North Atlantic Ocean", a_liverpool, "Edinburgh")
+        f_norwegian_sea = b.convoy(b.players["England"], "Norwegian Sea", a_liverpool, "Edinburgh")
+
+        a_edinburgh = b.move(b.players["Germany"], UnitType.ARMY, "Edinburgh", "Liverpool")
+        f_north_sea = b.convoy(b.players["Germany"], "North Sea", a_edinburgh, "Liverpool")
+        f_english_channel = b.convoy(b.players["Germany"], "English Channel", a_edinburgh, "Liverpool")
+        f_irish_sea = b.convoy(b.players["Germany"], "Irish Sea", a_edinburgh, "Liverpool")
 
         # Assert the convoy movements
-        b.assertSuccess(f_north_atlantic, f_norwegian_sea, a_liverpool)  # England's convoy to Edinburgh
-        b.assertSuccess(f_north_sea, f_english_channel, f_irish_sea, a_edinburgh)  # Germany's convoy to Liverpool
+        b.assert_success(f_north_atlantic, f_norwegian_sea, a_liverpool)  # England's convoy to Edinburgh
+        b.assert_success(f_north_sea, f_english_channel, f_irish_sea, a_edinburgh)  # Germany's convoy to Liverpool
 
         # Adjudicate the moves to finalize the state
         b.moves_adjudicate(self)
@@ -373,16 +373,16 @@ class TestDATC_G(unittest.TestCase):
             army in Trieste is dislodged by the fleet in Albania.
         """
         b = BoardBuilder()
-        a_trieste = b.move(b.austria, UnitType.ARMY, "Trieste", "Venice")
-        b.convoy(b.austria, "Adriatic Sea", a_trieste, "Venice")
+        a_trieste = b.move(b.players["Austria"], UnitType.ARMY, "Trieste", "Venice")
+        b.convoy(b.players["Austria"], "Adriatic Sea", a_trieste, "Venice")
 
         # Italy's setup (support and move)
-        f_albania = b.move(b.italy, UnitType.FLEET, "Albania", "Trieste")
-        b.supportMove(b.italy, UnitType.ARMY, "Venice", f_albania, "Trieste")
+        f_albania = b.move(b.players["Italy"], UnitType.FLEET, "Albania", "Trieste")
+        b.support_move(b.players["Italy"], UnitType.ARMY, "Venice", f_albania, "Trieste")
 
-        b.assertFail(a_trieste)
-        b.assertDislodge(a_trieste)
-        b.assertSuccess(f_albania)
+        b.assert_fail(a_trieste)
+        b.assert_dislodge(a_trieste)
+        b.assert_success(f_albania)
 
         b.moves_adjudicate(self)
 
@@ -404,18 +404,18 @@ class TestDATC_G(unittest.TestCase):
             bounces and stays in the Norwegian Sea.
         """
         b = BoardBuilder()
-        a_norway = b.move(b.england, UnitType.ARMY, "Norway", "Sweden")
-        f_denmark = b.supportMove(b.england, UnitType.FLEET, "Denmark", a_norway, "Sweden")
-        f_finland = b.supportMove(b.england, UnitType.FLEET, "Finland", a_norway, "Sweden")
-        a_sweden = b.move(b.russia, UnitType.ARMY, "Sweden", "Norway");
-        f_skagerrak = b.convoy(b.germany, "Skagerrak", a_sweden, "Norway")
-        b.supportMove(b.russia, UnitType.FLEET, "Barents Sea", a_sweden, "Norway")
-        f_norwegian_sea = b.move(b.france, UnitType.FLEET, "Norwegian Sea", "Norway")
-        b.supportMove(b.france, UnitType.FLEET, "North Sea", f_norwegian_sea, "Norway")
+        a_norway = b.move(b.players["England"], UnitType.ARMY, "Norway", "Sweden")
+        f_denmark = b.support_move(b.players["England"], UnitType.FLEET, "Denmark", a_norway, "Sweden")
+        f_finland = b.support_move(b.players["England"], UnitType.FLEET, "Finland", a_norway, "Sweden")
+        a_sweden = b.move(b.players["Russia"], UnitType.ARMY, "Sweden", "Norway")
+        f_skagerrak = b.convoy(b.players["Germany"], "Skagerrak", a_sweden, "Norway")
+        b.support_move(b.players["Russia"], UnitType.FLEET, "Barents Sea", a_sweden, "Norway")
+        f_norwegian_sea = b.move(b.players["France"], UnitType.FLEET, "Norwegian Sea", "Norway")
+        b.support_move(b.players["France"], UnitType.FLEET, "North Sea", f_norwegian_sea, "Norway")
 
-        b.assertDislodge(a_sweden)
-        b.assertSuccess(f_denmark, f_finland, f_skagerrak, a_norway)
-        b.assertFail(f_norwegian_sea, a_sweden)
+        b.assert_dislodge(a_sweden)
+        b.assert_success(f_denmark, f_finland, f_skagerrak, a_norway)
+        b.assert_fail(f_norwegian_sea, a_sweden)
         b.moves_adjudicate(self)
 
     def test_6_g_15(self):
@@ -434,16 +434,16 @@ class TestDATC_G(unittest.TestCase):
             stays in Yorkshire.
         """
         b = BoardBuilder()
-        a_yorkshire = b.move(b.england, UnitType.ARMY, "Yorkshire", "London")
-        a_london = b.move(b.england, UnitType.ARMY, "London", "Belgium")
-        b.convoy(b.england, "North Sea", a_london, "Belgium")
-        b.supportMove(b.england, UnitType.ARMY, "Holland", a_london, "Belgium")
-        a_belgium = b.move(b.france, UnitType.ARMY, "Belgium", "London")
-        b.convoy(b.france, "English Channel", a_belgium, "London")
+        a_yorkshire = b.move(b.players["England"], UnitType.ARMY, "Yorkshire", "London")
+        a_london = b.move(b.players["England"], UnitType.ARMY, "London", "Belgium")
+        b.convoy(b.players["England"], "North Sea", a_london, "Belgium")
+        b.support_move(b.players["England"], UnitType.ARMY, "Holland", a_london, "Belgium")
+        a_belgium = b.move(b.players["France"], UnitType.ARMY, "Belgium", "London")
+        b.convoy(b.players["France"], "English Channel", a_belgium, "London")
 
-        b.assertDislodge(a_belgium)
-        b.assertSuccess(a_london)
-        b.assertFail(a_belgium, a_yorkshire)
+        b.assert_dislodge(a_belgium)
+        b.assert_success(a_london)
+        b.assert_fail(a_belgium, a_yorkshire)
         b.moves_adjudicate(self)
 
     def test_6_g_16(self):
@@ -467,16 +467,16 @@ class TestDATC_G(unittest.TestCase):
             in Norway, because it is stronger then the fleet in the North Sea. This fleet will stay in the North Sea.
         """
         b = BoardBuilder()
-        a_norway = b.move(b.england, UnitType.ARMY, "Norway", "Sweden")
-        b.supportMove(b.england, UnitType.FLEET, "Denmark", a_norway, "Sweden")
-        b.supportMove(b.england, UnitType.FLEET, "Baltic Sea", a_norway, "Sweden")
-        f_north_sea = b.move(b.england, UnitType.FLEET, "North Sea", "Norway")
-        a_sweden = b.move(b.russia, UnitType.ARMY, "Sweden", "Norway");
-        b.convoy(b.russia, "Skagerrak", a_sweden, "Norway")
-        b.supportMove(b.russia, UnitType.FLEET, "Norwegian Sea", a_sweden, "Norway")
+        a_norway = b.move(b.players["England"], UnitType.ARMY, "Norway", "Sweden")
+        b.support_move(b.players["England"], UnitType.FLEET, "Denmark", a_norway, "Sweden")
+        b.support_move(b.players["England"], UnitType.FLEET, "Baltic Sea", a_norway, "Sweden")
+        f_north_sea = b.move(b.players["England"], UnitType.FLEET, "North Sea", "Norway")
+        a_sweden = b.move(b.players["Russia"], UnitType.ARMY, "Sweden", "Norway")
+        b.convoy(b.players["Russia"], "Skagerrak", a_sweden, "Norway")
+        b.support_move(b.players["Russia"], UnitType.FLEET, "Norwegian Sea", a_sweden, "Norway")
 
-        b.assertFail(f_north_sea)
-        b.assertSuccess(a_norway, a_sweden)
+        b.assert_fail(f_north_sea)
+        b.assert_success(a_norway, a_sweden)
         b.moves_adjudicate(self)
 
     def test_6_g_17(self):
@@ -492,16 +492,16 @@ class TestDATC_G(unittest.TestCase):
             Sweden and Norway are swapped, while the fleet in the North Sea will bounce.
         """
         b = BoardBuilder()
-        a_norway = b.move(b.england, UnitType.ARMY, "Norway", "Sweden")
-        b.supportMove(b.england, UnitType.FLEET, "Denmark", a_norway, "Sweden")
-        b.supportMove(b.england, UnitType.FLEET, "Baltic Sea", a_norway, "Sweden")
-        b.convoy(b.russia, "Skagerrak", a_norway, "Sweden")
-        f_north_sea = b.move(b.england, UnitType.FLEET, "North Sea", "Norway")
-        a_sweden = b.move(b.russia, UnitType.ARMY, "Sweden", "Norway");
-        b.supportMove(b.russia, UnitType.FLEET, "Norwegian Sea", a_sweden, "Norway")
+        a_norway = b.move(b.players["England"], UnitType.ARMY, "Norway", "Sweden")
+        b.support_move(b.players["England"], UnitType.FLEET, "Denmark", a_norway, "Sweden")
+        b.support_move(b.players["England"], UnitType.FLEET, "Baltic Sea", a_norway, "Sweden")
+        b.convoy(b.players["Russia"], "Skagerrak", a_norway, "Sweden")
+        f_north_sea = b.move(b.players["England"], UnitType.FLEET, "North Sea", "Norway")
+        a_sweden = b.move(b.players["Russia"], UnitType.ARMY, "Sweden", "Norway")
+        b.support_move(b.players["Russia"], UnitType.FLEET, "Norwegian Sea", a_sweden, "Norway")
 
-        b.assertFail(f_north_sea)
-        b.assertSuccess(a_norway, a_sweden)
+        b.assert_fail(f_north_sea)
+        b.assert_success(a_norway, a_sweden)
         b.moves_adjudicate(self)
 
     def test_6_g_18(self):
@@ -518,15 +518,15 @@ class TestDATC_G(unittest.TestCase):
             Belgium and London are swapped, while the army in Yorkshire fails to move to London.
         """
         b = BoardBuilder()
-        a_london = b.move(b.england, UnitType.ARMY, "London", "Belgium")
-        b.convoy(b.england, "North Sea", a_london, "Belgium")
-        b.supportMove(b.england, UnitType.ARMY, "Holland", a_london, "Belgium")
-        b.supportMove(b.england, UnitType.ARMY, "Ruhr", a_london, "Belgium")
-        a_yorkshire = b.move(b.england, UnitType.ARMY, "Yorkshire", "London")
-        a_belgium = b.move(b.france, UnitType.ARMY, "Belgium", "London")
-        b.convoy(b.france, "English Channel", a_belgium, "London")
-        b.supportMove(b.france, UnitType.ARMY, "Wales", a_belgium, "London")
+        a_london = b.move(b.players["England"], UnitType.ARMY, "London", "Belgium")
+        b.convoy(b.players["England"], "North Sea", a_london, "Belgium")
+        b.support_move(b.players["England"], UnitType.ARMY, "Holland", a_london, "Belgium")
+        b.support_move(b.players["England"], UnitType.ARMY, "Ruhr", a_london, "Belgium")
+        a_yorkshire = b.move(b.players["England"], UnitType.ARMY, "Yorkshire", "London")
+        a_belgium = b.move(b.players["France"], UnitType.ARMY, "Belgium", "London")
+        b.convoy(b.players["France"], "English Channel", a_belgium, "London")
+        b.support_move(b.players["France"], UnitType.ARMY, "Wales", a_belgium, "London")
 
-        b.assertSuccess(a_belgium, a_london)
-        b.assertFail(a_yorkshire)
+        b.assert_success(a_belgium, a_london)
+        b.assert_fail(a_yorkshire)
         b.moves_adjudicate(self)

@@ -8,7 +8,7 @@ class TransGL3:
             transform_string = ""
         if not isinstance(transform_string, str):
             transform_string = transform_string.get("transform", "")
-        
+
         pre = None
         post = None
         self.matrix = np.array([
@@ -62,12 +62,12 @@ class TransGL3:
             ])
             self.matrix = self.matrix @ m
 
-        if ("matrix" not in transform_string 
+        if ("matrix" not in transform_string
             and "translate" not in transform_string
             and "rotate" not in transform_string
             and transform_string != ""):
             raise Exception(f"Unknown transformation: {transform_string}")
-        
+
         # the matrix represents the transformation from (x, y, const) to (x, y const)
         # we preserve the const via a 1 so that convolutions work correctly
         if pre is not None and post is not None:

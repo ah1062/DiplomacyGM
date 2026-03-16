@@ -35,9 +35,11 @@ class Manager(metaclass=SingletonMeta):
         # do it like this so that the parser can cache data between board initializations
 
     def list_servers(self) -> set[int]:
+        """Gets a list of server ids that have games."""
         return set(self._boards.keys())
 
-    def create_game(self, server_id: int, gametype: str = "impdip") -> str:
+    def create_game(self, server_id: int, gametype: str = "classic") -> str:
+        """Creates a new game in the specified server and of the specified variant."""
         if self._boards.get(server_id):
             return "A game already exists in this server."
         if not os.path.isdir(f"variants/{gametype}"):
@@ -52,18 +54,23 @@ class Manager(metaclass=SingletonMeta):
 
     # Gets adjacent provinces, but with High Seas combined into one for the purpose of finding adjacency issues
     def _get_adjacent_geom(self, province: Province) -> set[Province]:
-        return {a for a in province.adjacent if a.name[-1] not in "23456789"}
+        return {a for a in province.adjacency_data.adjacent if a.name[-1] not in "23456789"}
 
     # A recursive function to find loops of provinces with no internal adjacencies
     # Generally, two adjacent provinces should share exactly two adjacencies on either side
     # If there's only one, that typeically means there's a "hole" or the edge of the board
     # We try to trace a chain of such provinces, and if we reach the start, we have a loop
-    def _find_province_loop(self, province: Province, destination: Province, visited: list[Province], ignored_provinces: set[Province]) -> Optional[list[Province]]:
+    def _find_province_loop(self,
+                            province: Province,
+                            destination: Province,
+                            visited: list[Province],
+                            ignored_provinces: set[Province]) -> Optional[list[Province]]:
         if province == destination:
             return None if len(visited) == 2 else visited # A -> B -> A shouldn't count
         visited.append(province)
         for adj in self._get_adjacent_geom(province):
-            if adj in visited[1:] or adj in ignored_provinces: # ignored_provinces prevents us finding the same loop multiple times
+            # ignored_provinces prevents us finding the same loop multiple times
+            if adj in visited[1:] or adj in ignored_provinces:
                 continue
             if len(self._get_adjacent_geom(province) & self._get_adjacent_geom(adj)) > 1:
                 continue
@@ -76,13 +83,17 @@ class Manager(metaclass=SingletonMeta):
     # This is a function that goes through a map and attempts to find adjacency issues
     # It will not be fool-proof, but it should detect the majority of potential errors
     # The list of warnings it generates include the following:
-    # - High Seas provinces in the same region that have different adjacencies (e.g. Cape Khoe bordering SAO1 but not SAO2)
+    # - High Seas provinces in the same region that have different adjacencies
+    #   (e.g. Cape Khoe bordering SAO1 but not SAO2)
     # - Provinces with zero adjacencies
     # - Adjacent provinces that have no common adjacencies
     # - Loops of provinces that have no internal connections (note that this does detect the board edges)
     # - Groups of four provinces that all border each other
     # TODO: Potentially simplify this function's complexity
     def verify_adjacencies(self, variant: str) -> str:
+        """Checks for potential adjacency issues in a variant.
+        This is not guaranteed to find all issues, but should find the majority of them.
+        Returns a string listing any warnings found."""
         if not os.path.isdir(f"variants/{variant}"):
             return f"Game {variant} does not exist."
         board: Board = get_parser(variant).parse()
@@ -96,46 +107,54 @@ class Manager(metaclass=SingletonMeta):
             try:
                 comp_province = board.get_province(province.name[:-1] + "1")
                 # Two high seas' adjacencies should differ by only each other
-                if comp_province.adjacent ^ province.adjacent != {province, comp_province}:
+                if comp_province.adjacency_data.adjacent ^ province.adjacency_data.adjacent != {province, comp_province}:
                     warnings.append(f"Province {province.name} and {comp_province.name} have different adjacencies")
                 visited_provinces.add(province)
             except ValueError:
-                warnings.append(f"Province {province.name} is named like a high seas province but {province.name[:-1]}1 was not found")
-    
+                warnings.append(f"Province {province.name} is named like a high seas province " +
+                                f"but {province.name[:-1]}1 was not found")
+
         for province in board.provinces:
             if province in visited_provinces:
                 continue
-            if len(province.adjacent) == 0:
+            if len(province.adjacency_data.adjacent) == 0:
                 warnings.append(f"Province {province.name} has no adjacencies")
             visited_adjacent = set()
             for adj in self._get_adjacent_geom(province) - visited_provinces:
                 common_adj = self._get_adjacent_geom(province) & self._get_adjacent_geom(adj)
                 if len(common_adj) == 0:
-                    warnings.append(f"Provinces {province.name} and {adj.name} are adjacent but have no common adjacencies")
+                    warnings.append(f"Provinces {province.name} and {adj.name} are adjacent " +
+                                    "but have no common adjacencies")
                     continue
                 # Finding loops of provinces
                 if len(common_adj) == 1:
                     loop = self._find_province_loop(adj, province, [province], visited_provinces)
-                    if loop is not None and loop[1].name > loop[-1].name: # Otherwise we would see each loop in both directions
-                        warnings.append(f"Found a loop of provinces {', '.join(p.name for p in loop)}. If they surround an impassible province or the board edge, this is expected")
-                
+                    # Comparing names of the first and last provinces in the loop so we only report it once
+                    if loop is not None and loop[1].name > loop[-1].name:
+                        warnings.append(f"Found a loop of provinces {', '.join(p.name for p in loop)}. " +
+                                        "If they surround an impassible province or the board edge, this is expected")
+
                 # Searching for groups of four provinces that all share a border
                 visited_third = set()
                 for third_province in common_adj - visited_provinces - visited_adjacent:
-                    fourth_adjacent = common_adj & self._get_adjacent_geom(third_province) - visited_provinces - visited_adjacent - visited_third
+                    fourth_adjacent = (common_adj & self._get_adjacent_geom(third_province)
+                                       - visited_provinces - visited_adjacent - visited_third)
                     for fourth_province in fourth_adjacent:
                         if min(len(self._get_adjacent_geom(province)),
                                len(self._get_adjacent_geom(adj)),
                                len(self._get_adjacent_geom(third_province)),
                                len(self._get_adjacent_geom(fourth_province))) == 3:
-                            continue # Skips provinces that only border the other three, as that's geometrically possible
-                        warnings.append(f"Provinces {province.name}, {adj.name}, {third_province.name}, and {fourth_province.name} all border each other")
+                            # Skips provinces that only border the other three, as that's geometrically possible
+                            continue
+                        warnings.append(f"Provinces {province.name}, {adj.name}, {third_province.name}, " +
+                                        f"and {fourth_province.name} all border each other")
                     visited_third.add(third_province)
                 visited_adjacent.add(adj)
             visited_provinces.add(province)
         return "\n".join(warnings) if warnings else "No adjacency issues found"
 
     def get_spec_request(self, server_id: int, user_id: int) -> SpecRequest | None:
+        """Gets a spec request for a user in a server, if it exists."""
         if server_id not in self._spec_requests:
             return None
 
@@ -148,6 +167,7 @@ class Manager(metaclass=SingletonMeta):
     def save_spec_request(
         self, server_id: int, user_id: int, role_id: int, override=False
     ) -> str:
+        """Saves a spec request for a user in a server."""
         # create new list if first time in server
         if server_id not in self._spec_requests:
             self._spec_requests[server_id] = []
@@ -163,6 +183,7 @@ class Manager(metaclass=SingletonMeta):
         return "Approved request Logged!"
 
     def get_board(self, server_id: int) -> Board:
+        """Gets the current board for a server."""
         # NOTE: Temporary for Meme's Severence Diplomacy Event
         if server_id == SEVERENCE_B_ID:
             server_id = SEVERENCE_A_ID
@@ -177,10 +198,12 @@ class Manager(metaclass=SingletonMeta):
         return board
 
     def total_delete(self, server_id: int):
+        """Completely wipes all data for a server."""
         self._database.total_delete(self._boards[server_id])
         del self._boards[server_id]
 
     def list_variants(self) -> str:
+        """Lists all available variants."""
         variants = os.listdir("variants")
         loaded_variants = []
         for v in variants:
@@ -201,6 +224,12 @@ class Manager(metaclass=SingletonMeta):
         movement_only: bool = False,
         is_severance: bool = False,
     ) -> tuple[bytes, str]:
+        """Gets the map for a server.
+        draw_moves: whether to draw the moves on the map
+        player_restriction: only draws moves that the player knows about
+        color_mode: whether to use a special color mode (e.g. dark, pink, etc.)
+        turn: whether to draw the map for a previous turn (defaults to current turn)
+        movement_only: whether to only draw succcessful moves (used mainly for Carnage)"""
         cur_board = self.get_board(server_id)
         if turn is None:
             board = cur_board
@@ -242,6 +271,7 @@ class Manager(metaclass=SingletonMeta):
         color_mode: str | None = None,
         movement_only: bool = False,
     ) -> tuple[bytes, str]:
+        """Gets the current map for a board."""
         start = time.time()
 
         if draw_moves:
@@ -258,6 +288,7 @@ class Manager(metaclass=SingletonMeta):
         return svg, file_name
 
     def adjudicate(self, server_id: int, test: bool = False) -> Board:
+        """Adjudicates the game for a given board, and saves the result if it's not a test adjudication."""
         start = time.time()
 
         board = self.get_board(server_id)
@@ -286,6 +317,8 @@ class Manager(metaclass=SingletonMeta):
         player_restriction: Player | None,
         color_mode: str | None = None,
     ) -> tuple[bytes, str]:
+        """Draws the current map for a board with fog of war.
+        Should probably be updated."""
         start = time.time()
 
         svg, file_name = Mapper(
@@ -302,6 +335,8 @@ class Manager(metaclass=SingletonMeta):
         player_restriction: Player | None,
         color_mode: str | None = None,
     ) -> tuple[bytes, str]:
+        """Draws the moves map for a board with fog of war for a specific player.
+        Should probably be updated."""
         start = time.time()
 
         if player_restriction:
@@ -320,6 +355,8 @@ class Manager(metaclass=SingletonMeta):
     def draw_fow_moves_map(
         self, server_id: int, player_restriction: Player | None
     ) -> tuple[bytes, str]:
+        """Draws the moves map for a board with fog of war.
+        Should probably be updated."""
         start = time.time()
 
         svg, file_name = Mapper(
@@ -336,6 +373,8 @@ class Manager(metaclass=SingletonMeta):
         player_restriction: Player | None = None,
         color_mode: str | None = None,
     ) -> tuple[bytes, str]:
+        """Draws the GUI map for a board with fog of war.
+        Should probably be updated."""
         start = time.time()
 
         svg, file_name = Mapper(
@@ -352,6 +391,7 @@ class Manager(metaclass=SingletonMeta):
         player_restriction: Player | None = None,
         color_mode: str | None = None,
     ) -> tuple[bytes, str]:
+        """Draws an GUI map for a board."""
         start = time.time()
 
         svg, file_name = Mapper(
@@ -363,6 +403,7 @@ class Manager(metaclass=SingletonMeta):
         return svg, file_name
 
     def rollback(self, server_id: int) -> tuple[str, bytes, str]:
+        """Rolls back the board to the previous turn."""
         logger.info(f"Rolling back in server {server_id}")
         board = self.get_board(server_id)
         # TODO: what happens if we're on the first phase?
@@ -390,6 +431,7 @@ class Manager(metaclass=SingletonMeta):
         return message, file, file_name
 
     def get_previous_board(self, server_id: int) -> Board | None:
+        """Gets the previous board for a server."""
         board = self.get_board(server_id)
         # TODO: what happens if we're on the first phase?
         last_turn = board.turn.get_previous_turn()
@@ -403,6 +445,7 @@ class Manager(metaclass=SingletonMeta):
         return old_board
 
     def reload(self, server_id: int) -> tuple[str, bytes, str]:
+        """Reloads the board for a server."""
         logger.info(f"Reloading server {server_id}")
         board = self.get_board(server_id)
 
@@ -422,9 +465,10 @@ class Manager(metaclass=SingletonMeta):
         return message, file, file_name
 
     def reload_variant(self, variant: str) -> str:
+        """Reloads a variant, including adjacencies and all boards."""
         if not os.path.isdir(f"variants/{variant}"):
             return f"Variant {variant} does not exist."
-        
+
         # Remove adjacency cache to force a reload
         if os.path.isfile(f"assets/{variant}_adjacencies.txt"):
             os.remove(f"assets/{variant}_adjacencies.txt")
@@ -443,6 +487,7 @@ class Manager(metaclass=SingletonMeta):
         return f"Reloaded variant {variant}"
 
     def get_member_player_object(self, member: Member | User) -> Player | None:
+        """Gets the player object associated with a Discord member, if it exists."""
         if isinstance(member, User):
             return None
         for role in member.roles:

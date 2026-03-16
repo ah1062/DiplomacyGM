@@ -27,7 +27,7 @@ class MovesAdjudicator(Adjudicator):
     # Algorithm from https://diplom.org/Zine/S2009M/Kruijswijk/DipMath_Chp6.htm
     def __init__(self, board: Board):
         super().__init__(board)
- 
+
         self.orders: set[AdjudicableOrder] = set()
 
         # run supports after everything else since illegal cores / moves should be treated as holds
@@ -57,7 +57,7 @@ class MovesAdjudicator(Adjudicator):
         # Replace invalid orders with holds
         # Importantly, this includes supports for which the corresponding unit didn't make the same move
         # Same for convoys
-        
+
         if unit.order is None:
             unit.order = NMR()
 
@@ -116,7 +116,7 @@ class MovesAdjudicator(Adjudicator):
 
     def _update_order(self, order: AdjudicableOrder):
         if order.type == OrderType.CORE and order.resolution == Resolution.SUCCEEDS:
-            order.source_province.corer = order.country
+            order.source_province.core_data.corer = order.country
         if order.type == OrderType.TRANSFORM and order.resolution == Resolution.SUCCEEDS:
             logger.debug(f"Transforming {order.base_unit}")
             if order.base_unit.unit_type == UnitType.ARMY:
@@ -135,11 +135,12 @@ class MovesAdjudicator(Adjudicator):
                 order.base_unit.retreat_options = None
             # Dislodge whatever is there
             order.destination_province.dislodged_unit = order.destination_province.unit
+            dislodged_unit = order.destination_province.dislodged_unit
             # see DATC 4.A.5
-            if order.destination_province.dislodged_unit is not None and order.destination_province.dislodged_unit.player is not None:
-                order.destination_province.dislodged_unit.add_retreat_options()
+            if dislodged_unit is not None and dislodged_unit.player is not None:
+                dislodged_unit.add_retreat_options()
                 if not order.is_convoy:
-                    order.destination_province.dislodged_unit.remove_retreat_option(order.source_province)
+                    dislodged_unit.remove_retreat_option(order.source_province)
             # Move us there
             order.base_unit.province = order.destination_province
             order.base_unit.coast = order.destination_coast
@@ -160,15 +161,15 @@ class MovesAdjudicator(Adjudicator):
             self._update_order(order)
 
         for province in self._board.provinces:
-            if province.corer:
-                if province.half_core == province.corer:
-                    province.core = province.corer
-                    province.half_core = None
+            if province.core_data.corer:
+                if province.core_data.half_core == province.core_data.corer:
+                    province.core_data.core = province.core_data.corer
+                    province.core_data.half_core = None
                 else:
-                    province.half_core = province.corer
+                    province.core_data.half_core = province.core_data.corer
             else:
-                province.half_core = None
-            province.corer = None
+                province.core_data.half_core = None
+            province.core_data.corer = None
 
         contested = self._find_contested_areas()
 
@@ -226,13 +227,13 @@ class MovesAdjudicator(Adjudicator):
         while 0 < len(to_visit):
             current = to_visit.popleft()
             # Have to pass through at least one convoying fleet
-            if current != order.source_province and order.destination_province in current.adjacent:
+            if current != order.source_province and order.destination_province in current.adjacency_data.adjacent:
                 return Resolution.SUCCEEDS
 
             visited.add(current.name)
 
             adjacent_convoys = {
-                convoy_order for convoy_order in order.convoys if convoy_order.current_province in current.adjacent
+                convoy_order for convoy_order in order.convoys if convoy_order.current_province in current.adjacency_data.adjacent
             }
             for convoy in adjacent_convoys:
                 if convoy.current_province.name in visited:
@@ -282,7 +283,7 @@ class MovesAdjudicator(Adjudicator):
 
     def _count_strength(self, order: AdjudicableOrder, attacked_country: Player | None = None) -> int:
         # Your own unit counts, unless it's a difficult adjacency
-        strength = 0 if order.destination_province.name in order.base_unit.province.difficult_adjacencies else 1
+        strength = 0 if order.destination_province.name in order.base_unit.province.adjacency_data.difficult_adjacencies else 1
         for support in order.supports:
             if self._resolve_order(support) == Resolution.SUCCEEDS and attacked_country != support.country:
                 strength += 1
@@ -309,12 +310,13 @@ class MovesAdjudicator(Adjudicator):
         attack_strength = 1
         # Determine if destination unit moved
         attacked_move = (
-            attacked_order == None
+            attacked_order is None
             or (attacked_order.type == OrderType.MOVE
                 and self._resolve_order(attacked_order) == Resolution.SUCCEEDS)
         )
 
-        # If there is a unit in the destionation and it either didn't move or is a head-on attack, we need to compare supports
+        # If there is a unit in the destionation and it either didn't move or is a head-on attack,
+        # we need to compare supports
         if attacked_order and (head_on or not attacked_move):
             attacked_country = attacked_order.country
 
@@ -362,7 +364,7 @@ class MovesAdjudicator(Adjudicator):
             if order not in self._dependencies:
                 self._dependencies.append(order)
             return order.resolution
-            
+
         if not order.is_valid:
             order.resolution = Resolution.FAILS
             order.state = ResolutionState.RESOLVED

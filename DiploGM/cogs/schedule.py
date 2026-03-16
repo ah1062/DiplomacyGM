@@ -85,7 +85,7 @@ class ScheduleCog(commands.Cog):
         *,
         content: str = "",
     ):
-        f"""Schedule a command for execution at a time in the future
+        """Schedule a command for execution at a time in the future
 
         Usage: 
             Used as `.schedule <timestamp> <command_name> <content>`

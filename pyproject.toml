@@ -1,2 +1,7 @@
 [tool.black]
 target-version = ['py311']
+[tool.pylint."messages control"]
+disable = ["W1203"]
+
+[tool.pylint.format]
+max-line-length = 120

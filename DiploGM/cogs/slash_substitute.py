@@ -163,7 +163,7 @@ class SlashSubstituteCog(commands.Cog):
                 await interaction.followup.send("Failure!", ephemeral=True)
                 return
 
-        
+
         out = (
             f"Period: {timestamp_msg}\n"
             f"Game: {guild.name}\n"

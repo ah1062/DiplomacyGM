@@ -1,9 +1,12 @@
-from typing import List, Tuple
+from __future__ import annotations
+
+from typing import List, Tuple, TYPE_CHECKING
 
 from DiploGM.models.order import PlayerOrder
 from discord.ext.commands import Context
 
-from DiploGM.models.board import Board
+if TYPE_CHECKING:
+    from DiploGM.models.board import Board
 from DiploGM.models.player import Player
 
 def get_build_orders(player: Player, player_restriction: Player | None, ctx: Context, subset: str | None, blind: bool) -> tuple[str | None, str | None]:

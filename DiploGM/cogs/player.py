@@ -20,7 +20,7 @@ class PlayerCog(commands.Cog):
 
     @commands.command(
         brief="Submits orders; there must be one and only one order per line.",
-        description="""Submits orders: 
+        description="""Submits orders:
     There must be one and only one order per line.
     A variety of keywords are supported: e.g. '-', '->', 'move', and 'm' are all supported for a move command.
     Supplying the unit type is fine but not required: e.g. 'A Ghent -> Normandy' and 'Ghent -> Normandy' are the same
@@ -174,7 +174,7 @@ class PlayerCog(commands.Cog):
         movement_only = "movement" in arguments
         board = manager.get_board(ctx.guild.id)
         turn = parse_season(arguments, board.turn)
-        
+
         if player and not board.orders_enabled:
             log_command(logger, ctx, "Orders locked - not processing")
             await send_message_and_file(
@@ -259,7 +259,7 @@ class PlayerCog(commands.Cog):
         color_mode = color_arguments[0] if color_arguments else None
         board = manager.get_board(ctx.guild.id)
         turn = parse_season(arguments, board.turn)
-        
+
         try:
             if not board.fow:
                 file, file_name = manager.draw_map(
