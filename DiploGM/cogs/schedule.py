@@ -2,6 +2,7 @@ from copy import deepcopy
 import datetime
 import json
 import logging
+import uuid
 
 from discord.ext import commands, tasks
 from discord import Message, TextChannel, User
@@ -85,7 +86,7 @@ class ScheduleCog(commands.Cog):
         *,
         content: str = "",
     ):
-        """Schedule a command for execution at a time in the future
+        f"""Schedule a command for execution at a time in the future
 
         Usage: 
             Used as `.schedule <timestamp> <command_name> <content>`
@@ -116,6 +117,19 @@ class ScheduleCog(commands.Cog):
         guild = ctx.guild
         channel = ctx.channel
         if not guild or not channel:
+            return
+
+            
+        if "\n" in content:
+            for i, line in enumerate(content.split("\n")):
+                if i == 0:
+                    line = f"{timestamp} {command_name} {line}"
+                
+                components = line.split(" ")
+                _timestamp = components[0]
+                _command_name = components[1]
+                _content = " ".join(components[2:])
+                await self.schedule(ctx, _timestamp, _command_name, content=_content)
             return
 
         now = datetime.datetime.now(datetime.timezone.utc)
@@ -188,7 +202,8 @@ class ScheduleCog(commands.Cog):
             channel=ctx.channel, title="Schedule successful!", message=out
         )
 
-        self.scheduled_tasks[str(ctx.message.id)] = scheduled_task
+        task_id = uuid.uuid4().hex[:8]
+        self.scheduled_tasks[task_id] = scheduled_task
         await self.save_scheduled_tasks()
 
     @commands.command(

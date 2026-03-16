@@ -472,6 +472,10 @@ def parse_remove_order(message: str, player_restriction: Player | None, board: B
 
 def _parse_remove_order(command: str, player_restriction: Player | None, board: Board) -> Player | Unit | str:
     command = command.lower().strip()
+    components = command.split(" ")
+    if components[0] in ["a", "f", "army", "fleet"]:
+        command = " ".join(components[1:])
+
     province, _ = board.get_province_and_coast(command)
     if command.startswith("relationship"):
         if player_restriction is None:

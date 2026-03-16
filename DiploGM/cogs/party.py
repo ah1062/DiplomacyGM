@@ -374,10 +374,10 @@ class PartyCog(commands.Cog):
 
     @commands.command(hidden=True)
     async def fish(self, ctx: commands.Context) -> None:
-        """Get a list of the best fishing servers, also the position of the current
+        """There's always a bigger fish... you just might find one!
 
         Usage: 
-            Used as `.global_leaderboard`
+            Used as `.fish`
 
         Note:
             Can potentially debumblify bumbled users

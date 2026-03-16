@@ -5,6 +5,7 @@ from discord.ext import commands
 
 from DiploGM import config
 from DiploGM import perms
+from DiploGM.db.database import get_connection
 from DiploGM.parse_order import parse_order, parse_remove_order
 from DiploGM.utils import get_orders, log_command, parse_season, send_message_and_file
 from DiploGM.manager import Manager, SEVERENCE_A_ID, SEVERENCE_B_ID
@@ -87,6 +88,46 @@ class PlayerCog(commands.Cog):
         message = parse_remove_order(content, player, board)
         log_command(logger, ctx, message=message["message"])
         await send_message_and_file(channel=ctx.channel, **message)
+
+    @commands.command(brief="Clears all players orders.")
+    @perms.player("remove all orders")
+    async def remove_all(self, ctx: commands.Context, player: Player | None) -> None:
+        """Remove all currently submitted orders from the board
+
+        Usage: 
+            Used as `.remove_all`
+
+        Note: 
+            Removes first from the board object and then from the database
+            Use in a GM Channel will remove all orders globally
+            Use in a Player Channel will remove all orders for that player
+
+        Args:
+            ctx (commands.Context): Context from discord regarding command invocation
+
+        Returns:
+            None
+
+        Raises:
+            None:
+            Messages:
+        """
+
+        assert ctx.guild is not None
+
+        board = manager.get_board(ctx.guild.id)
+    
+        if player is None:
+            for unit in board.units:
+                unit.order = None
+        else:
+            for unit in filter(lambda u: u.player == player, board.units):
+                unit.order = None
+
+        database = get_connection()
+        database.save_order_for_units(board, board.units)
+        log_command(logger, ctx, message="Removed all Orders")
+        await send_message_and_file(channel=ctx.channel, title="Removed all Orders")
 
     @commands.command(
         brief="Outputs your current submitted orders.",
@@ -497,17 +538,42 @@ class PlayerCog(commands.Cog):
     @perms.player("generate a press directory")
     async def press_directory(self, ctx: commands.Context, player: Player | None) -> None:
         assert ctx.guild is not None
+        gm_arguments = {"global"}
+        arguments = (
+            ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")
+            .strip()
+            .lower()
+            .split()
+        )
+
+
+        if len(set(arguments).intersection(gm_arguments)) == 0:
+            perms.assert_gm_only(ctx, "use a gm argument for .press_directory")
+
         board = manager.get_board(ctx.guild.id)
         power_roles = set(map(lambda p: p.find_discord_role(ctx.guild.roles), board.players))
-
+        
         if player is None:
-            await send_message_and_file(
-                channel=ctx.channel,
-                message="Due to the number of potential channels, global press directories are not currently permitted for GMs, instead create them in player orders channels",
-                embed_colour=config.PARTIAL_ERROR_COLOUR,
-            )
-            return
+            if "global" in arguments:
+                for player in board.players:
+                    order_channel_name = player.get_name().lower().replace(" ", "-") + "-orders"
 
+                    order_channel = discord.utils.find(lambda c: c.name == order_channel_name, ctx.guild.text_channels)
+                    if order_channel:
+                        await self._player_press_directory(ctx, channel=order_channel, player=player, power_roles=power_roles)
+
+                await send_message_and_file(channel=ctx.channel, message="Created press directories for all players")
+                return
+            else:
+                await send_message_and_file(channel=ctx.channel, message=f"Please provide a GM argument: {gm_arguments}", embed_colour=config.PARTIAL_ERROR_COLOUR)
+                return
+
+        if player is not None:
+            await self._player_press_directory(ctx, channel=ctx.channel, player=player, power_roles=power_roles)
+        
+
+    async def _player_press_directory(self, ctx: commands.Context, *, channel, player, power_roles):
+        assert ctx.guild is not None
         void_channels = [] # channels where the only perms are the calling country
         direct_channels = [] # channels where the only perms are the calling country +1
         group_channels = [] # channels where the only perms are the calling country + >1
@@ -559,7 +625,7 @@ class PlayerCog(commands.Cog):
             f"{group_out}"
         )
         await send_message_and_file(
-            channel=ctx.channel,
+            channel=channel,
             title=f"{player_role.name} Press Channel Directory",
             message=out
         )

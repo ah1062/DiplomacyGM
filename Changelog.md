@@ -1,3 +1,15 @@
+1.6.1
+=====
+
+Contributors
+- aahoughton
+
+# Quality of Life
+- Reclassified `.remove_all` as a player command, GMs can still use in a GM channel to wipe all orders 
+- Added a fix to strip unit designations when removing orders- `.remove f london` will become `.remove london` within the code
+- Added a detection loop for newlines when using `.schedule` allowing multiple commands to be scheduled at once
+  - Changed the task_id to use an 8 long hex string (obtained by slicing a uuid4)
+
 1.6.0
 =====
 
