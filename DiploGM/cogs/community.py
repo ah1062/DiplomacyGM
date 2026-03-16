@@ -2,11 +2,11 @@ import datetime
 import hashlib
 import io
 import logging
-import matplotlib.pyplot as plt
-import networkx as nx
 import random
 from sqlite3 import IntegrityError
 from typing import Optional, Union
+import matplotlib.pyplot as plt
+import networkx as nx
 
 import discord
 from discord.ext import commands
