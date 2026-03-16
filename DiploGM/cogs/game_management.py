@@ -31,7 +31,6 @@ from DiploGM.utils import (
 )
 
 from DiploGM.perms import is_gm
-from DiploGM.db.database import get_connection
 from DiploGM.models.extension import ExtensionEvent, SQLiteExtensionEventRepository
 from DiploGM.models.order import Disband, Build
 from DiploGM.models.player import Player
@@ -667,37 +666,6 @@ class GameManagementCog(commands.Cog):
 
         await send_message_and_file(channel=ctx.channel, title=f"Graces in {gname}", message=out)
 
-    @commands.command(brief="Clears all players orders.")
-    @perms.gm_only("remove all orders")
-    async def remove_all(self, ctx: commands.Context) -> None:
-        """Remove all currently submitted orders from the board
-
-        Usage: 
-            Used as `.remove_all`
-
-        Note: 
-            Removes first from the board object and then from the database
-
-        Args:
-            ctx (commands.Context): Context from discord regarding command invocation
-
-        Returns:
-            None
-
-        Raises:
-            None:
-            Messages:
-        """
-
-        assert ctx.guild is not None
-        board = manager.get_board(ctx.guild.id)
-        for unit in board.units:
-            unit.order = None
-
-        database = get_connection()
-        database.save_order_for_units(board, board.units)
-        log_command(logger, ctx, message="Removed all Orders")
-        await send_message_and_file(channel=ctx.channel, title="Removed all Orders")
 
     async def _post_orders(self, ctx: commands.Context, board: Board) -> str:
         assert ctx.guild is not None
