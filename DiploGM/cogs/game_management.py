@@ -15,7 +15,6 @@ from discord import (
     Thread,
     Guild,
 )
-from discord.abc import GuildChannel
 from discord.ext import commands
 
 from DiploGM import config
@@ -81,6 +80,20 @@ class GameManagementCog(commands.Cog):
             gametype = gametype.removeprefix(" ")
 
         message = manager.create_game(ctx.guild.id, gametype)
+
+        welcome_message = "Welcome to the bot!"
+        board = manager.get_board(ctx.guild.id)
+        for c in [cat for cat in ctx.guild.categories if config.is_player_category(cat)]:
+            for ch in c.text_channels:
+                player = board.get_player_by_channel(ch)
+                if not player:
+                    continue
+
+                await send_message_and_file(
+                    channel=ch,
+                    title="Welcome!",
+                    message=welcome_message,
+                )
         log_command(logger, ctx, message=message)
         await send_message_and_file(channel=ctx.channel, message=message)
 
@@ -187,7 +200,10 @@ class GameManagementCog(commands.Cog):
         log_command(logger, ctx, message=f"Archived {len(categories)} Channels")
         await send_message_and_file(channel=ctx.channel, message=message)
 
-    def _ping_player_builds(self, player: Player, users: set[discord.Member | discord.Role], build_anywhere: bool) -> str:
+    def _ping_player_builds(self,
+                            player: Player,
+                            users: set[discord.Member | discord.Role],
+                            build_options: str) -> str:
         user_str = ''.join([u.mention for u in users])
 
         count = len(player.centers) - len(player.units)
@@ -214,12 +230,7 @@ class GameManagementCog(commands.Cog):
             return f"Hey {user_str}, you have {difference} {'less' if current > count else 'more'} " + \
                 f"disband {order_text} than necessary. Please get this looked at."
 
-        available_centers = [
-            center
-            for center in player.centers
-            if center.unit is None
-            and (center.core_data.core == player or build_anywhere)
-        ]
+        available_centers = [center for center in player.centers if center.can_build(build_options)]
         available = min(len(available_centers), count)
 
         difference = abs(current - available)
@@ -339,7 +350,7 @@ class GameManagementCog(commands.Cog):
                     users.add(role)
 
                 if board.turn.is_builds():
-                    response = self._ping_player_builds(player, users, board.data.get("build_options") == "anywhere")
+                    response = self._ping_player_builds(player, users, board.data.get("build_options", "classic"))
                 else:
                     missing = [
                         unit
@@ -514,18 +525,18 @@ class GameManagementCog(commands.Cog):
 
     @grace.command(name="delete")
     @perms.gm_only("delete a recorded grace")
-    async def grace_delete(self, ctx: commands.Context, id: int) -> None:
+    async def grace_delete(self, ctx: commands.Context, grace_id: int) -> None:
         """Delete a record of grace from the database
 
         Usage: 
-            Used as `.grace delete <id>`
+            Used as `.grace delete <grace_id>`
 
         Note: 
             Will return positive message even if no record for ID
 
         Args:
             ctx (commands.Context): Context from discord regarding command invocation
-            id (int): Target Grace ID -> PK in Table
+            grace_id (int): Target Grace ID -> PK in Table
 
         Returns:
             None
@@ -534,9 +545,9 @@ class GameManagementCog(commands.Cog):
             None:
             Messages:
         """
-        self.grace_repo.delete(id)
+        self.grace_repo.delete(grace_id)
         await send_message_and_file(channel=ctx.channel,
-                                    message=f"If a grace with ID {id} existed, it exists no longer :fire:")
+                                    message=f"If a grace with ID {grace_id} existed, it exists no longer :fire:")
 
     @grace.group(name="view", invoke_without_command=True)
     async def grace_view(self, ctx: commands.Context) -> None:
@@ -875,7 +886,8 @@ class GameManagementCog(commands.Cog):
             await send_message_and_file(
                 channel=ctx.channel,
                 title="Missing Orders",
-                message="Game has not been adjudicated due to missing orders. To adjudicate anyway, use `.adjudicate confirm`",
+                message="Game has not been adjudicated due to missing orders. " +
+                        "To adjudicate anyway, use `.adjudicate confirm`",
                 embed_colour=config.ERROR_COLOUR,
             )
             return
