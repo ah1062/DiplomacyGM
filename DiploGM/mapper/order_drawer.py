@@ -1,15 +1,17 @@
 """Module to draw orders (moves, support, etc.) on the map."""
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
-from xml.etree.ElementTree import ElementTree, Element
-import lxml.etree as etree
-from DiploGM.models.order import Hold, Core, Transform, Move, Support, ConvoyTransport, Build, Disband, TransformBuild, RetreatMove, RetreatDisband
 import numpy as np
+from typing import TYPE_CHECKING, Any
+from xml.etree.ElementTree import ElementTree
+
 from DiploGM.db.database import logger
+from DiploGM.models.order import (
+    Hold, Core, Transform, Move, Support, ConvoyTransport,
+    Build, Disband, TransformBuild, RetreatMove, RetreatDisband
+)
 from DiploGM.models.unit import UnitType
 
 if TYPE_CHECKING:
-    from DiploGM.models.board import Board
     from DiploGM.models.province import Province
     from DiploGM.models.unit import Unit
     from DiploGM.models.player import Player
@@ -19,7 +21,12 @@ if TYPE_CHECKING:
 
 class OrderDrawer:
     """Class to draw orders on the map."""
-    def __init__(self, utils: MapperUtils, moves_svg: ElementTree, board_svg_data: dict[str, Any], adjacent_provinces: set[str], player_restriction: Player | None = None):
+    def __init__(self,
+                 utils: MapperUtils,
+                 moves_svg: ElementTree,
+                 board_svg_data: dict[str, Any],
+                 adjacent_provinces: set[str],
+                 player_restriction: Player | None = None):
         self.utils = utils
         self.moves_svg: ElementTree = moves_svg
         self.board_svg_data = board_svg_data
@@ -27,6 +34,7 @@ class OrderDrawer:
         self.player_restriction = player_restriction
 
     def draw_order(self, unit: Unit, coordinate: tuple[float, float], current_turn: Turn) -> None:
+        """Draws a specific order on the map."""
         order = unit.order
         if isinstance(order, Hold):
             self._draw_hold(coordinate, order.has_failed)
@@ -53,6 +61,7 @@ class OrderDrawer:
             logger.debug("None order found: hold drawn. Coordinates: %s", coordinate)
 
     def draw_player_order(self, order: PlayerOrder):
+        """Draws a Player Order (e.g. build, disband, etc.) on the map."""
         if isinstance(order, Build):
             self._draw_build(order)
         elif isinstance(order, Disband):
@@ -127,7 +136,10 @@ class OrderDrawer:
         )
         element.append(drawn_order)
 
-    def draw_retreat_move(self, order: RetreatMove, unit_type: UnitType, coordinate: tuple[float, float]) -> None:
+    def draw_retreat_move(self,
+                          order: RetreatMove,
+                          unit_type: UnitType,
+                          coordinate: tuple[float, float]) -> None:
         destination = self.utils.loc_to_point(order.destination, unit_type, order.destination_coast, coordinate)
         if order.destination.unit:
             destination = self.utils.pull_coordinate(coordinate, destination)

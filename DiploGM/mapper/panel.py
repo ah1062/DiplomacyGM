@@ -1,8 +1,9 @@
-
+"""Module responsible for drawing the side panel on the map, which includes the date and scoreboard."""
 from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 from xml.etree.ElementTree import ElementTree, Element
+
 from DiploGM.map_parser.vector.utils import get_element_color, get_svg_element
 from DiploGM.map_parser.vector.transform import TransGL3
 

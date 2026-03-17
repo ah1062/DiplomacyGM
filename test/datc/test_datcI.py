@@ -1,9 +1,9 @@
 import unittest
 
-from DiploGM.models.unit import UnitType
 from test.utils import BoardBuilder
+from DiploGM.models.unit import UnitType
 
-# These tests are based off https://webdiplomacy.net/doc/DATC_v3_0.html, with 
+# These tests are based off https://webdiplomacy.net/doc/DATC_v3_0.html, with
 # https://github.com/diplomacy/diplomacy/blob/master/diplomacy/tests/test_datc.py being used as a reference as well.
 
 # 6.I. TEST CASES, BUILDING

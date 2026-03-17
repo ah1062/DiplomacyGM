@@ -25,7 +25,11 @@ class MapperUtils:
         attributes_str = {key: str(val) for key, val in attributes.items()}
         return etree.Element(tag, attributes_str)
 
-    def is_moveable(self, unit: Unit, adjacent_provinces: set[str], player_restriction: Player | None, is_retreats: bool = False) -> bool:
+    def is_moveable(self,
+                    unit: Unit,
+                    adjacent_provinces: set[str],
+                    player_restriction: Player | None,
+                    is_retreats: bool = False) -> bool:
         """Checks if a unit is moveable."""
         if unit.province.name not in adjacent_provinces:
             return False
@@ -113,7 +117,10 @@ class MapperUtils:
         scale = pull / distance
         return cx + dx * scale, cy + dy * scale
 
-    def add_arrow_definition_to_svg(self, svg: ElementTree, board: Board, player_colors: dict[str, str]) -> None:
+    def add_arrow_definition_to_svg(self,
+                                    svg: ElementTree,
+                                    board: Board,
+                                    player_colors: dict[str, str]) -> None:
         """ Adds arrow marker definitions and half-core gradients to the SVG."""
         defs = svg.find("{http://www.w3.org/2000/svg}defs")
         if defs is None:
@@ -217,6 +224,7 @@ class MapperUtils:
             defs.append(gradient_def)
 
     def color_element(self, element: Element, color: str, key="fill"):
+        """Colors a specific element with a given color."""
         if len(color) == 6:  # Potentially buggy hack; just assume everything with length 6 is rgb without #
             color = f"#{color}"
         if element.get(key) is not None:

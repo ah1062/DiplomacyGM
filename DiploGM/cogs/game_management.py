@@ -80,7 +80,13 @@ class GameManagementCog(commands.Cog):
 
         message = manager.create_game(ctx.guild.id, gametype)
 
-        welcome_message = "Welcome to the bot!"
+        welcome_message = "Welcome to the game!\n" + \
+            "To submit orders, use the .order command, entering one order per line.\n" + \
+            "To view a map including all submitted orders, use the .view_map command.\n" + \
+            "To see all your units and which orders you have submitted, use the .view_orders command.\n" + \
+            "To create a private press channel, use .create_press_channel.\n" + \
+            "For a list of all commands, use the .help command.\n" + \
+            "Good luck!"
         board = manager.get_board(ctx.guild.id)
         for c in [cat for cat in ctx.guild.categories if config.is_player_category(cat)]:
             for ch in c.text_channels:

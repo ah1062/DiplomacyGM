@@ -1,6 +1,6 @@
+"""The Mapper module, for drawing maps with or without orders on them."""
 import copy
 import itertools
-import re
 import sys
 from xml.etree.ElementTree import ElementTree, Element, register_namespace
 from xml.etree.ElementTree import tostring as elementToString
@@ -15,16 +15,13 @@ from DiploGM.map_parser.vector.utils import (
     clear_svg_element, get_element_color, get_svg_element,
     get_unit_coordinates, initialize_province_resident_data
 )
+from DiploGM.db.database import logger
 from DiploGM.mapper.order_drawer import OrderDrawer
-from DiploGM.mapper.utils import MapperUtils
 from DiploGM.mapper.panel import PanelDrawer
+from DiploGM.mapper.utils import MapperUtils
 from DiploGM.models import turn
 from DiploGM.models.board import Board
-from DiploGM.db.database import logger
-from DiploGM.models.order import (
-    Move, Support,
-    RetreatMove, Build, PlayerOrder
-)
+from DiploGM.models.order import Move, Support, RetreatMove, Build, PlayerOrder
 from DiploGM.models.player import Player
 from DiploGM.models.province import ProvinceType, Province, UnitLocation
 from DiploGM.models.unit import Unit, UnitType
@@ -50,6 +47,7 @@ SVG_CONFIG_KEY: str = "svg config"
 # make sure to sync them with mapper.js
 
 class Mapper:
+    """The main Mapper class."""
     def __init__(self, board: Board, restriction: Player | None = None, color_mode: str | None = None):
         register_namespace('', "http://www.w3.org/2000/svg")
         register_namespace('inkscape', "http://www.inkscape.org/namespaces/inkscape")
@@ -140,7 +138,8 @@ class Mapper:
                                                              {UnitLocation((0, 0), (0, 0))}))
 
                 for endpoint in e_list:
-                    new_locs += [self.utils.normalize(self.utils.get_closest_loc(unit_locs, endpoint.primary_coordinate))]
+                    new_locs += [self.utils.normalize(
+                        self.utils.get_closest_loc(unit_locs, endpoint.primary_coordinate))]
                 unit_locs = new_locs
             try:
                 for loc in unit_locs:
@@ -187,7 +186,9 @@ class Mapper:
                     if isinstance(build_order, PlayerOrder) and build_order.province.name in self.adjacent_provinces:
                         self.order_drawer.draw_player_order(build_order)
                     if isinstance(build_order, Build) and build_order.province.name in self.adjacent_provinces:
-                        self._draw_unit(Unit(build_order.unit_type, player, build_order.province, build_order.coast), use_moves_svg=True)
+                        self._draw_unit(
+                            Unit(build_order.unit_type, player, build_order.province, build_order.coast),
+                            use_moves_svg=True)
 
         self.panel_drawer.draw_side_panel(self._moves_svg)
 
@@ -197,6 +198,7 @@ class Mapper:
         return elementToString(t, encoding="utf-8"), svg_file_name
 
     def draw_gui_map(self, current_turn: turn.Turn, player_restriction: Player | None) -> tuple[bytes, str]:
+        """Draws the interactive GUI map."""
         self.player_restriction = player_restriction
         self.current_turn = current_turn
         self._reset_moves_map()
@@ -531,10 +533,12 @@ class Mapper:
         province_coordinates = unit.province.all_coordinates
         if unit.coast:
             if unit.coast in province_coordinates:
-                return {loc.retreat_coordinate if is_retreats else loc.primary_coordinate for loc in province_coordinates[unit.coast]}
+                return {loc.retreat_coordinate if is_retreats else loc.primary_coordinate
+                        for loc in province_coordinates[unit.coast]}
         else:
             if unit.unit_type.name in province_coordinates:
-                return {loc.retreat_coordinate if is_retreats else loc.primary_coordinate for loc in province_coordinates[unit.unit_type.name]}
+                return {loc.retreat_coordinate if is_retreats else loc.primary_coordinate
+                        for loc in province_coordinates[unit.unit_type.name]}
 
         logger.warning(
             "Could not find coordinates for %s in province %s. Trying to find another coordinate to use",
@@ -542,7 +546,8 @@ class Mapper:
             unit.province.name,
         )
         if len(province_coordinates) > 0:
-            return {loc.retreat_coordinate if is_retreats else loc.primary_coordinate for loc in next(iter(province_coordinates.values()))}
+            return {loc.retreat_coordinate if is_retreats else loc.primary_coordinate
+                    for loc in next(iter(province_coordinates.values()))}
         logger.warning("No coordinates found for province %s, using (0, 0) as fallback", unit.province.name)
         return {(0, 0)}
 
@@ -595,7 +600,8 @@ class Mapper:
     def _draw_retreat_options(self, unit: Unit, svg):
         root = svg.getroot()
         if not unit.retreat_options:
-            self.order_drawer.draw_force_disband(unit.province.get_unit_coordinates(unit.unit_type, unit.coast, True), svg)
+            self.order_drawer.draw_force_disband(
+                unit.province.get_unit_coordinates(unit.unit_type, unit.coast, True), svg)
             return
 
         # TODO: Move into helper function along with logic in draw_moves_and_retreats
@@ -608,7 +614,9 @@ class Mapper:
             elif retreat_coast:
                 e_list = retreat_province.all_coordinates[retreat_coast]
             else:
-                e_list = retreat_province.all_coordinates.get(unit.unit_type.name, retreat_province.all_coordinates.get(UnitType.ARMY.name, {UnitLocation((0, 0), (0, 0))}))
+                e_list = retreat_province.all_coordinates.get(
+                    unit.unit_type.name,
+                    retreat_province.all_coordinates.get(UnitType.ARMY.name, {UnitLocation((0, 0), (0, 0))}))
 
             # Unspecified coast, so default to army location
             for endpoint in e_list:

@@ -1,12 +1,13 @@
+"""Module to parse commands to edit the board parameters."""
 from DiploGM.config import ERROR_COLOUR, PARTIAL_ERROR_COLOUR
-from DiploGM.models.player import Player
-from DiploGM.utils import get_unit_type, get_keywords, parse_season
+from DiploGM.utils import get_keywords
 from DiploGM.mapper.mapper import Mapper
 from DiploGM.models.board import Board
 from DiploGM.db.database import get_connection
-from DiploGM.utils.sanitise import sanitise_name, simple_player_name
 
 def parse_board_params(message: str, board: Board) -> tuple[str, str, bytes | None, str | None, str | None]:
+    """Parses a message containing commands to edit the board parameters,
+    executes those commands, and returns a response message and an updated map if applicable."""
     invalid: list[tuple[str, Exception]] = []
     commands = str.splitlines(message)
     for command in commands:

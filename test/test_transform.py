@@ -1,9 +1,11 @@
+"""Module to test the Transform move."""
 import unittest
 
 from test.utils import BoardBuilder
 from DiploGM.models.unit import UnitType
 
 class TestTransform(unittest.TestCase):
+    """Tests for the Transform move, which transforms an army into a fleet or vice versa."""
     def test_transform_1(self):
         """ 
             Transforming should fail for non-SCs.
