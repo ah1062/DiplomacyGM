@@ -1,7 +1,7 @@
 from DiploGM.config import ERROR_COLOUR, PARTIAL_ERROR_COLOUR
 from DiploGM.models.player import Player
 from DiploGM.utils import get_unit_type, get_keywords, parse_season
-from DiploGM.adjudicator.mapper import Mapper
+from DiploGM.mapper.mapper import Mapper
 from DiploGM.models.board import Board
 from DiploGM.db.database import get_connection
 from DiploGM.utils.sanitise import sanitise_name, simple_player_name
