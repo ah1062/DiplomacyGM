@@ -1,4 +1,5 @@
 
+import os
 import re
 
 from DiploGM.models.turn import PhaseName, Turn
@@ -117,3 +118,19 @@ def get_value_from_timestamp(timestamp: str) -> int | None:
         return int(match.group(1))
 
     return None
+
+def parse_variant_path(variant: str) -> str:
+    """Parses the variant path to get the correct path for the parser."""
+    if os.path.isdir(f"variants/{variant}"):
+        if os.path.isfile(f"variants/{variant}/config.json"):
+            return f"variants/{variant}"
+        variant_list = sorted(os.listdir(f"variants/{variant}"), reverse=True)
+        for v in variant_list:
+            if os.path.isdir(f"variants/{variant}/{v}") and os.path.isfile(f"variants/{variant}/{v}/config.json"):
+                return f"variants/{variant}/{v}"
+    else:
+        variant_name, variant_version = variant.split(".", 1)
+        variant_path = f"variants/{variant_name}/{variant_version}"
+        if os.path.isdir(variant_path) and os.path.isfile(f"{variant_path}/config.json"):
+            return variant_path
+    raise ValueError(f"Variant {variant} does not exist or is missing a config file.")

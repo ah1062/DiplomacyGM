@@ -19,6 +19,7 @@ from DiploGM.models.board import Board
 from DiploGM.models.player import Player
 from DiploGM.models.province import Province, ProvinceType, UnitLocation
 from DiploGM.models.unit import Unit, UnitType
+from DiploGM.utils.sanitise import parse_variant_path
 
 # TODO: (BETA) all attribute getting should be in utils which we import and call utils.my_unit()
 # TODO: (BETA) consistent in bracket formatting
@@ -37,10 +38,10 @@ class Parser:
     def __init__(self, data: str):
         self.datafile = data
 
-        with open(f"variants/{data}/config.json", "r") as f:
+        with open(f"{parse_variant_path(data)}/config.json", "r") as f:
             self.data = json.load(f)
 
-        self.data["file"] = f"variants/{data}/{self.data['file']}"
+        self.data["file"] = f"{parse_variant_path(data)}/{self.data['file']}"
 
         svg_root = etree.parse(self.data["file"])
 
