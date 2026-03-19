@@ -371,6 +371,7 @@ class SlashSubstituteCog(commands.Cog):
                     embed_colour=config.PARTIAL_ERROR_COLOUR,
                     message=f"{incoming_user.mention} is previously spectated a currently unknown power.",
                 )
+                return
             else:
                 await interaction.followup.send(
                     f"{incoming_user.mention} is previously spectated {other.mention}!"
