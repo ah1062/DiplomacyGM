@@ -141,3 +141,22 @@ class Player:
             return PlayerClass.KINGDOM
         else:
             return PlayerClass.DUCHY
+
+class OrdersSubsetOption(Enum):
+    FULL = 0
+    MISSING = 1
+    SUBMITTED = 2
+
+class ForcedRetreatOption(Enum):
+    FULL = 0
+    FORCED = 1
+    FREE = 2
+
+class ViewOrdersTags:
+    def __init__(self, subset: OrdersSubsetOption, blind: bool, forced: ForcedRetreatOption):
+        self.subset = subset
+        self.blind = blind
+        self.forced = forced
+    
+    def get_default(self):
+        return ViewOrdersTags(subset=OrdersSubsetOption.FULL, blind=False, forced=ForcedRetreatOption)

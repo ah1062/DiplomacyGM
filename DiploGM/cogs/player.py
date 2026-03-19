@@ -1,3 +1,4 @@
+from enum import Enum
 import logging
 
 import discord
@@ -8,11 +9,16 @@ from DiploGM import perms
 from DiploGM.parse_order import parse_order, parse_remove_order
 from DiploGM.utils import get_orders, log_command, parse_season, send_message_and_file
 from DiploGM.manager import Manager, SEVERENCE_A_ID, SEVERENCE_B_ID
-from DiploGM.models.player import Player
+from DiploGM.models.player import Player, ViewOrdersTags, OrdersSubsetOption, ForcedRetreatOption
 
 logger = logging.getLogger(__name__)
 manager = Manager()
 
+MISSING_ALIASES = ["missing", "miss", "m"]
+SUBMITTED_ALIASES = ["submitted", "submit", "sub", "s"]
+BLIND_ALIASES = ["blind", "b"]
+FORCED_RETREAT_ALIASES = ["forced", "f"]
+FREE_RETREAT_ALIASES = ['free', 'retreat', 'r']
 
 class PlayerCog(commands.Cog):
     def __init__(self, bot):
@@ -93,7 +99,11 @@ class PlayerCog(commands.Cog):
         description="Outputs your current submitted orders. "
         "Use .view_map to view a sample moves map of your orders. "
         "Use the 'missing' or 'submitted' argument to view only units without orders or only submitted orders. "
-        "Use the 'blind' argument to view only the number of orders submitted.",
+        f"\tAliases: {MISSING_ALIASES}; {SUBMITTED_ALIASES}"
+        "Use the 'blind' argument to view only the number of orders submitted."
+        f"\tAliases: {BLIND_ALIASES}"
+        "Use the 'forced-disband' or 'free-retreat' argument to view only dislodged units that must disband or that may move. (Only in retreat phases)"
+        f"\t Aliases: {FORCED_RETREAT_ALIASES}; {FREE_RETREAT_ALIASES}",
         aliases=["v", "view", "vieworders", "view-orders"],
     )
     @perms.player("view orders")
@@ -105,18 +115,28 @@ class PlayerCog(commands.Cog):
             .lower()
             .split()
         )
-        subset = "missing" if {"missing", "miss", "m"} & set(arguments) else None
-        subset = (
-            "submitted"
-            if {"submitted", "submit", "sub", "s"} & set(arguments)
-            else subset
+
+        tags = ViewOrdersTags(
+            subset=OrdersSubsetOption.MISSING if set(MISSING_ALIASES) & set(arguments) 
+                else OrdersSubsetOption.SUBMITTED if set(SUBMITTED_ALIASES) & set(arguments)
+                else OrdersSubsetOption.FULL,
+            blind=set(BLIND_ALIASES) & set(arguments),
+            only_forced=ForcedRetreatOption.FORCED if set(FORCED_RETREAT_ALIASES) & set(arguments)
+                else ForcedRetreatOption.FREE if set(FREE_RETREAT_ALIASES) & set(arguments)
+                else ForcedRetreatOption.FULL
         )
+        # subset = "missing" if {"missing", "miss", "m"} & set(arguments) else None
+        # subset = (
+        #     "submitted"
+        #     if {"submitted", "submit", "sub", "s"} & set(arguments)
+        #     else subset
+        # )
 
         try:
             board = manager.get_board(ctx.guild.id)
 
             blind = "blind" in arguments
-            order_text = get_orders(board, player, ctx, subset=subset, blind=blind)
+            order_text = get_orders(board, player, ctx, tags=tags)
 
         except RuntimeError as err:
             logger.error(err, exc_info=True)

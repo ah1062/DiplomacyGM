@@ -4,9 +4,9 @@ from DiploGM.models.order import PlayerOrder
 from discord.ext.commands import Context
 
 from DiploGM.models.board import Board
-from DiploGM.models.player import Player
+from DiploGM.models.player import Player, ViewOrdersTags, OrdersSubsetOption
 
-def get_build_orders(player: Player, player_restriction: Player | None, ctx: Context, subset: str | None, blind: bool) -> tuple[str | None, str | None]:
+def get_build_orders(player: Player, player_restriction: Player | None, ctx: Context, tags: ViewOrdersTags) -> tuple[str | None, str | None]:
     assert ctx.guild is not None
     if (not player_restriction and
         (len(player.centers) + len(player.units) == 0)):
@@ -15,11 +15,11 @@ def get_build_orders(player: Player, player_restriction: Player | None, ctx: Con
     if player_restriction and player != player_restriction:
         return None, None
 
-    if (subset == "missing" and
+    if (tags.subset == OrdersSubsetOption.MISSING and
         abs(len(player.centers) - len(player.units) - player.waived_orders) == len(player.build_orders)):
         return None, None
 
-    if (subset == "submitted"
+    if (tags.subset == OrdersSubsetOption.SUBMITTED
         and len(player.build_orders) == 0
         and player.waived_orders == 0):
         return None, None
@@ -32,7 +32,7 @@ def get_build_orders(player: Player, player_restriction: Player | None, ctx: Con
 
     title = f"**{player_name}**: ({len(player.centers)}) ({'+' if len(player.centers) - len(player.units) >= 0 else ''}{len(player.centers) - len(player.units)})"
     body = ""
-    if blind:
+    if tags.blind:
         return title, f" ({len(player.build_orders) + player.waived_orders})"
 
     for unit in player.build_orders | set(
@@ -43,7 +43,7 @@ def get_build_orders(player: Player, player_restriction: Player | None, ctx: Con
         body += f"\nWaive {player.waived_orders}"
     return title, body
 
-def get_move_orders(player: Player, player_restriction: Player | None, ctx: Context, subset: str | None, blind: bool, is_retreats: bool) -> tuple[str | None, str | None]:
+def get_move_orders(player: Player, player_restriction: Player | None, ctx: Context, tags: ViewOrdersTags, is_retreats: bool) -> tuple[str | None, str | None]:
     assert ctx.guild is not None
     if (not player_restriction
         and len(player.centers) + len(player.units) == 0):
@@ -57,10 +57,11 @@ def get_move_orders(player: Player, player_restriction: Player | None, ctx: Cont
     ordered = [unit for unit in moving_units if unit.order is not None]
     missing = [unit for unit in moving_units if unit.order is None]
 
-    if subset == "missing" and not missing:
-        return None, None
-    if subset == "submitted" and not ordered:
-        return None, None
+    match tags.subset:
+        case OrdersSubsetOption.MISSING:
+            if not missing: return (None, None)
+        case OrdersSubsetOption.SUBMITTED:
+            if not ordered: return (None, None)
 
     if (player_role := player.find_discord_role(ctx.guild.roles)) is not None:
         player_name = player_role.mention
@@ -69,14 +70,14 @@ def get_move_orders(player: Player, player_restriction: Player | None, ctx: Cont
 
     title = f"**{player_name}** ({len(ordered)}/{len(moving_units)})"
     body = ""
-    if blind:
+    if tags.blind:
         return title, ""
 
-    if missing and subset != "submitted":
+    if missing and tags.subset != OrdersSubsetOption.SUBMITTED:
         body += f"__Missing Orders:__\n"
         for unit in sorted(missing, key=lambda _unit: _unit.province.name):
             body += f"{unit}\n"
-    if ordered and subset != "missing":
+    if ordered and tags.subset != OrdersSubsetOption.MISSING:
         body += f"__Submitted Orders:__\n"
         for unit in sorted(ordered, key=lambda _unit: _unit.province.name):
             body += f"{unit} {unit.order}\n"
@@ -87,19 +88,21 @@ def get_orders(
     player_restriction: Player | None,
     ctx: Context,
     fields: bool = False,
-    subset: str | None = None,
-    blind: bool = False,
+    tags: ViewOrdersTags | None = None
 ) -> str | List[Tuple[str, str]]:
     if fields:
         response = []
     else:
         response = ""
+
+    if tags is None:
+        tags = ViewOrdersTags.get_default()
     #TODO: Lots of duplicated code here
     if board.turn.is_builds():
         for player in sorted(board.players, key=lambda sort_player: sort_player.get_name()):
             if board.data["players"][player.name].get("hidden", "false") == "true":
                 continue
-            title, body = get_build_orders(player, player_restriction, ctx, subset, blind)
+            title, body = get_build_orders(player, player_restriction, ctx, tags)
             if title is None:
                 continue
             if isinstance(response, list):
@@ -117,7 +120,7 @@ def get_orders(
         for player in sorted(players, key=lambda p: p.get_name()):
             if board.data["players"][player.name].get("hidden", "false") == "true":
                 continue
-            title, body = get_move_orders(player, player_restriction, ctx, subset, blind, board.turn.is_retreats())
+            title, body = get_move_orders(player, player_restriction, ctx, tags, board.turn.is_retreats())
             if title is None:
                 continue
             if isinstance(response, list):
