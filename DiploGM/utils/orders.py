@@ -9,7 +9,11 @@ if TYPE_CHECKING:
     from DiploGM.models.board import Board
 from DiploGM.models.player import Player
 
-def get_build_orders(player: Player, player_restriction: Player | None, ctx: Context, subset: str | None, blind: bool) -> tuple[str | None, str | None]:
+def get_build_orders(player: Player,
+                     player_restriction: Player | None,
+                     ctx: Context,
+                     subset: str | None,
+                     blind: bool) -> tuple[str | None, str | None]:
     assert ctx.guild is not None
     if (not player_restriction and
         (len(player.centers) + len(player.units) == 0)):
@@ -33,7 +37,9 @@ def get_build_orders(player: Player, player_restriction: Player | None, ctx: Con
         player_name = player.get_name()
 
 
-    title = f"**{player_name}**: ({len(player.centers)}) ({'+' if len(player.centers) - len(player.units) >= 0 else ''}{len(player.centers) - len(player.units)})"
+    title = f"**{player_name}**: ({len(player.centers)}) " + \
+            f"({'+' if len(player.centers) - len(player.units) >= 0 else ''}" + \
+            f"{len(player.centers) - len(player.units)})"
     body = ""
     if blind:
         return title, f" ({len(player.build_orders) + player.waived_orders})"
@@ -46,7 +52,10 @@ def get_build_orders(player: Player, player_restriction: Player | None, ctx: Con
         body += f"\nWaive {player.waived_orders}"
     return title, body
 
-def get_move_orders(player: Player, player_restriction: Player | None, ctx: Context, subset: str | None, blind: bool, is_retreats: bool) -> tuple[str | None, str | None]:
+def get_move_orders(player: Player,
+                    player_restriction: Player | None,
+                    ctx: Context, subset: str | None,
+                    blind: bool, is_retreats: bool) -> tuple[str | None, str | None]:
     assert ctx.guild is not None
     if (not player_restriction
         and len(player.centers) + len(player.units) == 0):
@@ -76,11 +85,11 @@ def get_move_orders(player: Player, player_restriction: Player | None, ctx: Cont
         return title, ""
 
     if missing and subset != "submitted":
-        body += f"__Missing Orders:__\n"
+        body += "__Missing Orders:__\n"
         for unit in sorted(missing, key=lambda _unit: _unit.province.name):
             body += f"{unit}\n"
     if ordered and subset != "missing":
-        body += f"__Submitted Orders:__\n"
+        body += "__Submitted Orders:__\n"
         for unit in sorted(ordered, key=lambda _unit: _unit.province.name):
             body += f"{unit} {unit.order}\n"
     return title, body
@@ -106,7 +115,7 @@ def get_orders(
             if title is None:
                 continue
             if isinstance(response, list):
-                response.append((f"", f"{title}{body}"))
+                response.append(("", f"{title}{body}"))
             else:
                 response += f"\n{title}{body}"
         return response
@@ -124,7 +133,7 @@ def get_orders(
             if title is None:
                 continue
             if isinstance(response, list):
-                response.append((f"", f"{title}\n{body}"))
+                response.append(("", f"{title}\n{body}"))
             else:
                 response += f"{title}\n{body}"
 
@@ -146,38 +155,39 @@ def get_filtered_orders(board: Board, player_restriction: Player) -> str:
                 ]
 
                 if len(visible) > 0:
-                    response += f"\n**{player.get_name()}**: ({len(player.centers)}) ({'+' if len(player.centers) - len(player.units) >= 0 else ''}{len(player.centers) - len(player.units)})"
+                    response += f"\n**{player.get_name()}**: ({len(player.centers)}) " + \
+                        f"({'+' if len(player.centers) - len(player.units) >= 0 else ''}" + \
+                        f"{len(player.centers) - len(player.units)})"
                     for unit in visible:
                         response += f"\n{unit}"
         return response
-    else:
-        response = ""
+    response = ""
 
-        for player in board.players: 
-            if board.data["players"][player.name].get("hidden", "false") == "true":
-                continue
-            if board.turn.is_retreats():
-                in_moves = lambda u: u == u.province.dislodged_unit
-            else:
-                in_moves = lambda _: True
-            moving_units = [
-                unit
-                for unit in player.units
-                if in_moves(unit) and unit.province in visible
-            ]
+    for player in board.players:
+        if board.data["players"][player.name].get("hidden", "false") == "true":
+            continue
+        if board.turn.is_retreats():
+            in_moves = lambda u: u == u.province.dislodged_unit
+        else:
+            in_moves = lambda _: True
+        moving_units = [
+            unit
+            for unit in player.units
+            if in_moves(unit) and unit.province in visible
+        ]
 
-            if len(moving_units) > 0:
-                ordered = [unit for unit in moving_units if unit.order is not None]
-                missing = [unit for unit in moving_units if unit.order is None]
+        if len(moving_units) > 0:
+            ordered = [unit for unit in moving_units if unit.order is not None]
+            missing = [unit for unit in moving_units if unit.order is None]
 
-                response += f"**{player.get_name()}** ({len(ordered)}/{len(moving_units)})\n"
-                if missing:
-                    response += f"__Missing Orders:__\n"
-                    for unit in sorted(missing, key=lambda _unit: _unit.province.name):
-                        response += f"{unit}\n"
-                if ordered:
-                    response += f"__Submitted Orders:__\n"
-                    for unit in sorted(ordered, key=lambda _unit: _unit.province.name):
-                        response += f"{unit} {unit.order}\n"
+            response += f"**{player.get_name()}** ({len(ordered)}/{len(moving_units)})\n"
+            if missing:
+                response += "__Missing Orders:__\n"
+                for unit in sorted(missing, key=lambda _unit: _unit.province.name):
+                    response += f"{unit}\n"
+            if ordered:
+                response += "__Submitted Orders:__\n"
+                for unit in sorted(ordered, key=lambda _unit: _unit.province.name):
+                    response += f"{unit} {unit.order}\n"
 
-        return response
+    return response

@@ -153,7 +153,7 @@ class SlashSubstituteCog(commands.Cog):
             if match:
                 timestamp_msg = f"until <t:{match.group(1)}:F>"
             else:
-                out = f"Improper value for argument 'timestamp'"
+                out = "Improper value for argument 'timestamp'"
                 await send_message_and_file(
                     channel=interaction.channel,
                     title="/advertise output",
@@ -174,7 +174,8 @@ class SlashSubstituteCog(commands.Cog):
             "\n"
             f"Message: {message}\n"
             "\n"
-            f"If you are interested, please go to {locations['tickets_channel'].mention} and create a ticket. Don't forget to ping {interaction.user.mention}[{interaction.user.name}] so that they know you want to join the game!"
+            f"If you are interested, please go to {locations['tickets_channel'].mention} and create a ticket. " +
+            f"Don't forget to ping {interaction.user.mention}[{interaction.user.name}] so that they know you want to join the game!"
         )
         file, file_name = manager.draw_map_for_board(
             board, player_restriction=None, draw_moves=False, color_mode="standard"
@@ -325,9 +326,9 @@ class SlashSubstituteCog(commands.Cog):
             "power-orders": discord_find(
                 lambda r: r.name == f"orders-{power_role.name.lower()}", guild.roles
             ),
-            "player": discord_find(lambda r: r.name == f"Player", guild.roles),
+            "player": discord_find(lambda r: r.name == "Player", guild.roles),
             "cspec": discord_find(
-                lambda r: r.name == f"Country Spectator", guild.roles
+                lambda r: r.name == "Country Spectator", guild.roles
             ),
         }
 

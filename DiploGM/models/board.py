@@ -54,9 +54,9 @@ class Board:
         # store as lower case for user input purposes
         self.name_to_player: Dict[str, Player] = {player.name.lower(): player for player in self.players}
         # remove periods and apostrophes
-        cleaned_name_to_player: Dict[str, Player] = {sanitise_name(player.name.lower()): player for player in self.players}
-        simple_player_name_to_player: Dict[str, Player] = {simple_player_name(player.name): player for player in self.players}
-        self.name_to_player = self.name_to_player | cleaned_name_to_player | simple_player_name_to_player
+        cleaned_names: Dict[str, Player] = {sanitise_name(player.name.lower()): player for player in self.players}
+        simple_names: Dict[str, Player] = {simple_player_name(player.name): player for player in self.players}
+        self.name_to_player = self.name_to_player | cleaned_names | simple_names
         self.name_to_province: Dict[str, Province] = {}
         self.name_to_coast: Dict[str, tuple[Province, str | None]] = {}
         for location in self.provinces:

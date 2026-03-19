@@ -50,7 +50,8 @@ class ScheduleCog(commands.Cog):
 
         except FileNotFoundError:
             logger.warning(
-                "Could not load previous store of scheduled tasks because it does not exist: should be located at 'DiploGM/assets/schedule.json'"
+                "Could not load previous store of scheduled tasks because it does not exist: " +
+                "should be located at 'DiploGM/assets/schedule.json'"
             )
         except Exception as e:
             logger.warning(f"Could not load previous store of scheduled tasks: {e}")
@@ -119,12 +120,12 @@ class ScheduleCog(commands.Cog):
         if not guild or not channel:
             return
 
-            
+
         if "\n" in content:
             for i, line in enumerate(content.split("\n")):
                 if i == 0:
                     line = f"{timestamp} {command_name} {line}"
-                
+
                 components = line.split(" ")
                 _timestamp = components[0]
                 _command_name = components[1]
@@ -370,11 +371,16 @@ class ScheduleCog(commands.Cog):
             delta = now - task["execute_at"]
             if delta > MAX_DELAY:
                 logger.warning(
-                    f"Skipping stale task {task_id}: Could not handle on time. (missed by '{now-task['execute_at']}') which is greater than maximum allowed time '{MAX_DELAY}'"
+                    "Skipping stale task %s: Could not handle on time. " +
+                    "(missed by '%s') which is greater than maximum allowed time '%s'",
+                    task_id,
+                    now - task["execute_at"],
+                    MAX_DELAY
                 )
                 await send_message_and_file(
                     channel=channel,
-                    message=f"Skipping stale task {task_id}: Could not handle on time (Expected: {task['execute_at']})\nTask: {task['full_command']}",
+                    message=f"Skipping stale task {task_id}: Could not handle on time " +
+                            f"(Expected: {task['execute_at']})\nTask: {task['full_command']}",
                     embed_colour=ERROR_COLOUR,
                 )
                 del self.scheduled_tasks[task_id]

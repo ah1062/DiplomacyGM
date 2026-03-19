@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from discord import TextChannel
 import logging
 import tomllib
-import sys
 from typing import List, Tuple, Any, TYPE_CHECKING
+from discord import TextChannel
 
 if TYPE_CHECKING:
     from discord import CategoryChannel, Role

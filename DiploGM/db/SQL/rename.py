@@ -51,5 +51,5 @@ for table, column in db_usages:
 
 SQL_txt += "\nCOMMIT;\n"
 
-with open("SQL/Rename.out.sql", 'w') as f:
+with open("SQL/Rename.out.sql", 'w', encoding="utf-8") as f:
     f.write(SQL_txt)

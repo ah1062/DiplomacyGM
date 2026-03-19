@@ -374,7 +374,8 @@ class CommunityCog(commands.Cog):
         community = self.service.get_community(existing_community_id)
         if not community:
             raise ValueError(
-                f"The community attached to this server '{existing_community_id}' could not be found, contact a Bot Superuser."
+                f"The community attached to this server '{existing_community_id}' could not be found, " +
+                 "contact a Bot Superuser."
             )
 
         if not self.service.is_community_owner(
@@ -456,7 +457,8 @@ class CommunityCog(commands.Cog):
         if self.service.is_community_owner(community, ctx.author):
             await send_message_and_file(
                 channel=ctx.channel,
-                message="### You're the owner of that community!\nFind a replacement owner and contact a bot superuser to replace.",
+                message="### You're the owner of that community!\n" +
+                        "Find a replacement owner and contact a bot superuser to replace.",
                 embed_colour=ERROR_COLOUR,
             )
             return

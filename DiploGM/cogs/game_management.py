@@ -58,8 +58,8 @@ class GameManagementCog(commands.Cog):
 
         Note: 
             Limited to the server of command invocation
-            Default for <gametype> is "impdip" (A2/B1)
-            Valid <gametype> values can be found as folders in https://github.com/Imperial-Diplomacy/DiplomacyGM-Variants/tree/main
+            Default for <gametype> is "classic"
+            Valid <gametype> values can be found by running .list_variants
 
         Args:
             ctx (commands.Context): Context from discord regarding command invocation
@@ -131,7 +131,8 @@ class GameManagementCog(commands.Cog):
     @commands.command(brief="lists all variants currently supported")
     @perms.gm_only("lists variants")
     async def list_variants(self, ctx: commands.Context) -> None:
-        """Lists all variants currently loaded into the bot. To create a game of a specific variant, use `.create_game <variant>`
+        """Lists all variants currently loaded into the bot.
+        To create a game of a specific variant, use `.create_game <variant>`
 
         Usage: 
             Used as `.list_variants`
