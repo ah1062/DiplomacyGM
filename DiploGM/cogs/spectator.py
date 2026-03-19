@@ -113,6 +113,10 @@ class SpectatorCog(commands.Cog):
         self.bot = bot
         self.ban_repo = SpectatorBanRepository("assets/spec_bans.json")
 
+    async def close(self):
+        logger.info("Saved spectating ban list")
+        self.ban_repo._save_to_file()
+
     @commands.group(name="spec_ban", invoke_without_command=True)
     @perms.mod_only("interact with spectator bans")
     async def spec_ban(self, ctx: commands.Context):
@@ -151,17 +155,15 @@ class SpectatorCog(commands.Cog):
             Messages:
                 Invalid timestamp provided
         """
-        if isinstance(end_timestamp, str):
-            if (
-                value := utils.get_value_from_timestamp(end_timestamp)
-            ) and value is None:
-                await send_message_and_file(
-                    channel=ctx.channel,
-                    message=f"Invalid timestamp provided! '{end_timestamp}'",
-                    embed_colour=ERROR_COLOUR,
-                )
         if end_timestamp is None:
             end_timestamp = "<t:4102444800:F>"
+        elif utils.get_value_from_timestamp(end_timestamp) is None:
+            await send_message_and_file(
+                channel=ctx.channel,
+                message=f"Invalid timestamp provided! '{end_timestamp}'",
+                embed_colour=ERROR_COLOUR,
+            )
+            return
 
         ban = SpectatorBan(user.id, end_timestamp)
         self.ban_repo.save(ban)
@@ -169,6 +171,14 @@ class SpectatorCog(commands.Cog):
             channel=ctx.channel,
             message=f"User '{user.mention}' banned from spectating until: {end_timestamp}",
         )
+
+    @spec_ban_add.error
+    async def spec_ban_add_error(self, ctx: commands.Context, exc):
+        if isinstance(exc, commands.errors.UserNotFound):
+            await send_message_and_file(channel=ctx.channel, message="Could not find that user!", embed_colour=ERROR_COLOUR)
+            ctx.handled = True # type: ignore
+            return
+
 
     @spec_ban.command(name="remove")
     @perms.mod_only("remove a spectating ban")
