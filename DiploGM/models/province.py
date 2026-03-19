@@ -235,7 +235,9 @@ class Province():
                 continue
             # check for situations where one of the provinces is situated in the other two
 
-            if min(len(possible_tripoint.adjacency_data.adjacent), len(p1.adjacency_data.adjacent), len(p2.adjacency_data.adjacent)) == 2:
+            if min(len(possible_tripoint.adjacency_data.adjacent),
+                   len(p1.adjacency_data.adjacent),
+                   len(p2.adjacency_data.adjacent)) == 2:
                 return True
 
             # If the two provinces only share one adjacent province (the sea tile), they must be coastally adjacent
@@ -276,7 +278,7 @@ class Province():
                     this = find_set_with_element(to_process)
                     other = find_set_with_element(neighbor)
                     connected_sets = connected_sets - {this, other}
-                    connected_sets.add(this | other)            
+                    connected_sets.add(this | other)
 
             l = 0
 

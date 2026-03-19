@@ -8,14 +8,14 @@ from discord import Member, User
 from DiploGM.models.province import Province
 from DiploGM.utils import SingletonMeta
 from DiploGM.adjudicator.make_adjudicator import make_adjudicator
-from DiploGM.adjudicator.mapper import Mapper
+from DiploGM.mapper.mapper import Mapper
 from DiploGM.map_parser.vector.vector import get_parser
 from DiploGM.models.turn import Turn
 from DiploGM.models.board import Board
 from DiploGM.db import database
 from DiploGM.models.player import Player
 from DiploGM.models.spec_request import SpecRequest
-from DiploGM.utils.sanitise import simple_player_name
+from DiploGM.utils.sanitise import parse_variant_path, simple_player_name
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class Manager(metaclass=SingletonMeta):
         """Creates a new game in the specified server and of the specified variant."""
         if self._boards.get(server_id):
             return "A game already exists in this server."
-        if not os.path.isdir(f"variants/{gametype}"):
+        if not os.path.isdir(parse_variant_path(gametype)):
             return f"Game {gametype} does not exist."
 
         logger.info(f"Creating new game in server {server_id}")
@@ -94,7 +94,7 @@ class Manager(metaclass=SingletonMeta):
         """Checks for potential adjacency issues in a variant.
         This is not guaranteed to find all issues, but should find the majority of them.
         Returns a string listing any warnings found."""
-        if not os.path.isdir(f"variants/{variant}"):
+        if not os.path.isdir(parse_variant_path(variant)):
             return f"Game {variant} does not exist."
         board: Board = get_parser(variant).parse()
         warnings = []
@@ -211,6 +211,15 @@ class Manager(metaclass=SingletonMeta):
                 continue
             if os.path.isfile(os.path.join("variants", v, "config.json")):
                 loaded_variants.append(f"* {v}")
+            else:
+                version_list = []
+                variant_versions = os.listdir(os.path.join("variants", v))
+                for vv in variant_versions:
+                    if os.path.isdir(os.path.join("variants", v, vv)) \
+                       and os.path.isfile(os.path.join("variants", v, vv, "config.json")):
+                        version_list.append(vv)
+                version_list.sort()
+                loaded_variants.append(f"* {v}:\n    " + "\n    ".join(version_list))
         loaded_variants.sort()
         return "\n".join(loaded_variants)
 
@@ -466,7 +475,7 @@ class Manager(metaclass=SingletonMeta):
 
     def reload_variant(self, variant: str) -> str:
         """Reloads a variant, including adjacencies and all boards."""
-        if not os.path.isdir(f"variants/{variant}"):
+        if not os.path.isdir(parse_variant_path(variant)):
             return f"Variant {variant} does not exist."
 
         # Remove adjacency cache to force a reload

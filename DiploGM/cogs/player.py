@@ -118,7 +118,7 @@ class PlayerCog(commands.Cog):
         assert ctx.guild is not None
 
         board = manager.get_board(ctx.guild.id)
-    
+
         if player is None:
             for unit in board.units:
                 unit.order = None
@@ -475,7 +475,8 @@ class PlayerCog(commands.Cog):
         if len(arguments) < 3:
             await send_message_and_file(
                 channel=ctx.channel,
-                message="Invalid command format. Please use `.create_press_channel {category} {name} {@country1} {@country2} ...`",
+                message="Invalid command format. " +
+                        "Please use `.create_press_channel {category} {name} {@country1} {@country2} ...`",
                 embed_colour=config.ERROR_COLOUR,
             )
             return
@@ -533,7 +534,8 @@ class PlayerCog(commands.Cog):
         except discord.HTTPException:
             await send_message_and_file(
                 channel=ctx.channel,
-                message="Failed to create channel, probably because the category is full. If you keep seeing this error, please contact the GM Team.",
+                message="Failed to create channel, probably because the category is full. " +
+                        "If you keep seeing this error, please contact the GM Team.",
                 embed_colour=config.ERROR_COLOUR,
             )
             return
@@ -561,7 +563,7 @@ class PlayerCog(commands.Cog):
 
         board = manager.get_board(ctx.guild.id)
         power_roles = set(map(lambda p: p.find_discord_role(ctx.guild.roles), board.players))
-        
+
         if player is None:
             if "global" in arguments:
                 for player in board.players:
@@ -569,17 +571,21 @@ class PlayerCog(commands.Cog):
 
                     order_channel = discord.utils.find(lambda c: c.name == order_channel_name, ctx.guild.text_channels)
                     if order_channel:
-                        await self._player_press_directory(ctx, channel=order_channel, player=player, power_roles=power_roles)
+                        await self._player_press_directory(ctx,
+                                                           channel=order_channel,
+                                                           player=player,
+                                                           power_roles=power_roles)
 
                 await send_message_and_file(channel=ctx.channel, message="Created press directories for all players")
                 return
-            else:
-                await send_message_and_file(channel=ctx.channel, message=f"Please provide a GM argument: {gm_arguments}", embed_colour=config.PARTIAL_ERROR_COLOUR)
-                return
+            await send_message_and_file(channel=ctx.channel,
+                                        message=f"Please provide a GM argument: {gm_arguments}",
+                                        embed_colour=config.PARTIAL_ERROR_COLOUR)
+            return
 
         if player is not None:
             await self._player_press_directory(ctx, channel=ctx.channel, player=player, power_roles=power_roles)
-        
+
 
     async def _player_press_directory(self, ctx: commands.Context, *, channel, player, power_roles):
         assert ctx.guild is not None

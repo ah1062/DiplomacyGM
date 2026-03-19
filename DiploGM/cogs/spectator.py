@@ -222,7 +222,8 @@ class SpectatorCog(commands.Cog):
             prev_role = guild.get_role(prev_request.role_id)
             if prev_role:
                 await admin_channel.send(
-                    f"[SPECTATOR LOG] {interaction.user.mention} has requested to spectate {power_role.mention} after already being accepted for role: {prev_role.mention}"
+                    f"[SPECTATOR LOG] {interaction.user.mention} has requested to spectate {power_role.mention} " +
+                    f"after already being accepted for role: {prev_role.mention}"
                 )
 
                 await interaction.response.send_message(

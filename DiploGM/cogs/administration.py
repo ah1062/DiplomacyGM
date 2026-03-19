@@ -103,7 +103,7 @@ class AdminCog(commands.Cog):
                 board = manager.get_board(server.id)
                 board_state = f" - {board.turn}"
             else:
-                board_state = f" - no active game"
+                board_state = " - no active game"
 
             if send_invite:
                 try:

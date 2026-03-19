@@ -19,6 +19,7 @@ from DiploGM.models.board import Board
 from DiploGM.models.player import Player
 from DiploGM.models.province import Province, ProvinceType, UnitLocation
 from DiploGM.models.unit import Unit, UnitType
+from DiploGM.utils.sanitise import parse_variant_path
 
 # TODO: (BETA) all attribute getting should be in utils which we import and call utils.my_unit()
 # TODO: (BETA) consistent in bracket formatting
@@ -37,10 +38,10 @@ class Parser:
     def __init__(self, data: str):
         self.datafile = data
 
-        with open(f"variants/{data}/config.json", "r") as f:
+        with open(f"{parse_variant_path(data)}/config.json", "r", encoding="utf-8") as f:
             self.data = json.load(f)
 
-        self.data["file"] = f"variants/{data}/{self.data['file']}"
+        self.data["file"] = f"{parse_variant_path(data)}/{self.data['file']}"
 
         svg_root = etree.parse(self.data["file"])
 
@@ -252,7 +253,8 @@ class Parser:
             if "adjacencies" in data:
                 province.adjacency_data.adjacent.update({self.name_to_province[n] for n in data["adjacencies"]})
             if "remove_adjacencies" in data:
-                province.adjacency_data.adjacent.difference_update({self.name_to_province[n] for n in data["remove_adjacencies"]})
+                province.adjacency_data.adjacent.difference_update(
+                    {self.name_to_province[n] for n in data["remove_adjacencies"]})
             if "remove_adjacent_coasts" in data:
                 province.adjacency_data.nonadjacent_coasts.update(data["remove_adjacent_coasts"])
             if "difficult_adjacency" in data:
@@ -260,7 +262,8 @@ class Parser:
             if "coasts" in data:
                 province.adjacency_data.fleet_adjacent = {}
                 for coast_name, coast_adjacent in data["coasts"].items():
-                    province.adjacency_data.fleet_adjacent[coast_name] = {self._get_province_and_coast(n) for n in coast_adjacent}
+                    province.adjacency_data.fleet_adjacent[coast_name] = {
+                        self._get_province_and_coast(n) for n in coast_adjacent}
             # For compatability reasons, we assume these are sea tiles
             # TODO: Add support for armies/multicoastal tiles
             unit_locs = data.get("unit_loc", [])
@@ -330,7 +333,8 @@ class Parser:
         # they don't go in board.provinces
         impassible_provinces = set()
         if self.layer_data.get("impassibles_layer") is not None:
-            impassible_provinces = self._create_provinces_type(self.layer_data["impassibles_layer"], ProvinceType.IMPASSIBLE)
+            impassible_provinces = self._create_provinces_type(
+                self.layer_data["impassibles_layer"], ProvinceType.IMPASSIBLE)
         return land_provinces | island_provinces | sea_provinces | impassible_provinces
 
     # TODO: (BETA) can a library do all of this for us? more safety from needing to support wild SVG legal syntax
@@ -395,7 +399,10 @@ class Parser:
             assert new_name is not None
             province.name = new_name
 
-        initialize_province_resident_data(provinces, list(self.layer_data["names_layer"]), get_coordinates, set_province_name)
+        initialize_province_resident_data(provinces,
+                                          list(self.layer_data["names_layer"]),
+                                          get_coordinates,
+                                          set_province_name)
 
     def _initialize_supply_centers_assisted(self) -> None:
         for center_data in self.layer_data["supply_center_icons"]:

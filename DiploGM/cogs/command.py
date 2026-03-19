@@ -1,9 +1,9 @@
 from __future__ import annotations
-from black.trans import defaultdict
 import inspect
 import logging
 from typing import TYPE_CHECKING
 
+from black.trans import defaultdict
 from discord import Member
 from discord.ext import commands
 
@@ -16,7 +16,6 @@ from DiploGM.utils import (
 from DiploGM.manager import Manager, SEVERENCE_A_ID, SEVERENCE_B_ID
 from DiploGM.models.player import Player
 from DiploGM.models.province import ProvinceType
-from DiploGM.models.turn import PhaseName
 from DiploGM.utils.sanitise import parse_season
 
 if TYPE_CHECKING:
@@ -35,6 +34,7 @@ class CommandCog(commands.Cog):
 
     @commands.command(brief="How long has the bot been online?")
     async def uptime(self, ctx: commands.Context) -> None:
+        """Outputs the bot's uptime and time since last command."""
         uptime = ctx.message.created_at - self.bot.creation_time
 
         hours = int(uptime.total_seconds() // 3600)
@@ -64,7 +64,7 @@ class CommandCog(commands.Cog):
             ),
         )
 
-    def generate_chaos_scoreboard(self, board: Board, ctx) -> str:
+    def _generate_chaos_scoreboard(self, board: Board, ctx) -> str:
         response = ""
         the_player = perms.get_player_by_context(ctx)
         scoreboard_rows = []
@@ -81,7 +81,7 @@ class CommandCog(commands.Cog):
 
             if i <= 25 or player == the_player:
                 scoreboard_rows.append((latest_index + 1, player))
-            elif the_player == None:
+            elif the_player is None:
                 break
             elif the_player == player:
                 scoreboard_rows.append((latest_index + 1, player))
@@ -100,7 +100,7 @@ class CommandCog(commands.Cog):
             )
         return response
 
-    def generate_scoreboard(self, board: Board, ctx: commands.Context, alphabetical: bool) -> str:
+    def _generate_scoreboard(self, board: Board, ctx: commands.Context, alphabetical: bool) -> str:
         assert ctx.guild is not None
         response = ""
         old_board = manager._database.get_board(
@@ -149,6 +149,7 @@ class CommandCog(commands.Cog):
         aliases=["leaderboard", "sb"],
     )
     async def scoreboard(self, ctx: commands.Context) -> None:
+        """Outputs the scoreboard. Can be optionally sorted alphabetically."""
         assert ctx.guild is not None
         arguments = (
             ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")
@@ -172,9 +173,9 @@ class CommandCog(commands.Cog):
             return
 
         if board.is_chaos() and "standard" not in ctx.message.content:
-            response = self.generate_chaos_scoreboard(board, ctx)
+            response = self._generate_chaos_scoreboard(board, ctx)
         else:
-            response = self.generate_scoreboard(board, ctx, alphabetical)
+            response = self._generate_scoreboard(board, ctx, alphabetical)
 
         log_command(logger, ctx, message="Generated scoreboard")
         await send_message_and_file(
@@ -185,6 +186,7 @@ class CommandCog(commands.Cog):
 
     @commands.command(brief="outputs information about the current game", aliases=["i"])
     async def info(self, ctx: commands.Context) -> None:
+        """Outputs information about the current game."""
         assert ctx.guild is not None
         try:
             board = manager.get_board(ctx.guild.id)
@@ -272,6 +274,7 @@ class CommandCog(commands.Cog):
         aliases=["province"],
     )
     async def province_info(self, ctx: commands.Context) -> None:
+        """Outputs information about a specific province."""
         assert ctx.guild is not None
         board = manager.get_board(ctx.guild.id)
 
@@ -296,7 +299,7 @@ class CommandCog(commands.Cog):
             f"{ctx.prefix}{ctx.invoked_with}"
         ).strip()
         if not province_name:
-            log_command(logger, ctx, message=f"No province given")
+            log_command(logger, ctx, message="No province given")
             await send_message_and_file(
                 channel=ctx.channel,
                 title="No province given",
@@ -305,7 +308,7 @@ class CommandCog(commands.Cog):
             return
         try:
             province = board.get_province(province_name)
-        except:
+        except ValueError as _:
             log_command(logger, ctx, message=f"Province `{province_name}` not found")
             await send_message_and_file(
                 channel=ctx.channel, title=f"Could not find province {province_name}"
@@ -347,6 +350,7 @@ class CommandCog(commands.Cog):
                 adjacent_list.append(f"{adj[0] if isinstance(adj, tuple) else adj}")
             adjacent_coasts += "\n- ".join(sorted(adjacent_list))
             adjacent_coasts += "\n"
+        adjacent_sorted = sorted([adjacent.name for adjacent in province.adjacency_data.adjacent | province.adjacency_data.impassible_adjacent])
         out = f"Type: {province.type.name}\n" + \
             f"{coast_info}" + \
             f"Owner: {province.owner.name if province.owner else 'None'}\n" + \
@@ -355,7 +359,7 @@ class CommandCog(commands.Cog):
             f"Center: {province.has_supply_center}\n" + \
             f"Core: {province.core_data.core.name if province.core_data.core else 'None'}\n" + \
             f"Half-Core: {province.core_data.half_core.name if province.core_data.half_core else 'None'}\n" + \
-            "Adjacent Provinces:\n- " + "\n- ".join(sorted([adjacent.name for adjacent in province.adjacency_data.adjacent | province.adjacency_data.impassible_adjacent])) + "\n" + \
+            "Adjacent Provinces:\n- " + "\n- ".join(adjacent_sorted) + "\n" + \
             f"{adjacent_coasts}"
         # fmt: on
         log_command(logger, ctx, message=f"Got info for {province_name}")
@@ -369,6 +373,7 @@ class CommandCog(commands.Cog):
         aliases=["player"],
     )
     async def player_info(self, ctx: commands.Context) -> None:
+        """Outputs information about a specific player."""
         guild = ctx.guild
         if not guild:
             return
@@ -396,7 +401,7 @@ class CommandCog(commands.Cog):
             f"{ctx.prefix}{ctx.invoked_with}"
         ).strip()
         if not player_name:
-            log_command(logger, ctx, message=f"No player given")
+            log_command(logger, ctx, message="No player given")
             await send_message_and_file(
                 channel=ctx.channel,
                 title="No player given",
@@ -404,18 +409,16 @@ class CommandCog(commands.Cog):
             )
             return
 
-        variant = "standard"
         player: Player | None = None
         if board.is_chaos():
             # HACK: chaos has same name of players as provinces so we exploit that
             province, _ = board.get_province_and_coast(player_name)
             player = board.get_player(province.name.lower())
-            variant = "chaos"
 
         elif board.fow:
             await send_message_and_file(
                 channel=ctx.channel,
-                title=f"Gametype Error!",
+                title="Gametype Error!",
                 message="This command does not work with FoW",
                 embed_colour=ERROR_COLOUR,
             )
@@ -444,6 +447,7 @@ class CommandCog(commands.Cog):
 
     @commands.command(brief="outputs all provinces per owner")
     async def all_province_data(self, ctx: commands.Context) -> None:
+        """Outputs all provinces sorted by owner."""
         assert ctx.guild is not None
         board = manager.get_board(ctx.guild.id)
 
@@ -512,9 +516,10 @@ class CommandCog(commands.Cog):
 
     @commands.command(brief="Changes your nickname")
     async def nick(self, ctx: commands.Context) -> None:
+        """Changes the user's nickname. Used for chaos games."""
         assert isinstance(ctx.author, Member)
         name = ctx.author.nick
-        if name == None:
+        if name is None:
             name = ctx.author.name
         if "]" in name:
             prefix = name.split("] ", 1)[0]
@@ -526,7 +531,7 @@ class CommandCog(commands.Cog):
             await send_message_and_file(
                 channel=ctx.channel,
                 embed_colour=ERROR_COLOUR,
-                message=f"A nickname must be at least 1 character",
+                message="A nickname must be at least 1 character",
             )
             return
         if len(prefix + name) > 32:
@@ -541,7 +546,7 @@ class CommandCog(commands.Cog):
             channel=ctx.channel, message=f"Nickname updated to `{prefix + name}`"
         )
 
-
 async def setup(bot):
+    """Sets up the cog."""
     cog = CommandCog(bot)
     await bot.add_cog(cog)

@@ -1,14 +1,14 @@
+"""Module to parse commands to edit the game state."""
 import copy
 import logging
 import string
 
 from DiploGM.config import ERROR_COLOUR, PARTIAL_ERROR_COLOUR
 from DiploGM.utils import get_unit_type, get_keywords, parse_season
-from DiploGM.adjudicator.mapper import Mapper
+from DiploGM.mapper.mapper import Mapper
 from DiploGM.models.board import Board
 from DiploGM.db.database import get_connection
 from DiploGM.manager import Manager
-from DiploGM.models.player import Player
 from DiploGM.models.province import Province
 from DiploGM.models.unit import Unit, UnitType
 
@@ -17,6 +17,8 @@ manager = Manager()
 
 
 def parse_edit_state(message: str, board: Board) -> tuple[str, str, bytes | None, str | None, str | None]:
+    """Parses a message containing commands to edit the game state,
+    executes those commands, and returns a response message and an updated map if applicable."""
     invalid: list[tuple[str, Exception]] = []
     commands = str.splitlines(message)
     for command in commands:
@@ -294,10 +296,10 @@ def _move_unit(keywords: list[str], board: Board) -> None:
 def _dislodge_unit(keywords: list[str], board: Board) -> None:
     if board.turn.is_retreats():
         province = board.get_province(keywords[0])
-        if province.dislodged_unit != None:
+        if province.dislodged_unit is not None:
             raise RuntimeError("Dislodged unit already exists in province")
         unit = province.unit
-        if unit == None:
+        if unit is None:
             raise RuntimeError("No unit to dislodge in province")
         retreat_options = {board.get_province_and_coast(province_name) for province_name in keywords[1:]}
         if not all(retreat_options):

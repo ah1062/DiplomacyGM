@@ -487,7 +487,9 @@ class _DatabaseConnection:
         )
         # TODO - this is hacky
         cursor.executemany(
-            "INSERT INTO units (board_id, phase, location, is_dislodged, owner, is_army, order_type, order_destination, order_source, failed_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO units (board_id, phase, location, is_dislodged, owner, " +
+                                "is_army, order_type, order_destination, order_source, failed_order) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     board_id,

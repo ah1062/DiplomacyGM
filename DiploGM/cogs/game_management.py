@@ -58,8 +58,8 @@ class GameManagementCog(commands.Cog):
 
         Note: 
             Limited to the server of command invocation
-            Default for <gametype> is "impdip" (A2/B1)
-            Valid <gametype> values can be found as folders in https://github.com/Imperial-Diplomacy/DiplomacyGM-Variants/tree/main
+            Default for <gametype> is "classic"
+            Valid <gametype> values can be found by running .list_variants
 
         Args:
             ctx (commands.Context): Context from discord regarding command invocation
@@ -80,7 +80,13 @@ class GameManagementCog(commands.Cog):
 
         message = manager.create_game(ctx.guild.id, gametype)
 
-        welcome_message = "Welcome to the bot!"
+        welcome_message = "Welcome to the game!\n" + \
+            "To submit orders, use the .order command, entering one order per line.\n" + \
+            "To view a map including all submitted orders, use the .view_map command.\n" + \
+            "To see all your units and which orders you have submitted, use the .view_orders command.\n" + \
+            "To create a private press channel, use .create_press_channel.\n" + \
+            "For a list of all commands, use the .help command.\n" + \
+            "Good luck!"
         board = manager.get_board(ctx.guild.id)
         for c in [cat for cat in ctx.guild.categories if config.is_player_category(cat)]:
             for ch in c.text_channels:
@@ -125,7 +131,8 @@ class GameManagementCog(commands.Cog):
     @commands.command(brief="lists all variants currently supported")
     @perms.gm_only("lists variants")
     async def list_variants(self, ctx: commands.Context) -> None:
-        """Lists all variants currently loaded into the bot. To create a game of a specific variant, use `.create_game <variant>`
+        """Lists all variants currently loaded into the bot.
+        To create a game of a specific variant, use `.create_game <variant>`
 
         Usage: 
             Used as `.list_variants`

@@ -13,7 +13,7 @@ from DiploGM.adjudicator.defs import (
 )
 from DiploGM.adjudicator.validate_order import OrderValidity, is_valid_result, order_is_valid
 from DiploGM.db import database
-from DiploGM.models.order import NMR, Move, Core, Transform, Support
+from DiploGM.models.order import NMR, Core, Support
 from DiploGM.models.unit import UnitType
 
 if TYPE_CHECKING:
@@ -108,7 +108,7 @@ class MovesAdjudicator(Adjudicator):
             order.state = ResolutionState.UNRESOLVED
         for order in self.orders:
             self._resolve_order(order)
-            order.get_original_order().has_failed = (order.resolution == Resolution.FAILS)
+            order.get_original_order().has_failed = order.resolution == Resolution.FAILS
         if self.save_orders:
             database.get_connection().save_order_for_units(self._board, set(o.base_unit for o in self.orders))
         self._update_board()
@@ -233,7 +233,8 @@ class MovesAdjudicator(Adjudicator):
             visited.add(current.name)
 
             adjacent_convoys = {
-                convoy_order for convoy_order in order.convoys if convoy_order.current_province in current.adjacency_data.adjacent
+                convoy_order for convoy_order in order.convoys
+                    if convoy_order.current_province in current.adjacency_data.adjacent
             }
             for convoy in adjacent_convoys:
                 if convoy.current_province.name in visited:

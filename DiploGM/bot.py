@@ -296,7 +296,8 @@ class DiploGM(commands.Bot):
         else:
             original = error
 
-        channel_name = ctx.channel.name if isinstance(ctx.channel, (discord.TextChannel, discord.Thread)) else ctx.channel.id
+        channel_name = (ctx.channel.name if isinstance(ctx.channel, (discord.TextChannel, discord.Thread))
+                                         else ctx.channel.id)
 
         if isinstance(original, CommandPermissionError):
             logger.info(
@@ -333,7 +334,8 @@ class DiploGM(commands.Bot):
         if isinstance(original, commands.errors.MissingRequiredArgument):
             out = (
                 f"`{original}`\n\n"
-                f"If you need some help on how to use this command, consider running this command instead: `.help {ctx.command}`"
+                "If you need some help on how to use this command, " +
+                f"consider running this command instead: `.help {ctx.command}`"
             )
             await send_message_and_file(
                 channel=ctx.channel,
@@ -365,7 +367,8 @@ class DiploGM(commands.Bot):
             out = (
                 "Please wait a few (10 to 30) seconds and try again.\n"
                 "Sorry for the inconvenience. :D\n\n"
-                "-# If after repeated attempts it still breaks, please report this to a bot dev using a feedback channel"
+                "-# If after repeated attempts it still breaks, "
+                "please report this to a bot dev using a feedback channel"
             )
             await send_message_and_file(
                 channel=ctx.channel,

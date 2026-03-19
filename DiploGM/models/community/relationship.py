@@ -106,4 +106,3 @@ class SQLiteRelationshipRepository(Repository[Relationship]):
             type=RelationshipType(row[3]),
             created_at=row[4],
         )
-

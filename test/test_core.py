@@ -1,9 +1,11 @@
+"""Tests for the Core move."""
 import unittest
 
-from DiploGM.models.unit import UnitType
 from test.utils import BoardBuilder
+from DiploGM.models.unit import UnitType
 
 class TestCore(unittest.TestCase):
+    """Tests for the Core move, which can allow a player to build in a province.."""
     def test_core_1(self):
         """ 
             Coring should fail for non-SCs.

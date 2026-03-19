@@ -492,7 +492,8 @@ class PartyCog(commands.Cog):
 
         if debumblify:
             temporary_bumbles.remove(ctx.author.name)
-            fish_message = f"\n Your luck has run out! {fish_message}\nBumble is sad, you must once again prove your worth by Bumbling!"
+            fish_message = f"\n Your luck has run out! {fish_message}\n" + \
+                           "Bumble is sad, you must once again prove your worth by Bumbling!"
 
         await send_message_and_file(channel=ctx.channel, title=fish_message)
 
@@ -612,8 +613,10 @@ class PartyCog(commands.Cog):
 
         assert ctx.guild is not None
         if ctx.author.id == 1352388421003251833:
-            if ctx.guild.id != IMPDIP_SERVER_ID and is_gm(ctx.author) and (ctx.guild.id not in self.eolhc_ed_members or ctx.me.id not in self.eolhc_ed_members[ctx.guild.id]):
-                self.eolhc_ed_members.setdefault(ctx.guild.id, list()).append(ctx.me.id)
+            if (ctx.guild.id != IMPDIP_SERVER_ID
+                and is_gm(ctx.author)
+                and (ctx.guild.id not in self.eolhc_ed_members or ctx.me.id not in self.eolhc_ed_members[ctx.guild.id])):
+                self.eolhc_ed_members.setdefault(ctx.guild.id, []).append(ctx.me.id)
                 await ctx.reply("*incoherent screaming*"[::-1])
                 await ctx.me.edit(nick=ctx.me.display_name[::-1])
             else:

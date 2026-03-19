@@ -1,38 +1,35 @@
-
+"""Module to sanitise string inputs to stuff that the bot likes."""
+import os
 import re
 
 from DiploGM.models.turn import PhaseName, Turn
 from DiploGM.models.unit import UnitType
 
-
-_north_coast = "nc"
-_south_coast = "sc"
-_east_coast = "ec"
-_west_coast = "wc"
-
 coast_dict = {
-    _north_coast: ["nc", "north coast", "(nc)"],
-    _south_coast: ["sc", "south coast", "(sc)"],
-    _east_coast: ["ec", "east coast", "(ec)"],
-    _west_coast: ["wc", "west coast", "(wc)"],
+    "nc": ["nc", "north coast", "(nc)"],
+    "sc": ["sc", "south coast", "(sc)"],
+    "ec": ["ec", "east coast", "(ec)"],
+    "wc": ["wc", "west coast", "(wc)"],
 }
 
-_army = "army"
-_fleet = "fleet"
+ARMY = "army"
+FLEET = "fleet"
 
 unit_dict = {
-    _army: ["a", "army", "cannon"],
-    _fleet: ["f", "fleet", "boat", "ship"],
+    ARMY: ["a", "army", "cannon"],
+    FLEET: ["f", "fleet", "boat", "ship"],
 }
 
-def sanitise_name(str):
-    str = re.sub(r"[‘’`´′‛.']", "", str)
-    str = re.sub(r"-", " ", str)
-    return str
+def sanitise_name(name: str) -> str:
+    """Removes apostrophes and replaces hyphens with spaces."""
+    name = re.sub(r"[‘’`´′‛.']", "", name)
+    name = re.sub(r"-", " ", name)
+    return name
 
 
 # I'm sorry this is a bad function name. I couldn't think of anything better and I'm in a rush
-def simple_player_name(name: str):
+def simple_player_name(name: str) -> str:
+    """Returns a player name without hyphens, apostrophes or periods and in lowercase."""
     return name.lower().replace("-", " ").replace("'", "").replace(".", "")
 
 
@@ -40,13 +37,13 @@ def get_keywords(command: str) -> list[str]:
     """Command is split by whitespace with '_' representing whitespace in a concept to be stuck in one word.
     e.g. 'A New_York - Boston' becomes ['A', 'New York', '-', 'Boston']"""
     keywords = command.split(" ")
-    for i in range(len(keywords)):
-        for j in range(len(keywords[i])):
+    for i, _ in enumerate(keywords):
+        for j, _ in enumerate(keywords[i]):
             if keywords[i][j] == "_":
                 keywords[i] = keywords[i][:j] + " " + keywords[i][j + 1 :]
 
-    for i in range(len(keywords)):
-        keywords[i] = _manage_coast_signature(keywords[i])
+    for i, keyword in enumerate(keywords):
+        keywords[i] = _manage_coast_signature(keyword)
 
     return keywords
 
@@ -65,10 +62,11 @@ def _manage_coast_signature(keyword: str) -> str:
 
 
 def get_unit_type(command: str) -> UnitType | None:
+    """Gets the unit type from its string."""
     command = command.strip()
-    if command in unit_dict[_army]:
+    if command in unit_dict[ARMY]:
         return UnitType.ARMY
-    if command in unit_dict[_fleet]:
+    if command in unit_dict[FLEET]:
         return UnitType.FLEET
     return None
 
@@ -76,6 +74,8 @@ def get_unit_type(command: str) -> UnitType | None:
 def parse_season(
     arguments: list[str], default_turn: Turn
 ) -> Turn:
+    """Given a string, attempts to parse it into a Turn.
+    The result should be at latest default_turn, and that is used if year is not given."""
     year, season, retreat = None, None, False
     for s in arguments:
         if s.isnumeric() and int(s) >= default_turn.start_year:
@@ -109,6 +109,7 @@ def parse_season(
 
 
 def get_value_from_timestamp(timestamp: str) -> int | None:
+    """Gets the value from a timestamp string."""
     if len(timestamp) == 10 and timestamp.isnumeric():
         return int(timestamp)
 
@@ -117,3 +118,20 @@ def get_value_from_timestamp(timestamp: str) -> int | None:
         return int(match.group(1))
 
     return None
+
+def parse_variant_path(variant: str) -> str:
+    """Parses the variant path to get the correct path for the parser."""
+    if os.path.isdir(f"variants/{variant}"):
+        if os.path.isfile(f"variants/{variant}/config.json"):
+            return f"variants/{variant}"
+        variant_list = sorted(os.listdir(f"variants/{variant}"), reverse=True)
+        print(variant_list)
+        for v in variant_list:
+            if os.path.isdir(f"variants/{variant}/{v}") and os.path.isfile(f"variants/{variant}/{v}/config.json"):
+                return f"variants/{variant}/{v}"
+    else:
+        variant_name, variant_version = variant.split(".", 1)
+        variant_path = f"variants/{variant_name}/{variant_version}"
+        if os.path.isdir(variant_path) and os.path.isfile(f"{variant_path}/config.json"):
+            return variant_path
+    raise ValueError(f"Variant {variant} does not exist or is missing a config file.")
