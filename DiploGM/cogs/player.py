@@ -17,8 +17,7 @@ manager = Manager()
 MISSING_ALIASES = ["missing", "miss", "m"]
 SUBMITTED_ALIASES = ["submitted", "submit", "sub", "s"]
 BLIND_ALIASES = ["blind", "b"]
-FORCED_RETREAT_ALIASES = ["forced", "f"]
-FREE_RETREAT_ALIASES = ['free', 'retreat', 'r']
+FORCED_RETREAT_ALIASES = ["forced", "force", "f"]
 
 class PlayerCog(commands.Cog):
     def __init__(self, bot):
@@ -102,8 +101,8 @@ class PlayerCog(commands.Cog):
         f"\tAliases: {MISSING_ALIASES}; {SUBMITTED_ALIASES}"
         "Use the 'blind' argument to view only the number of orders submitted."
         f"\tAliases: {BLIND_ALIASES}"
-        "Use the 'forced-disband' or 'free-retreat' argument to view only dislodged units that must disband or that may move. (Only in retreat phases)"
-        f"\t Aliases: {FORCED_RETREAT_ALIASES}; {FREE_RETREAT_ALIASES}",
+        "Use the 'forced-disband' argument to view how many dislodged units have no valid retreat locations and must disband. (Only in retreat phases)"
+        f"\t Aliases: {FORCED_RETREAT_ALIASES}",
         aliases=["v", "view", "vieworders", "view-orders"],
     )
     @perms.player("view orders")
@@ -122,15 +121,8 @@ class PlayerCog(commands.Cog):
                 else OrdersSubsetOption.FULL,
             blind=set(BLIND_ALIASES) & set(arguments),
             only_forced=ForcedRetreatOption.FORCED if set(FORCED_RETREAT_ALIASES) & set(arguments)
-                else ForcedRetreatOption.FREE if set(FREE_RETREAT_ALIASES) & set(arguments)
                 else ForcedRetreatOption.FULL
         )
-        # subset = "missing" if {"missing", "miss", "m"} & set(arguments) else None
-        # subset = (
-        #     "submitted"
-        #     if {"submitted", "submit", "sub", "s"} & set(arguments)
-        #     else subset
-        # )
 
         try:
             board = manager.get_board(ctx.guild.id)

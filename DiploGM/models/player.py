@@ -150,7 +150,6 @@ class OrdersSubsetOption(Enum):
 class ForcedRetreatOption(Enum):
     FULL = 0
     FORCED = 1
-    FREE = 2
 
 class ViewOrdersTags:
     def __init__(self, subset: OrdersSubsetOption, blind: bool, forced: ForcedRetreatOption):
@@ -159,4 +158,4 @@ class ViewOrdersTags:
         self.forced = forced
     
     def get_default(self):
-        return ViewOrdersTags(subset=OrdersSubsetOption.FULL, blind=False, forced=ForcedRetreatOption)
+        return ViewOrdersTags(subset=OrdersSubsetOption.FULL, blind=False, forced=ForcedRetreatOption.FULL)

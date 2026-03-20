@@ -4,7 +4,7 @@ from DiploGM.models.order import PlayerOrder
 from discord.ext.commands import Context
 
 from DiploGM.models.board import Board
-from DiploGM.models.player import Player, ViewOrdersTags, OrdersSubsetOption
+from DiploGM.models.player import Player, ViewOrdersTags, OrdersSubsetOption, ForcedRetreatOption
 
 def get_build_orders(player: Player, player_restriction: Player | None, ctx: Context, tags: ViewOrdersTags) -> tuple[str | None, str | None]:
     assert ctx.guild is not None
@@ -69,14 +69,22 @@ def get_move_orders(player: Player, player_restriction: Player | None, ctx: Cont
         player_name = player.get_name()
 
     title = f"**{player_name}** ({len(ordered)}/{len(moving_units)})"
+    if is_retreats and tags.forced == ForcedRetreatOption.FORCED:
+        forced_disband_count = sum(unit.retreat_options is not None for unit in missing)
+        if forced_disband_count > 0:
+            title += f" ({forced_disband_count} missing forced disbands)"
+
     body = ""
     if tags.blind:
-        return title, ""
+        return title, body
 
     if missing and tags.subset != OrdersSubsetOption.SUBMITTED:
         body += f"__Missing Orders:__\n"
         for unit in sorted(missing, key=lambda _unit: _unit.province.name):
-            body += f"{unit}\n"
+            body += f"{unit}"
+            if is_retreats and tags.forced == ForcedRetreatOption.FORCED and unit.retreat_options:
+                body += " (forced disband)"
+            body += "\n"
     if ordered and tags.subset != OrdersSubsetOption.MISSING:
         body += f"__Submitted Orders:__\n"
         for unit in sorted(ordered, key=lambda _unit: _unit.province.name):
