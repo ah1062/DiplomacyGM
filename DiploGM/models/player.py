@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Sequence
 from enum import Enum, auto
 import discord
@@ -147,11 +148,11 @@ class OrdersSubsetOption(Enum):
     MISSING = auto()
     SUBMITTED = auto()
 
+@dataclass
 class ViewOrdersTags:
-    def __init__(self, subset: OrdersSubsetOption, blind: bool, forced: bool):
-        self.subset = subset
-        self.blind = blind
-        self.forced = forced
+    subset: OrdersSubsetOption
+    blind: bool
+    forced: bool
 
     @classmethod
     def get_default(cls):
