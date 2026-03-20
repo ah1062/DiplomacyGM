@@ -1,5 +1,5 @@
-from enum import Enum
 import logging
+from typing import Callable, Iterable
 
 import discord
 from discord.ext import commands
@@ -9,7 +9,7 @@ from DiploGM import perms
 from DiploGM.parse_order import parse_order, parse_remove_order
 from DiploGM.utils import get_orders, log_command, parse_season, send_message_and_file
 from DiploGM.manager import Manager, SEVERENCE_A_ID, SEVERENCE_B_ID
-from DiploGM.models.player import Player, ViewOrdersTags, OrdersSubsetOption, ForcedRetreatOption
+from DiploGM.models.player import Player, ViewOrdersTags, OrdersSubsetOption
 
 logger = logging.getLogger(__name__)
 manager = Manager()
@@ -17,7 +17,7 @@ manager = Manager()
 MISSING_ALIASES = ["missing", "miss", "m"]
 SUBMITTED_ALIASES = ["submitted", "submit", "sub", "s"]
 BLIND_ALIASES = ["blind", "b"]
-FORCED_RETREAT_ALIASES = ["forced", "force", "f"]
+FORCED_RETREAT_ALIASES = ["forced-disband", "forced", "force", "f"]
 
 class PlayerCog(commands.Cog):
     def __init__(self, bot):
@@ -115,19 +115,18 @@ class PlayerCog(commands.Cog):
             .split()
         )
 
+        any_alias_in_args: Callable[[Iterable[str]], bool] = lambda aliases: 0 < len(set(arguments).intersection(set(aliases)))
+
         tags = ViewOrdersTags(
-            subset=OrdersSubsetOption.MISSING if set(MISSING_ALIASES) & set(arguments) 
-                else OrdersSubsetOption.SUBMITTED if set(SUBMITTED_ALIASES) & set(arguments)
+            subset=OrdersSubsetOption.MISSING if any_alias_in_args(MISSING_ALIASES) 
+                else OrdersSubsetOption.SUBMITTED if any_alias_in_args(SUBMITTED_ALIASES)
                 else OrdersSubsetOption.FULL,
-            blind=set(BLIND_ALIASES) & set(arguments),
-            only_forced=ForcedRetreatOption.FORCED if set(FORCED_RETREAT_ALIASES) & set(arguments)
-                else ForcedRetreatOption.FULL
+            blind=any_alias_in_args(BLIND_ALIASES),
+            forced=any_alias_in_args(FORCED_RETREAT_ALIASES),
         )
 
         try:
             board = manager.get_board(ctx.guild.id)
-
-            blind = "blind" in arguments
             order_text = get_orders(board, player, ctx, tags=tags)
 
         except RuntimeError as err:

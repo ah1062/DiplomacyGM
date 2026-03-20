@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, Sequence
-from enum import Enum
+from enum import Enum, auto
 import discord
 
 from DiploGM.models import order
@@ -143,19 +143,16 @@ class Player:
             return PlayerClass.DUCHY
 
 class OrdersSubsetOption(Enum):
-    FULL = 0
-    MISSING = 1
-    SUBMITTED = 2
-
-class ForcedRetreatOption(Enum):
-    FULL = 0
-    FORCED = 1
+    FULL = auto()
+    MISSING = auto()
+    SUBMITTED = auto()
 
 class ViewOrdersTags:
-    def __init__(self, subset: OrdersSubsetOption, blind: bool, forced: ForcedRetreatOption):
+    def __init__(self, subset: OrdersSubsetOption, blind: bool, forced: bool):
         self.subset = subset
         self.blind = blind
         self.forced = forced
-    
-    def get_default(self):
-        return ViewOrdersTags(subset=OrdersSubsetOption.FULL, blind=False, forced=ForcedRetreatOption.FULL)
+
+    @classmethod
+    def get_default(cls):
+        return ViewOrdersTags(subset=OrdersSubsetOption.FULL, blind=False, forced=False)
