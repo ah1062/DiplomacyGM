@@ -73,6 +73,8 @@ def get_move_orders(player: Player, player_restriction: Player | None, ctx: Cont
 
     if tags.forced == ForcedDisbandOption.ONLY_FREE:
         total_unit_count -= forced_disband_count
+        if total_unit_count == len(ordered):
+            return None, None
 
     title = f"**{player_name}** ({len(ordered)}/{total_unit_count})"
 
@@ -80,13 +82,13 @@ def get_move_orders(player: Player, player_restriction: Player | None, ctx: Cont
         title += rf" ({forced_disband_count} \*)"
 
     body = ""
-    if tags.blind or (tags.forced == ForcedDisbandOption.ONLY_FREE and total_unit_count == len(ordered)):
+    if tags.blind:
         return title, body
 
     if missing and tags.subset != OrdersSubsetOption.SUBMITTED:
         body += f"__Missing Orders:__\n"
         for unit in sorted(missing, key=lambda _unit: _unit.province.name):
-            unit_is_forced = is_retreats and tags.forced == ForcedDisbandOption.MARK_FORCED and not unit.retreat_options
+            unit_is_forced = is_retreats and not unit.retreat_options
             if unit_is_forced and tags.forced == ForcedDisbandOption.ONLY_FREE:
                 continue
             body += f"{unit}"
