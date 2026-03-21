@@ -148,12 +148,17 @@ class OrdersSubsetOption(Enum):
     MISSING = auto()
     SUBMITTED = auto()
 
+class ForcedDisbandOption(Enum):
+    UNMARKED = auto()
+    MARK_FORCED = auto()
+    ONLY_FREE = auto()
+
 @dataclass
 class ViewOrdersTags:
     subset: OrdersSubsetOption
     blind: bool
-    forced: bool
+    forced: ForcedDisbandOption
 
     @classmethod
     def get_default(cls):
-        return ViewOrdersTags(subset=OrdersSubsetOption.FULL, blind=False, forced=False)
+        return ViewOrdersTags(subset=OrdersSubsetOption.FULL, blind=False, forced=ForcedDisbandOption.UNMARKED)

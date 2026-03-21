@@ -4,7 +4,7 @@ from DiploGM.models.order import PlayerOrder
 from discord.ext.commands import Context
 
 from DiploGM.models.board import Board
-from DiploGM.models.player import Player, ViewOrdersTags, OrdersSubsetOption
+from DiploGM.models.player import ForcedDisbandOption, Player, ViewOrdersTags, OrdersSubsetOption
 
 def get_build_orders(player: Player, player_restriction: Player | None, ctx: Context, tags: ViewOrdersTags) -> tuple[str | None, str | None]:
     assert ctx.guild is not None
@@ -68,22 +68,30 @@ def get_move_orders(player: Player, player_restriction: Player | None, ctx: Cont
     else:
         player_name = player.get_name()
 
-    title = f"**{player_name}** ({len(ordered)}/{len(moving_units)})"
-    if is_retreats and tags.forced:
-        forced_disband_count = sum(unit.retreat_options is None or len(unit.retreat_options) == 0 for unit in missing)
-        if forced_disband_count > 0:
-            title += f" ({forced_disband_count} *)"
+    forced_disband_count = sum(unit.retreat_options is None or len(unit.retreat_options) == 0 for unit in missing)
+    total_unit_count = len(moving_units)
+
+    if tags.forced == ForcedDisbandOption.ONLY_FREE:
+        total_unit_count -= forced_disband_count
+
+    title = f"**{player_name}** ({len(ordered)}/{total_unit_count})"
+
+    if is_retreats and tags.forced == ForcedDisbandOption.MARK_FORCED and forced_disband_count > 0:
+        title += rf" ({forced_disband_count} \*)"
 
     body = ""
-    if tags.blind:
+    if tags.blind or (tags.forced == ForcedDisbandOption.ONLY_FREE and total_unit_count == len(ordered)):
         return title, body
 
     if missing and tags.subset != OrdersSubsetOption.SUBMITTED:
         body += f"__Missing Orders:__\n"
         for unit in sorted(missing, key=lambda _unit: _unit.province.name):
+            unit_is_forced = is_retreats and tags.forced == ForcedDisbandOption.MARK_FORCED and not unit.retreat_options
+            if unit_is_forced and tags.forced == ForcedDisbandOption.ONLY_FREE:
+                continue
             body += f"{unit}"
-            if is_retreats and tags.forced and not unit.retreat_options:
-                body += " *"
+            if unit_is_forced and tags.forced == ForcedDisbandOption.MARK_FORCED:
+                body += r" \*"
             body += "\n"
     if ordered and tags.subset != OrdersSubsetOption.MISSING:
         body += f"__Submitted Orders:__\n"
