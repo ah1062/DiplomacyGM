@@ -128,10 +128,10 @@ class Mapper:
             if isinstance(unit.order, (RetreatMove, Move, Support)):
                 new_locs = []
                 dest_coords = unit.order.destination.all_coordinates
-                if unit.unit_type.name not in dest_coords:
-                    e_list = next(iter(dest_coords.values()))
-                elif unit.order.destination_coast:
+                if unit.order.destination_coast and unit.order.destination_coast in dest_coords:
                     e_list = dest_coords[unit.order.destination_coast]
+                elif unit.unit_type.name not in dest_coords:
+                    e_list = next(iter(dest_coords.values()))
                 else:
                     e_list = dest_coords.get(unit.unit_type.name,
                                              dest_coords.get(UnitType.ARMY.name,
