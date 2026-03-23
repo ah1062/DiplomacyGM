@@ -324,7 +324,7 @@ retreats_parser = Lark(ebnf, start="retreat", parser="earley")
 builds_parser   = Lark(ebnf, start="build", parser="earley")
 
 def _check_for_warnings(unit: Unit) -> str | None:
-    if isinstance(unit.order, order.Move):
+    if isinstance(unit.order, (order.Move, order.RetreatMove)):
         if unit.order.destination not in unit.province.adjacency_data.adjacent:
             return "This move is not to an adjacent province. This will fail unless there is a convoy."
         if (unit.unit_type == UnitType.FLEET
