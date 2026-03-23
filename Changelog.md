@@ -1,20 +1,34 @@
-1.6.1
-=====
+1.7.0
 
 Contributors
 - aahoughton
+- Golden Kumuqat
 
 # New Features
 - Added `.spec_ban` command group to apply country spectating bans as Code of Conduct violation penalties.
   - `.spec_ban add` can create a ban
   - `.spec_ban remove` can remove a ban
   - `.spec_ban view` can list outstanding bans
+- Reorganized variants folder to split each variant its own subfolder and subrepo to allow for easier map development
+- Added a welcome message to order channels when a game is created
 
 # Quality of Life
 - Reclassified `.remove_all` as a player command, GMs can still use in a GM channel to wipe all orders 
 - Added a fix to strip unit designations when removing orders- `.remove f london` will become `.remove london` within the code
 - Added a detection loop for newlines when using `.schedule` allowing multiple commands to be scheduled at once
   - Changed the task_id to use an 8 long hex string (obtained by slicing a uuid4)
+
+# Developer Changes
+- Lots of documentation and code clarity changes
+- Split mapper into several smaller files for readability
+- Changed how location data is stored in Province.py
+- Added type checking to parser
+
+# Bugfixes
+- Movement to a specific coast displays properly
+- .announce works again
+- Minor fixes to neutral units
+- Order warnings now work with retreats
 
 1.6.0
 =====

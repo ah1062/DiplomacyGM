@@ -862,7 +862,7 @@ class GameManagementCog(commands.Cog):
                 channel=ctx.channel,
                 title="Missing Orders",
                 message="Game has not been adjudicated due to missing orders. " +
-                        "To adjudicate anyway, use `.adjudicate confirm`",
+                        f"To adjudicate anyway, use `{ctx.message.content} confirm`",
                 embed_colour=config.ERROR_COLOUR,
             )
             return
