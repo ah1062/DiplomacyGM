@@ -18,22 +18,25 @@ manager = Manager()
 
 class AdminCog(commands.Cog):
     """Bot administration commands, to be used by superusers only."""
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     @commands.command(hidden=True)
     @perms.superuser_only("send a GM announcement")
     async def announce(self, ctx: commands.Context) -> None:
         """Sends an annouuncement to all servers."""
+        bot: commands.Bot = ctx.bot
         guilds_with_games = manager.list_servers()
         content = ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")
         content = re.sub(r"<@&[0-9]{16,20}>", r"{}", content)
         roles = list(map(lambda role: role.name, ctx.message.role_mentions))
         message = ""
-        for server in ctx.bot.guilds:
+        for server in bot.guilds:
             if server is None:
                 continue
-            admin_chat_channels: list[TextChannel] = [channel for channel in server.channels if config.is_gm_channel(channel.name)]
+            admin_chat_channels: list[TextChannel] = [channel for channel in server.channels
+                                                      if isinstance(channel, TextChannel)
+                                                      and config.is_gm_channel(channel)]
 
             if len(admin_chat_channels) == 0:
                 message += f"\n- ~~{server.name}~~ Couldn't find admin channel"
@@ -67,11 +70,11 @@ class AdminCog(commands.Cog):
                 message=content.format(*server_roles),
             )
         log_command(
-            logger, ctx, f"Sent Announcement into {len(ctx.bot.guilds)} servers"
+            logger, ctx, f"Sent Announcement into {len(bot.guilds)} servers"
         )
         await send_message_and_file(
             channel=ctx.channel,
-            title=f"Announcement sent to {len(ctx.bot.guilds)} servers:",
+            title=f"Announcement sent to {len(bot.guilds)} servers:",
             message=message,
         )
 
