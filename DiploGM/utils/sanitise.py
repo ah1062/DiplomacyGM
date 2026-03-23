@@ -125,13 +125,12 @@ def parse_variant_path(variant: str) -> str:
         if os.path.isfile(f"variants/{variant}/config.json"):
             return f"variants/{variant}"
         variant_list = sorted(os.listdir(f"variants/{variant}"), reverse=True)
-        print(variant_list)
         for v in variant_list:
             if os.path.isdir(f"variants/{variant}/{v}") and os.path.isfile(f"variants/{variant}/{v}/config.json"):
                 return f"variants/{variant}/{v}"
     else:
-        variant_name, variant_version = variant.split(".", 1)
-        variant_path = f"variants/{variant_name}/{variant_version}"
+        variant_name, _ = variant.split(".", 1)
+        variant_path = f"variants/{variant_name}/{variant}"
         if os.path.isdir(variant_path) and os.path.isfile(f"{variant_path}/config.json"):
             return variant_path
     raise ValueError(f"Variant {variant} does not exist or is missing a config file.")

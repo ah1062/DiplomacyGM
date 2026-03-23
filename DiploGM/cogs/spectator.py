@@ -5,7 +5,9 @@ from discord.ext import commands
 from discord.utils import find as discord_find
 
 from DiploGM import perms
-from DiploGM.config import ERROR_COLOUR, IMPDIP_SERVER_ID
+from DiploGM import utils
+from DiploGM.config import ERROR_COLOUR, IMPDIP_SERVER_ID, PARTIAL_ERROR_COLOUR
+from DiploGM.models.spec_request import SpectatorBan, SpectatorBanRepository
 from DiploGM.utils import send_message_and_file
 from DiploGM.manager import Manager
 
@@ -109,6 +111,155 @@ class SpecView(discord.ui.View):
 class SpectatorCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.ban_repo = SpectatorBanRepository("assets/spec_bans.json")
+
+    async def close(self):
+        logger.info("Saved spectating ban list")
+        self.ban_repo._save_to_file()
+
+    @commands.group(name="spec_ban", invoke_without_command=True)
+    @perms.mod_only("interact with spectator bans")
+    async def spec_ban(self, ctx: commands.Context):
+        await send_message_and_file(
+            channel=ctx.channel,
+            message="You may use arguments: 'add', 'remove', 'view'",
+            embed_colour=PARTIAL_ERROR_COLOUR,
+        )
+
+    @spec_ban.command(name="add")
+    @perms.mod_only("ban a user from spectating")
+    async def spec_ban_add(
+        self,
+        ctx: commands.Context,
+        user: discord.User,
+        end_timestamp: str | None = None,
+    ):
+        """Ban a user from country spectating with /spec
+
+        Usage: 
+            Used as `.spec_ban add <user> <?timestamp>`
+
+        Note: 
+            Timestamps will be automatically checked and bans removed after expiration
+
+        Args:
+            ctx (commands.Context): Context from discord regarding command invocation
+            user (discord.User): mention, username, or user id of the individual to ban
+            end_timestamp (str): discord timestamp for end of ban (defaults to 2100/01/01)
+
+        Returns:
+            None
+
+        Raises:
+            None:
+            Messages:
+                Invalid timestamp provided
+        """
+        if end_timestamp is None:
+            end_timestamp = "<t:4102444800:F>"
+        elif utils.get_value_from_timestamp(end_timestamp) is None:
+            await send_message_and_file(
+                channel=ctx.channel,
+                message=f"Invalid timestamp provided! '{end_timestamp}'",
+                embed_colour=ERROR_COLOUR,
+            )
+            return
+
+        ban = SpectatorBan(user.id, end_timestamp)
+        self.ban_repo.save(ban)
+        await send_message_and_file(
+            channel=ctx.channel,
+            message=f"User '{user.mention}' banned from spectating until: {end_timestamp}",
+        )
+
+    @spec_ban_add.error
+    async def spec_ban_add_error(self, ctx: commands.Context, exc):
+        if isinstance(exc, commands.errors.UserNotFound):
+            await send_message_and_file(channel=ctx.channel, message="Could not find that user!", embed_colour=ERROR_COLOUR)
+            ctx.handled = True # type: ignore
+
+    @spec_ban.command(name="remove")
+    @perms.mod_only("remove a spectating ban")
+    async def spec_ban_remove(self, ctx: commands.Context, user: discord.User):
+        """Unban a user from spectating
+
+        Usage: 
+            Used as `.spec_ban remove <user>`
+
+        Note: 
+            Removes first from the board object and then from the database
+            Use in a GM Channel will remove all orders globally
+            Use in a Player Channel will remove all orders for that player
+
+        Args:
+            ctx (commands.Context): Context from discord regarding command invocation
+            user (discord.User): mention, username, or user id of the individual to ban
+
+        Returns:
+            None
+
+        Raises:
+            None:
+            Messages:
+        """
+        self.ban_repo.delete(user.id)
+        await send_message_and_file(
+            channel=ctx.channel,
+            message="Any spectating ban on this user has been removed.",
+        )
+
+    @spec_ban.command(name="view")
+    @perms.mod_only("view ongoing spectating bans")
+    async def spec_ban_view(
+        self, ctx: commands.Context, user: discord.User | None = None
+    ):
+        """Unban a user from spectating
+
+        Usage: 
+            Used as `.spec_ban remove <?user>`
+
+        Note: 
+            if no user is provided, list all current outstanding bans
+
+        Args:
+            ctx (commands.Context): Context from discord regarding command invocation
+            user (discord.User, default=None): mention, username, or user id of the individual with a ban
+
+        Returns:
+            None
+
+        Raises:
+            None:
+            Messages:
+                This user is not banned from spectating.
+        """
+        bans = []
+        if user is None:
+            bans = list(self.ban_repo.all())
+        else:
+            prev_ban = self.ban_repo.load(user.id)
+            if prev_ban is not None:
+                bans = [prev_ban]
+            else:
+                await send_message_and_file(
+                    channel=ctx.channel,
+                    message="This user is not banned from spectating.",
+                    embed_colour=ERROR_COLOUR,
+                )
+
+        out = ""
+        for ban in bans:
+            line = ""
+            user = self.bot.get_user(ban.user_id)
+            if user is not None:
+                line += f"{user.mention}:\n"
+
+            line += f"- Banned until: {ban.end_time}"
+            out += f"{line}\n"
+
+        await send_message_and_file(
+            channel=ctx.channel, title="Current spectator bans", message=out
+        )
 
     @discord.app_commands.command(
         name="spec",
@@ -145,9 +296,7 @@ class SpectatorCog(commands.Cog):
 
         _team = discord.utils.get(guild.roles, name="GM Team")
         if _team is None:
-            await interaction.response.send_message(
-                "This server has no GM Team!"
-            )
+            await interaction.response.send_message("This server has no GM Team!")
             return
 
         _team_roles = [
@@ -185,6 +334,20 @@ class SpectatorCog(commands.Cog):
         requester = guild.get_member(interaction.user.id)
         if not requester:
             return
+
+        prev_ban = self.ban_repo.load(requester.id)
+        if prev_ban is not None:
+            now_ts = discord.utils.utcnow().timestamp()
+            end_ts = utils.get_value_from_timestamp(prev_ban.end_time)
+
+            if end_ts is not None and now_ts < end_ts:
+                await interaction.response.send_message(
+                    f"You are currently banned from spectating with DiploGM until this time:\n\n{end_ts}\n\nContact the Imperial Diplomacy Moderation team if you are unsure why.",
+                    ephemeral=True,
+                )
+                return
+            else:
+                self.ban_repo.delete(requester.id)
 
         # check for membership and verification on the hub Server
         hub = self.bot.get_guild(IMPDIP_SERVER_ID)

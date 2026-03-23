@@ -4,6 +4,12 @@
 Contributors
 - aahoughton
 
+# New Features
+- Added `.spec_ban` command group to apply country spectating bans as Code of Conduct violation penalties.
+  - `.spec_ban add` can create a ban
+  - `.spec_ban remove` can remove a ban
+  - `.spec_ban view` can list outstanding bans
+
 # Quality of Life
 - Reclassified `.remove_all` as a player command, GMs can still use in a GM channel to wipe all orders 
 - Added a fix to strip unit designations when removing orders- `.remove f london` will become `.remove london` within the code
