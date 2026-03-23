@@ -1,3 +1,4 @@
+"""Player information and methods."""
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, Sequence
@@ -23,12 +24,14 @@ class VassalType(Enum):
 
 
 class PlayerClass(Enum):
+    """Used for Chaos. Can be ignored otherwise."""
     DUCHY = 0
     KINGDOM = 1
     EMPIRE = 2
 
 
 class Player:
+    """Represents a player in the game."""
     def __init__(
         self,
         name: str,
@@ -65,6 +68,7 @@ class Player:
 
 
     def find_discord_role(self, roles: Sequence[discord.Role]) -> Optional[discord.Role]:
+        """Gets the Discord role associated with this player, if it exists."""
         for role in roles:
             if simple_player_name(role.name) == simple_player_name(self.get_name()):
                 return role
@@ -76,18 +80,20 @@ class Player:
 
     def __str__(self):
         return self.name
-    
+
     def get_name(self):
+        """Gets the player's name, or their nickname if it exists."""
         if self.board is None:
             return self.name
         return self.board.data["players"][self.name].get("nickname", self.name)
 
     def info(self, board: Board) -> str:
+        """Gets a string representation about the player's information."""
         bullet = "\n- "
 
         units = sorted(self.units, key=lambda u: (u.unit_type.value, u.province.get_name(u.coast)))
         centers = sorted(self.centers, key=lambda c: c.name)
-        
+
         if board.data["players"] == "chaos":
             out = (
                 f"Color: #{self.render_color}\n"
@@ -102,42 +108,44 @@ class Player:
         center_str = "Centers:"
         for center in centers:
             center_str += bullet
-            if center.core == self:
+            if center.core_data.core == self:
                 center_str += f"{center.name} (core)"
-            elif center.half_core == self:
+            elif center.core_data.half_core == self:
                 center_str += f"{center.name} (half-core)"
             else:
                 center_str += f"{center.name}"
 
         unit_str = "Units:"
         for unit in units:
-            unit_str += f"{bullet}({unit.unit_type.value}) {unit.province}"
-            
+            unit_str += f"{bullet}({unit.unit_type.value}) {unit.province.get_name(unit.coast)}"
+
         out = (
             ""
             + f"Color: {(bullet + bullet.join([k + ': ' + v for k, v in self.color_dict.items()]) if self.color_dict is not None else self.render_color)}\n"
-            + f"Score: [{len(self.centers)}/{int(board.data['players'][self.name]['vscc'])}] {round(board.get_score(self) * 100, 2)}%\n"
+            + f"Score: [{len(self.centers)}/{int(board.data['players'][self.name]['vscc'])}] "
+                + f"{round(board.get_score(self) * 100, 2)}%\n"
             + f"{center_str}\n"
             + f"{unit_str}\n"
         )
         return out
 
     def get_number_of_builds(self) -> int:
+        """Gets how many builds or disbands the player currently has inputted."""
         if not self.board or not self.board.turn.is_builds():
             return 0
         num_builds = self.waived_orders
-        for order in self.build_orders:
-            if isinstance(order, Disband):
+        for build_order in self.build_orders:
+            if isinstance(build_order, Disband):
                 num_builds -= 1
-            elif isinstance(order, Build):
+            elif isinstance(build_order, Build):
                 num_builds += 1
         return num_builds
 
     def get_class(self) -> PlayerClass:
+        """Gets the player's rank. Used for Chaos."""
         scs = len(self.centers)
         if scs >= 6:
             return PlayerClass.EMPIRE
         elif scs >= 3:
             return PlayerClass.KINGDOM
-        else:
-            return PlayerClass.DUCHY
+        return PlayerClass.DUCHY

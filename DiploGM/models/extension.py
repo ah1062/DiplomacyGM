@@ -26,7 +26,7 @@ class ExtensionEvent:
             "reason": self.reason,
             "created_at": self.created_at.isoformat(),
         }
-    
+
     @classmethod
     def from_json(cls, data: dict) -> ExtensionEvent:
         return ExtensionEvent(

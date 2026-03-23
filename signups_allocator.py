@@ -399,7 +399,7 @@ for game, powers in games.items():
             dnp = dnp_lists[p]
             for user in map(str.strip, dnp.split(",")):
                 game_dnp_list.add(user.lower())
-    
+
     dnpout = "\n".join(game_dnp_list)
     donotplay.write(f"{dnpout}\n")
 

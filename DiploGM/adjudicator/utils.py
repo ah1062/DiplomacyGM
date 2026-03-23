@@ -6,11 +6,11 @@ from DiploGM.config import SIMULATRANEOUS_SVG_EXPORT_LIMIT
 
 logger = logging.getLogger(__name__)
 
-limit = SIMULATRANEOUS_SVG_EXPORT_LIMIT
+LIMIT = SIMULATRANEOUS_SVG_EXPORT_LIMIT
 
-if limit is None:
-    limit = 4
-external_task_limit = asyncio.Semaphore(int(limit))
+if LIMIT is None:
+    LIMIT = 4
+external_task_limit = asyncio.Semaphore(int(LIMIT))
 
 
 async def svg_to_png(svg: bytes, file_name: str) -> tuple[bytes, str]:
@@ -25,7 +25,7 @@ async def svg_to_png(svg: bytes, file_name: str) -> tuple[bytes, str]:
             stderr=PIPE,
             env=os_env,
         )
-        data, error = await p.communicate(input=svg)
+        data, _ = await p.communicate(input=svg)
 
         # Stupid inkscape error fix, not good but works
         # Inkscape can throw warnings in stdout, this should remove those warnings, leaving us with a valid png
@@ -55,4 +55,3 @@ async def png_to_jpg(png: bytes, file_name: str) -> tuple[bytes, str, bytes]:
         data, error = await p.communicate(input=png)
         base = os.path.splitext(file_name)[0]
         return bytes(data), base + ".jpg", error
-

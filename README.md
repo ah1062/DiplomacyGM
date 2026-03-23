@@ -110,7 +110,7 @@ To release a new version:
     2. Please ensure the dev branch has been suitably tested.
 4. Create a version tag with the semantic version eg `1.0.0` NOT `v1.0.0`
 5. On the server use `cd /opt/DiplomacyGM` followed by `git fetch && git checkout <Version>` eg `git fetch && git checkout 1.0.0`
-     
+
     1. This drops local changes to unstaged tracked files (Not the database or config.toml)
 6. Run the bot command `.shutdown_the_bot_yes_i_want_to_do_this` to shutdown the bot 
 7. On the server run `sudo systemctl restart DiploGM.service`

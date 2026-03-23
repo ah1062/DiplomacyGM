@@ -1,4 +1,3 @@
-import aiohttp.client_exceptions
 import datetime
 import inspect
 import importlib
@@ -7,11 +6,12 @@ import os
 import random
 import traceback
 from typing import Optional
+import aiohttp.client_exceptions
 
-from DiploGM.events.base_listener import BaseListener
 import discord
 from discord.ext import commands
 
+from DiploGM.events.base_listener import BaseListener
 from DiploGM.config import (
     BOT_DEV_UNHANDLED_ERRORS_CHANNEL_ID,
     EMBED_STANDARD_COLOUR,
@@ -267,7 +267,7 @@ class DiploGM(commands.Bot):
             # we shouldn't do anything if the user says something like "..."
             return
 
-        assert ctx.guild is not None and ctx.command is not None
+        assert ctx.guild is not None and ctx.command is not None and self.user is not None
         try:
             # mark the message as failed
             await ctx.message.add_reaction("❌")
@@ -296,7 +296,21 @@ class DiploGM(commands.Bot):
         else:
             original = error
 
-        channel_name = ctx.channel.name if isinstance(ctx.channel, (discord.TextChannel, discord.Thread)) else ctx.channel.id
+        channel_name = (ctx.channel.name if isinstance(ctx.channel, (discord.TextChannel, discord.Thread))
+                                         else ctx.channel.id)
+
+        if isinstance(original, CommandPermissionError):
+            logger.info(
+                f"[{ctx.guild.name}][#{channel_name}]({ctx.message.author.name}) - '{ctx.message.content}' - "
+                f"permission denied in {time_spent}s: {original}",
+            )
+            await send_message_and_file(
+                channel=ctx.channel,
+                message=str(original),
+                embed_colour=ERROR_COLOUR,
+            )
+            return
+
         logger.log(
             logging.ERROR,
             f"[{ctx.guild.name}][#{channel_name}]({ctx.message.author.name}) - '{ctx.message.content}' - "
@@ -317,18 +331,11 @@ class DiploGM(commands.Bot):
             )
             return
 
-        if isinstance(original, CommandPermissionError):
-            await send_message_and_file(
-                channel=ctx.channel,
-                message=str(original),
-                embed_colour=ERROR_COLOUR,
-            )
-            return
-
         if isinstance(original, commands.errors.MissingRequiredArgument):
             out = (
                 f"`{original}`\n\n"
-                f"If you need some help on how to use this command, consider running this command instead: `.help {ctx.command}`"
+                "If you need some help on how to use this command, " +
+                f"consider running this command instead: `.help {ctx.command}`"
             )
             await send_message_and_file(
                 channel=ctx.channel,
@@ -360,7 +367,8 @@ class DiploGM(commands.Bot):
             out = (
                 "Please wait a few (10 to 30) seconds and try again.\n"
                 "Sorry for the inconvenience. :D\n\n"
-                "-# If after repeated attempts it still breaks, please report this to a bot dev using a feedback channel"
+                "-# If after repeated attempts it still breaks, "
+                "please report this to a bot dev using a feedback channel"
             )
             await send_message_and_file(
                 channel=ctx.channel,
@@ -379,8 +387,12 @@ class DiploGM(commands.Bot):
         # Out to Bot Dev Server
         bot_error_channel = self.get_channel(BOT_DEV_UNHANDLED_ERRORS_CHANNEL_ID)
         if bot_error_channel and isinstance(bot_error_channel, discord.TextChannel):
-            channel_category = ctx.channel.category if isinstance(ctx.channel, (discord.TextChannel, discord.Thread)) else ctx.channel.id
-            channel_name = ctx.channel.name if isinstance(ctx.channel, (discord.TextChannel, discord.Thread)) else ctx.channel.id
+            channel_category = (ctx.channel.category
+                                if isinstance(ctx.channel, (discord.TextChannel, discord.Thread))
+                                else ctx.channel.id)
+            channel_name = (ctx.channel.name
+                            if isinstance(ctx.channel, (discord.TextChannel, discord.Thread))
+                            else ctx.channel.id)
             unhandled_out_dev = (
                 f"Type: {type(original)}\n"
                 f"Location: {ctx.guild.name} [{channel_category or ''}]-[{channel_name}]\n"

@@ -1,4 +1,5 @@
 assets/schedule.json
+assets/spec_bans.json
 assets/*_adjacencies.txt
 assets/community/
 *.pyc
@@ -10,6 +11,7 @@ assets/community/
 __pycache__
 *.py[cod]
 *.svg
+!variants/**/*.svg
 *.sqlite
 *.out.sql
 *.zip

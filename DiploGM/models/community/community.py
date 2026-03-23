@@ -78,4 +78,3 @@ class SQLiteCommunityRepository(Repository):
             description=row[2],
             created_at=datetime.datetime.fromisoformat(row[3]),
         )
-

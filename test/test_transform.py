@@ -1,9 +1,11 @@
+"""Module to test the Transform move."""
 import unittest
 
-from DiploGM.models.unit import UnitType
 from test.utils import BoardBuilder
+from DiploGM.models.unit import UnitType
 
 class TestTransform(unittest.TestCase):
+    """Tests for the Transform move, which transforms an army into a fleet or vice versa."""
     def test_transform_1(self):
         """ 
             Transforming should fail for non-SCs.
@@ -11,9 +13,9 @@ class TestTransform(unittest.TestCase):
             Prussia shouldn't be a fleet.
         """
         b = BoardBuilder()
-        a_prussia = b.transform(b.germany, UnitType.ARMY, "Prussia")
+        a_prussia = b.transform(b.players["Germany"], UnitType.ARMY, "Prussia")
 
-        b.assertIllegal(a_prussia)
+        b.assert_illegal(a_prussia)
         b.moves_adjudicate(self)
         self.assertNotEqual(a_prussia.unit_type, UnitType.FLEET, "Prussia shouldn't be a fleet")
 
@@ -25,9 +27,9 @@ class TestTransform(unittest.TestCase):
             Holland shouldn't be an army.
         """
         b = BoardBuilder()
-        f_holland = b.transform(b.germany, UnitType.FLEET, "Holland")
+        f_holland = b.transform(b.players["Germany"], UnitType.FLEET, "Holland")
 
-        b.assertIllegal(f_holland)
+        b.assert_illegal(f_holland)
         b.moves_adjudicate(self)
         self.assertNotEqual(f_holland.unit_type, UnitType.ARMY, "Holland shouldn't be an army")
 
@@ -39,9 +41,9 @@ class TestTransform(unittest.TestCase):
             Kiel should be a fleet.
         """
         b = BoardBuilder()
-        a_kiel = b.transform(b.germany, UnitType.ARMY, "Kiel")
+        a_kiel = b.transform(b.players["Germany"], UnitType.ARMY, "Kiel")
 
-        b.assertSuccess(a_kiel)
+        b.assert_success(a_kiel)
         b.moves_adjudicate(self)
         self.assertEqual(a_kiel.unit_type, UnitType.FLEET, "Kiel should be a fleet")
 
@@ -53,9 +55,9 @@ class TestTransform(unittest.TestCase):
             Kiel should be an army.
         """
         b = BoardBuilder()
-        f_kiel = b.transform(b.germany, UnitType.FLEET, "Kiel")
+        f_kiel = b.transform(b.players["Germany"], UnitType.FLEET, "Kiel")
 
-        b.assertSuccess(f_kiel)
+        b.assert_success(f_kiel)
         b.moves_adjudicate(self)
         self.assertEqual(f_kiel.unit_type, UnitType.ARMY, "Kiel should be an army")
 
@@ -67,9 +69,9 @@ class TestTransform(unittest.TestCase):
             Munich shouldn't be a fleet.
         """
         b = BoardBuilder()
-        a_munich = b.transform(b.germany, UnitType.ARMY, "Munich")
+        a_munich = b.transform(b.players["Germany"], UnitType.ARMY, "Munich")
 
-        b.assertIllegal(a_munich)
+        b.assert_illegal(a_munich)
         b.moves_adjudicate(self)
         self.assertNotEqual(a_munich.unit_type, UnitType.FLEET, "Munich shouldn't be a fleet")
 
@@ -83,14 +85,14 @@ class TestTransform(unittest.TestCase):
         """
         b = BoardBuilder()
         p_holland = b.board.get_province("Holland")
-        p_holland.owner = b.germany
-        a_holland = b.transform(b.germany, UnitType.ARMY, "Holland")
-        a_belgium = b.move(b.france, UnitType.ARMY, "Belgium", "Holland")
+        p_holland.owner = b.players["Germany"]
+        a_holland = b.transform(b.players["Germany"], UnitType.ARMY, "Holland")
+        a_belgium = b.move(b.players["France"], UnitType.ARMY, "Belgium", "Holland")
 
-        b.assertFail(a_holland, a_belgium)
-        b.assertNotIllegal(a_holland, a_belgium)
+        b.assert_fail(a_holland, a_belgium)
+        b.assert_not_illegal(a_holland, a_belgium)
         b.moves_adjudicate(self)
-        
+
         self.assertNotEqual(a_holland.unit_type, UnitType.FLEET, "Holland shouldn't be a fleet")
 
     def test_transform_7(self):
@@ -103,14 +105,14 @@ class TestTransform(unittest.TestCase):
         """
         b = BoardBuilder()
         p_holland = b.board.get_province("Holland")
-        p_holland.owner = b.germany
-        f_holland = b.transform(b.germany, UnitType.FLEET, "Holland")
-        a_belgium = b.move(b.germany, UnitType.ARMY, "Belgium", "Holland")
+        p_holland.owner = b.players["Germany"]
+        f_holland = b.transform(b.players["Germany"], UnitType.FLEET, "Holland")
+        a_belgium = b.move(b.players["Germany"], UnitType.ARMY, "Belgium", "Holland")
 
-        b.assertFail(f_holland, a_belgium)
-        b.assertNotIllegal(f_holland, a_belgium)
+        b.assert_fail(f_holland, a_belgium)
+        b.assert_not_illegal(f_holland, a_belgium)
         b.moves_adjudicate(self)
-        
+
         self.assertNotEqual(f_holland.unit_type, UnitType.ARMY, "Holland shouldn't be an army")
 
     def test_transform_8(self):
@@ -124,15 +126,15 @@ class TestTransform(unittest.TestCase):
         """
         b = BoardBuilder()
         p_holland = b.board.get_province("Holland")
-        p_holland.owner = b.germany
-        a_holland = b.transform(b.germany, UnitType.ARMY, "Holland")
-        a_london = b.move(b.england, UnitType.ARMY, "London", "Holland")
-        f_north_sea = b.convoy(b.england, "North Sea", a_london, "Holland")
+        p_holland.owner = b.players["Germany"]
+        a_holland = b.transform(b.players["Germany"], UnitType.ARMY, "Holland")
+        a_london = b.move(b.players["England"], UnitType.ARMY, "London", "Holland")
+        f_north_sea = b.convoy(b.players["England"], "North Sea", a_london, "Holland")
 
-        b.assertFail(a_holland, a_london)
-        b.assertNotIllegal(a_holland, f_north_sea, a_london)
+        b.assert_fail(a_holland, a_london)
+        b.assert_not_illegal(a_holland, f_north_sea, a_london)
         b.moves_adjudicate(self)
-        
+
         self.assertNotEqual(a_holland.unit_type, UnitType.FLEET, "Holland shouldn't be a fleet")
 
     def test_transform_9(self):
@@ -146,15 +148,15 @@ class TestTransform(unittest.TestCase):
         """
         b = BoardBuilder()
         p_holland = b.board.get_province("Holland")
-        p_holland.owner = b.germany
-        f_holland = b.transform(b.germany, UnitType.FLEET, "Holland")
-        a_london = b.move(b.germany, UnitType.ARMY, "London", "Holland")
-        f_north_sea = b.convoy(b.england, "North Sea", a_london, "Holland")
+        p_holland.owner = b.players["Germany"]
+        f_holland = b.transform(b.players["Germany"], UnitType.FLEET, "Holland")
+        a_london = b.move(b.players["Germany"], UnitType.ARMY, "London", "Holland")
+        f_north_sea = b.convoy(b.players["England"], "North Sea", a_london, "Holland")
 
-        b.assertFail(f_holland, a_london)
-        b.assertNotIllegal(f_holland, f_north_sea, a_london)
+        b.assert_fail(f_holland, a_london)
+        b.assert_not_illegal(f_holland, f_north_sea, a_london)
         b.moves_adjudicate(self)
-        
+
         self.assertNotEqual(f_holland.unit_type, UnitType.ARMY, "Holland shouldn't be an army")
 
     def test_transform_10(self):
@@ -167,13 +169,13 @@ class TestTransform(unittest.TestCase):
         """
         b = BoardBuilder()
         p_holland = b.board.get_province("Holland")
-        p_holland.owner = b.germany
-        f_holland = b.transform(b.germany, UnitType.FLEET, "Holland")
-        _ = b.move(b.england, UnitType.ARMY, "London", "Holland")
+        p_holland.owner = b.players["Germany"]
+        f_holland = b.transform(b.players["Germany"], UnitType.FLEET, "Holland")
+        _ = b.move(b.players["England"], UnitType.ARMY, "London", "Holland")
 
-        b.assertSuccess(f_holland)
+        b.assert_success(f_holland)
         b.moves_adjudicate(self)
-        
+
         self.assertEqual(f_holland.unit_type, UnitType.ARMY, "Holland should be an army")
 
     def test_transform_11(self):
@@ -184,9 +186,9 @@ class TestTransform(unittest.TestCase):
             St. Petersburg should be an army.
         """
         b = BoardBuilder()
-        f_st_petersburg = b.transform(b.russia, UnitType.FLEET, "St. Petersburg sc")
-        b.assertSuccess(f_st_petersburg)
-        b.moves_adjudicate(self)    
+        f_st_petersburg = b.transform(b.players["Russia"], UnitType.FLEET, "St. Petersburg sc")
+        b.assert_success(f_st_petersburg)
+        b.moves_adjudicate(self)
         self.assertEqual(f_st_petersburg.unit_type, UnitType.ARMY, "St. Petersburg should be an army")
 
     def test_transform_12(self):
@@ -197,9 +199,9 @@ class TestTransform(unittest.TestCase):
             St. Petersburg should be an fleet on the south coast.
         """
         b = BoardBuilder()
-        a_st_petersburg = b.transform(b.russia, UnitType.ARMY, "St. Petersburg", "sc")
-        b.assertSuccess(a_st_petersburg)
-        b.moves_adjudicate(self)    
+        a_st_petersburg = b.transform(b.players["Russia"], UnitType.ARMY, "St. Petersburg", "sc")
+        b.assert_success(a_st_petersburg)
+        b.moves_adjudicate(self)
         self.assertEqual(a_st_petersburg.unit_type, UnitType.FLEET, "St. Petersburg should be a fleet")
         self.assertEqual(a_st_petersburg.coast, "sc", "F St. Petersburg should be on the south coast")
 
@@ -211,7 +213,7 @@ class TestTransform(unittest.TestCase):
             St. Petersburg shouldn't be a fleet.
         """
         b = BoardBuilder()
-        a_st_petersburg = b.transform(b.russia, UnitType.ARMY, "St. Petersburg")
-        b.assertIllegal(a_st_petersburg)
-        b.moves_adjudicate(self)    
+        a_st_petersburg = b.transform(b.players["Russia"], UnitType.ARMY, "St. Petersburg")
+        b.assert_illegal(a_st_petersburg)
+        b.moves_adjudicate(self)
         self.assertEqual(a_st_petersburg.unit_type, UnitType.ARMY, "St. Petersburg shouldn't be a fleet")

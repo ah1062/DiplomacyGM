@@ -2,6 +2,7 @@ from copy import deepcopy
 import datetime
 import json
 import logging
+import uuid
 
 from discord.ext import commands, tasks
 from discord import Message, TextChannel, User
@@ -49,7 +50,8 @@ class ScheduleCog(commands.Cog):
 
         except FileNotFoundError:
             logger.warning(
-                "Could not load previous store of scheduled tasks because it does not exist: should be located at 'DiploGM/assets/schedule.json'"
+                "Could not load previous store of scheduled tasks because it does not exist: " +
+                "should be located at 'DiploGM/assets/schedule.json'"
             )
         except Exception as e:
             logger.warning(f"Could not load previous store of scheduled tasks: {e}")
@@ -116,6 +118,19 @@ class ScheduleCog(commands.Cog):
         guild = ctx.guild
         channel = ctx.channel
         if not guild or not channel:
+            return
+
+
+        if "\n" in content:
+            for i, line in enumerate(content.split("\n")):
+                if i == 0:
+                    line = f"{timestamp} {command_name} {line}"
+
+                components = line.split(" ")
+                _timestamp = components[0]
+                _command_name = components[1]
+                _content = " ".join(components[2:])
+                await self.schedule(ctx, _timestamp, _command_name, content=_content)
             return
 
         now = datetime.datetime.now(datetime.timezone.utc)
@@ -188,7 +203,8 @@ class ScheduleCog(commands.Cog):
             channel=ctx.channel, title="Schedule successful!", message=out
         )
 
-        self.scheduled_tasks[str(ctx.message.id)] = scheduled_task
+        task_id = uuid.uuid4().hex[:8]
+        self.scheduled_tasks[task_id] = scheduled_task
         await self.save_scheduled_tasks()
 
     @commands.command(
@@ -355,11 +371,16 @@ class ScheduleCog(commands.Cog):
             delta = now - task["execute_at"]
             if delta > MAX_DELAY:
                 logger.warning(
-                    f"Skipping stale task {task_id}: Could not handle on time. (missed by '{now-task['execute_at']}') which is greater than maximum allowed time '{MAX_DELAY}'"
+                    "Skipping stale task %s: Could not handle on time. " +
+                    "(missed by '%s') which is greater than maximum allowed time '%s'",
+                    task_id,
+                    now - task["execute_at"],
+                    MAX_DELAY
                 )
                 await send_message_and_file(
                     channel=channel,
-                    message=f"Skipping stale task {task_id}: Could not handle on time (Expected: {task['execute_at']})\nTask: {task['full_command']}",
+                    message=f"Skipping stale task {task_id}: Could not handle on time " +
+                            f"(Expected: {task['execute_at']})\nTask: {task['full_command']}",
                     embed_colour=ERROR_COLOUR,
                 )
                 del self.scheduled_tasks[task_id]
