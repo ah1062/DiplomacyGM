@@ -114,7 +114,7 @@ class Mapper:
         """Draws move and retreat arrows."""
         units = sorted(self.board.units, key=lambda unit: 0 if unit.order is None else unit.order.display_priority)
         for unit in units:
-            if not self.order_drawer.utils.is_moveable(unit, self.adjacent_provinces, self.player_restriction):
+            if not self.order_drawer.utils.is_moveable(unit, self.adjacent_provinces, self.player_restriction, current_turn.is_retreats()):
                 continue
 
             # Only show moves that succeed if requested
