@@ -2,6 +2,8 @@ import asyncio
 import logging
 import random
 import re
+from datetime import timedelta
+from time import time
 from typing import Optional
 
 import discord.utils
@@ -19,6 +21,7 @@ from discord.ext import commands
 
 from DiploGM import config
 from DiploGM.config import ERROR_COLOUR, MAP_ARCHIVE_SAS_TOKEN
+from DiploGM.db.database import get_connection
 from DiploGM.models.board import Board
 from DiploGM.parse_edit_state import parse_edit_state
 from DiploGM.parse_board_params import parse_board_params
@@ -38,6 +41,27 @@ from DiploGM.manager import Manager, SEVERENCE_A_ID, SEVERENCE_B_ID
 
 logger = logging.getLogger(__name__)
 manager = Manager()
+
+# Regex for parsing time deltas, e.g. "2 days 3h 15m"
+# Currently supports days, hours, minutes, and seconds and negative values
+# We could do more with this if need be, but this should hopefully work for now
+_TIMEDELTA_RE = re.compile(
+    r"(?:(-?\d+)\s*d(?:ays?)?)?\s*"
+    r"(?:(-?\d+)\s*h(?:(?:ou)?rs?)?)?\s*"
+    r"(?:(-?\d+)\s*m(?:in(?:ute)?s?)?)?\s*"
+    r"(?:(-?\d+)\s*s(?:ec(?:ond)?s?)?)?\s*$"
+)
+
+def _parse_timedelta(s: str) -> timedelta:
+    m = _TIMEDELTA_RE.fullmatch(s.strip())
+    if m and any(m.groups()):
+        return timedelta(
+            days=int(m.group(1) or 0),
+            hours=int(m.group(2) or 0),
+            minutes=int(m.group(3) or 0),
+            seconds=int(m.group(4) or 0),
+        )
+    raise ValueError(f"Cannot parse time duration: {s!r}")
 
 
 class GameManagementCog(commands.Cog):
@@ -206,6 +230,78 @@ class GameManagementCog(commands.Cog):
         log_command(logger, ctx, message=f"Archived {len(categories)} Channels")
         await send_message_and_file(channel=ctx.channel, message=message)
 
+    @commands.command(
+        brief="set deadline",
+        description="""Manages the deadline for the current phase.
+        At the moment, this sets the default timestamp for the .ping_players command.
+        In the future, this might have more functionality.
+        * .set_deadline <timestamp>
+        * .set_deadline adjust <relative time, e.g. 2 days, -3h, etc.>
+        * .set_deadline cancel
+        """
+    )
+    @perms.gm_only("set deadline")
+    async def set_deadline(self, ctx: commands.Context) -> None:
+        """Manages the deadline for the current phase."""
+        assert ctx.guild is not None
+        board = manager.get_board(ctx.guild.id)
+        content = ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}").strip()
+        adjust = content.startswith("adjust")
+        cancel = content.startswith("cancel")
+        if adjust:
+            content = content.removeprefix("adjust").strip()
+            deadline = int(board.data.get("deadline", time()))
+            try:
+                parsed_time = _parse_timedelta(content)
+            except ValueError as e:
+                await send_message_and_file(
+                    channel=ctx.channel,
+                    message=str(e),
+                    embed_colour=config.ERROR_COLOUR,
+                )
+                return
+            new_deadline = deadline + int(parsed_time.total_seconds())
+            board.data["deadline"] = new_deadline
+            logger.info(f"Adjusted deadline by {parsed_time} to {new_deadline}")
+            await send_message_and_file(
+                channel=ctx.channel,
+                message=f"Adjusted deadline by {parsed_time}. New deadline is <t:{int(new_deadline)}:R>.",
+            )
+        elif cancel:
+            board.data.pop("deadline", None)
+            new_deadline = None
+            logger.info("Removed deadline")
+            await send_message_and_file(
+                channel=ctx.channel,
+                message="Successfully removed deadline.",
+            )
+        else:
+            timestamp_match = re.search(r"(\d+)", content)
+            if not timestamp_match:
+                await send_message_and_file(
+                    channel=ctx.channel,
+                    message="Invalid timestamp format. Please provide a Unix timestamp.",
+                    embed_colour=config.ERROR_COLOUR,
+                )
+                return
+            new_deadline = int(timestamp_match.group(1))
+            board.data["deadline"] = new_deadline
+            logger.info(f"Set new deadline: {new_deadline}")
+            await send_message_and_file(
+                channel=ctx.channel,
+                message=f"Set new deadline: <t:{new_deadline}:R>.",
+            )
+        if new_deadline is not None:
+            get_connection().execute_arbitrary_sql(
+                "INSERT OR REPLACE INTO board_parameters (board_id, parameter_key, parameter_value) VALUES (?, ?, ?)",
+                (board.board_id, "deadline", new_deadline)
+            )
+        else:
+            get_connection().execute_arbitrary_sql(
+                "DELETE FROM board_parameters WHERE board_id = ? AND parameter_key = ?",
+                (board.board_id, "deadline")
+            )
+
     def _ping_player_builds(self,
                             player: Player,
                             users: set[discord.Member | discord.Role],
@@ -285,14 +381,15 @@ class GameManagementCog(commands.Cog):
         guild = ctx.guild
         assert guild is not None
         board = manager.get_board(guild.id)
+        timestamp = board.data.get("deadline")
 
         # extract deadline argument
-        timestamp = re.match(
+        parsed_timestamp = re.match(
             r"<t:(\d+):[a-zA-Z]>",
             ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}").strip(),
         )
-        if timestamp:
-            timestamp = f"<t:{timestamp.group(1)}:R>"
+        if parsed_timestamp:
+            timestamp = parsed_timestamp.group(1)
 
         # get abstract player information
         player_roles: set[Role] = set()
@@ -378,7 +475,7 @@ class GameManagementCog(commands.Cog):
                 if response:
                     pinged_players += 1
                     if timestamp:
-                        response += f"\n The orders deadline is {timestamp}."
+                        response += f"\n The orders deadline is <t:{timestamp}:R>."
                     await channel.send(response)
                     response = None
 
@@ -673,7 +770,6 @@ class GameManagementCog(commands.Cog):
 
         await send_message_and_file(channel=ctx.channel, title=f"Graces in {gname}", message=out)
 
-
     async def _post_orders(self, ctx: commands.Context, board: Board) -> str:
         assert ctx.guild is not None
 
@@ -765,6 +861,20 @@ class GameManagementCog(commands.Cog):
                     ),
                 )
 
+    async def _update_deadline(self, ctx: commands.Context, guild_id: int) -> None:
+        board = manager.get_board(guild_id)
+        if not (timestamp := board.data.get("deadline")):
+            return
+        phase_length = 2 if board.turn.is_moves() else 1
+        board.data["deadline"] = int(timestamp) + 60 * 60 * 24 * phase_length
+        get_connection().execute_arbitrary_sql(
+            "INSERT OR REPLACE INTO board_parameters (board_id, parameter_key, parameter_value) VALUES (?, ?, ?)",
+            (board.board_id, "deadline", board.data["deadline"])
+        )
+        await send_message_and_file(
+            channel=ctx.channel,
+            message=f"Updated deadline to <t:{board.data['deadline']}:f>.")
+
     @commands.command(
         brief="Sends all previous orders",
         description="For GM: Sends orders from previous phase to #orders-log",
@@ -793,6 +903,9 @@ class GameManagementCog(commands.Cog):
         if MAP_ARCHIVE_SAS_TOKEN:
             file, _ = manager.draw_map_for_board(board, draw_moves=True)
             _ = asyncio.create_task(upload_map_to_archive(ctx, guild.id, board, file))
+
+        if board.data.get("deadline"):
+            _ = asyncio.create_task(self._update_deadline(ctx, guild.id))
 
     async def _is_missing_orders(self, board: Board) -> bool:
         if board.turn.is_moves():

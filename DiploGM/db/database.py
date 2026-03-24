@@ -304,7 +304,13 @@ class _DatabaseConnection:
                 order = order_class(destination_coast=destination_coast)
             elif order_class in [Move, RetreatMove]:
                 order = order_class(destination=destination_province, destination_coast=destination_coast)
-            elif order_class in [ConvoyTransport, Support]:
+            elif order_class in [ConvoyTransport]:
+                if destination_province is None or source_province is None:
+                    raise ValueError(f"Invalid source or destination for ConvoyTransport order in {unit.province.name}")
+                order = order_class(destination=destination_province, source=source_province)
+            elif order_class in [Support]:
+                if destination_province is None or source_province is None:
+                    raise ValueError(f"Invalid source or destination for Support order in {unit.province.name}")
                 order = order_class(
                     destination=destination_province, source=source_province, destination_coast=destination_coast
                 )

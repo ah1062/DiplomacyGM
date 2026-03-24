@@ -202,15 +202,18 @@ class CommandCog(commands.Cog):
             message=f"Displayed info - {board.turn}|{str(board.datafile)}|"
             f"{'Open' if board.orders_enabled else 'Locked'}",
         )
+        message = f"Turn: {board.turn}\n"
+        message += f"Orders are {'Open' if board.orders_enabled else 'Locked'}\n"
+        message += f"Game Type: {str(board.datafile)}\n"
+        if board.data.get("deadline"):
+            message += f"Deadline: <t:{board.data['deadline']}:f>\n"
+        if board.is_chaos():
+            message += "Chaos: :white_check_mark:\n"
+        if board.fow:
+            message += "Fog of War: :white_check_mark:\n"
         await send_message_and_file(
             channel=ctx.channel,
-            message=(
-                f"Turn: {board.turn}\n"
-                f"Orders are {'Open' if board.orders_enabled else 'Locked'}\n"
-                f"Game Type: {str(board.datafile)}\n"
-                f"Chaos: {':white_check_mark:' if board.is_chaos() else ':x:'}\n"
-                f"Fog of War: {':white_check_mark:' if board.fow else ':x:'}"
-            ),
+            message=message,
         )
 
     @commands.command(
@@ -544,6 +547,18 @@ class CommandCog(commands.Cog):
         await send_message_and_file(
             channel=ctx.channel, message=f"Nickname updated to `{prefix + name}`"
         )
+
+    @commands.command(brief="Gets the current deadline",
+                      aliases=["deadline"])
+    async def get_deadline(self, ctx: commands.Context) -> None:
+        """Gets the current deadline."""
+        assert ctx.guild is not None
+        board = manager.get_board(ctx.guild.id)
+        deadline = board.data.get("deadline")
+        if deadline is None:
+            await send_message_and_file(channel=ctx.channel, message="No deadline set")
+            return
+        await send_message_and_file(channel=ctx.channel, message=f"Current deadline: <t:{deadline}:f>")
 
 async def setup(bot):
     """Sets up the cog."""
