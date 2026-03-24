@@ -1,6 +1,3 @@
-[submodule "variants"]
-	path = variants
-	url = https://github.com/Imperial-Diplomacy/DiplomacyGM-variants.git
 [submodule "variants/impdip"]
 	path = variants/impdip
 	url = https://github.com/Imperial-Diplomacy/ImpDip-variants.git

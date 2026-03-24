@@ -234,7 +234,7 @@ class OrderDrawer:
             p = [coordinate]
             start = coordinate
             for loc in path[1:]:
-                p += [self.utils.loc_to_point(loc, unit.unit_type, None, start)]
+                p += [self.utils.loc_to_point(loc, unit.unit_type, unit.order.destination_coast if unit.order is not None else None, start)]
                 start = p[-1]
 
             if path[-1].unit:

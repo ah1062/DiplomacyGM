@@ -518,10 +518,10 @@ class PlayerCog(commands.Cog):
 
         overwrites = {
             ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            player.find_discord_role(ctx.guild.roles): discord.PermissionOverwrite(view_channel=True, send_messages=True)
+            player.find_discord_role(ctx.guild.roles): discord.PermissionOverwrite(view_channel=True)
         }
         for role in roles:
-            overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+            overwrites[role] = discord.PermissionOverwrite(view_channel=True)
         try:
             channel = await category.create_text_channel(channel_name, overwrites=overwrites)
         except discord.Forbidden:

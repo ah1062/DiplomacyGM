@@ -100,10 +100,8 @@ class Player:
                 + f"Points: {self.points}\n"
                 + f"Vassals: {', '.join(map(str,self.vassals))}\n"
                 + f"Liege: {self.liege if self.liege else 'None'}\n"
-                + f"Units ({len(units)}): {(
-                    bullet + bullet.join([unit.province.get_name(unit.coast) for unit in units])) if len(units) > 0 else 'None'}\n"
-                + f"Centers ({len(centers)}): {(
-                    bullet + bullet.join([center.name for center in centers])) if len(centers) > 0 else 'None'}\n"
+                + f"Units ({len(units)}): {(bullet + bullet.join([unit.province.get_name(unit.coast) for unit in units])) if len(units) > 0 else 'None'}\n"
+                + f"Centers ({len(centers)}): {(bullet + bullet.join([center.name for center in centers])) if len(centers) > 0 else 'None'}\n"
             )
             return out
 
@@ -123,10 +121,7 @@ class Player:
 
         out = (
             ""
-            + f"Color: {(bullet +
-                bullet.join([k + ': ' + v for k, v in self.color_dict.items()])
-                if self.color_dict is not None
-                else self.render_color)}\n"
+            + f"Color: {(bullet + bullet.join([k + ': ' + v for k, v in self.color_dict.items()]) if self.color_dict is not None else self.render_color)}\n"
             + f"Score: [{len(self.centers)}/{int(board.data['players'][self.name]['vscc'])}] "
                 + f"{round(board.get_score(self) * 100, 2)}%\n"
             + f"{center_str}\n"

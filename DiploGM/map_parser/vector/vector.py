@@ -617,6 +617,7 @@ parsers = {}
 
 
 def get_parser(name: str, force_refresh: bool=False) -> Parser:
+    name = parse_variant_path(name, as_filename=False)
     if force_refresh or name not in parsers:
         logger.info(f"Creating new Parser for board named {name}")
         parsers[name] = Parser(name)

@@ -354,8 +354,7 @@ class CommandCog(commands.Cog):
         out = f"Type: {province.type.name}\n" + \
             f"{coast_info}" + \
             f"Owner: {province.owner.name if province.owner else 'None'}\n" + \
-            f"Unit: {((province.unit.player.get_name() if province.unit.player is not None else '')
-                      + ' ' + province.unit.unit_type.name if province.unit else 'None')}\n" + \
+            f"Unit: {((province.unit.player.get_name() if province.unit.player is not None else '') + ' ' + province.unit.unit_type.name if province.unit else 'None')}\n" + \
             f"Center: {province.has_supply_center}\n" + \
             f"Core: {province.core_data.core.name if province.core_data.core else 'None'}\n" + \
             f"Half-Core: {province.core_data.half_core.name if province.core_data.half_core else 'None'}\n" + \
