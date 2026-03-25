@@ -513,8 +513,9 @@ class PlayerCog(commands.Cog):
     @perms.player("generate a press directory")
     async def press_directory(self, ctx: commands.Context, player: Player | None) -> None:
         assert ctx.guild is not None
+        guild = ctx.guild
         board = manager.get_board(ctx.guild.id)
-        power_roles = set(map(lambda p: p.find_discord_role(ctx.guild.roles), board.players))
+        power_roles = set(map(lambda p: p.find_discord_role(guild.roles), board.players))
 
         if player is None:
             await send_message_and_file(
