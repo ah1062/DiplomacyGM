@@ -2,11 +2,11 @@ import datetime
 import hashlib
 import io
 import logging
-import matplotlib.pyplot as plt
-import networkx as nx
 import random
 from sqlite3 import IntegrityError
 from typing import Optional, Union
+import matplotlib.pyplot as plt
+import networkx as nx
 
 import discord
 from discord.ext import commands
@@ -31,7 +31,7 @@ class CommunityService:
         self.server_repo = SQLiteServerRepository()
         self.relation_repo = SQLiteRelationshipRepository()
 
-    def create_community(self, name: str, owner: discord.User):
+    def create_community(self, name: str, owner: discord.User | discord.Member):
         cid = string_to_u32(name)
         c = Community(id=cid, name=name, description="")
 
@@ -61,7 +61,7 @@ class CommunityService:
         if isinstance(identifier, str):
             return self.community_repo.find_one_by(lambda c: c.name == identifier)
 
-    def is_community_owner(self, community: Community, user: discord.User) -> bool:
+    def is_community_owner(self, community: Community, user: discord.User | discord.Member) -> bool:
         rel = self.relation_repo.find_one_by(
             lambda r: r.subject_id == user.id
             and r.object_id == community.id
@@ -72,7 +72,7 @@ class CommunityService:
 
         return False
 
-    def is_user_in_community(self, community: Community, user: discord.User) -> bool:
+    def is_user_in_community(self, community: Community, user: discord.User | discord.Member) -> bool:
         rel = self.relation_repo.find_one_by(
             lambda r: r.subject_id == user.id
             and r.object_id == community.id
@@ -374,7 +374,8 @@ class CommunityCog(commands.Cog):
         community = self.service.get_community(existing_community_id)
         if not community:
             raise ValueError(
-                f"The community attached to this server '{existing_community_id}' could not be found, contact a Bot Superuser."
+                f"The community attached to this server '{existing_community_id}' could not be found, " +
+                 "contact a Bot Superuser."
             )
 
         if not self.service.is_community_owner(
@@ -456,7 +457,8 @@ class CommunityCog(commands.Cog):
         if self.service.is_community_owner(community, ctx.author):
             await send_message_and_file(
                 channel=ctx.channel,
-                message="### You're the owner of that community!\nFind a replacement owner and contact a bot superuser to replace.",
+                message="### You're the owner of that community!\n" +
+                        "Find a replacement owner and contact a bot superuser to replace.",
                 embed_colour=ERROR_COLOUR,
             )
             return

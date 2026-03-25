@@ -41,7 +41,7 @@ def is_player_channel(player_role: Player, channel: Messageable) -> bool:
         return False
     player_channel = player_role.name + config.player_channel_suffix
     nickname_channel = player_role.get_name() + config.player_channel_suffix
-    return ((simple_player_name(player_channel) == simple_player_name(channel.name) 
+    return ((simple_player_name(player_channel) == simple_player_name(channel.name)
              or simple_player_name(nickname_channel) == simple_player_name(channel.name))
             and config.is_player_category(channel.category))
 

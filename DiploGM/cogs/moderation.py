@@ -1,3 +1,4 @@
+"""Cog for moderation features and user management."""
 import datetime
 import logging
 
@@ -13,12 +14,14 @@ logger = logging.getLogger(__name__)
 NEW_ACCOUNT_WARNING = datetime.timedelta(weeks=6)
 
 class ModerationCog(commands.Cog):
+    """Cog for moderation features and user management."""
     def __init__(self, bot):
         self.bot = bot
 
     @commands.command(help="Returns all shared guilds between DiploGM and user.")
     @perms.mod_only("find mutuals with user")
     async def membership(self, ctx: commands.Context, user: User) -> None:
+        """Gets the servers that a user is a member of."""
         guild = ctx.guild
         if not guild:
             return
@@ -38,10 +41,12 @@ class ModerationCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: Member):
+        """Checks for potentially suspicious accounts joining a server."""
         guild = member.guild
         hub = self.bot.get_guild(config.IMPDIP_SERVER_ID)
         if not hub:
-            logger.warning(f"{member.name} joined {member.guild.name}: Could not find the Hub server to check for moderation.")
+            logger.warning("%s joined %s: Could not find the Hub server to check for moderation.",
+                           member.name, member.guild.name)
             return
 
         now = datetime.datetime.now(datetime.timezone.utc)
@@ -67,9 +72,8 @@ class ModerationCog(commands.Cog):
             return
 
         modchannel = discord.utils.find(lambda c: c.name == "mod-log", hub.text_channels)
-        modrole = discord.utils.find(lambda r: r.name == "Moderator", hub.roles)
         msg = (
-            f"{modrole.mention} - Somebody to watch/interrogate:\n"
+            f"Somebody to watch/interrogate:\n"
             f"User: {member} (ID: {member.id})\n"
             f"Joined: {guild.name} [ID: {guild.id}]\n"
             f"**Problems:**\n"
@@ -80,5 +84,6 @@ class ModerationCog(commands.Cog):
         await modchannel.send(msg)
 
 async def setup(bot):
+    """Setup function for the Moderation cog."""
     cog = ModerationCog(bot)
     await bot.add_cog(cog)

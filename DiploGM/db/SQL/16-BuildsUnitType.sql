@@ -25,7 +25,7 @@ INSERT INTO builds (board_id, phase, player, location, order_type, unit_type)
 SELECT board_id, phase, player, location, order_type, "" FROM builds_old WHERE is_army = 0 AND order_type = "Disband";
 
 INSERT INTO builds (board_id, phase, player, location, order_type, unit_type)
-SELECT board_id, phase, player, SUBSTR(location, 1, LENGTH(location) - 3), order_type, CONCAT("F ", SUBSTR(location, -2, 2)) FROM builds_old WHERE is_army = 0 AND location LIKE "% _c";
+SELECT board_id, phase, player, SUBSTR(location, 1, LENGTH(location) - 3), order_type, "F " || SUBSTR(location, -2, 2) FROM builds_old WHERE is_army = 0 AND location LIKE "% _c";
 
 DROP TABLE builds_old;
 COMMIT;

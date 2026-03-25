@@ -1,15 +1,15 @@
-WS: /[ \t]+/
+_WS: /[ \t]+/
 
 order: (move_order
       | hold_order
       | support_order
       | convoy_order
       | core_order
-      | transform_order) WS
-   
+      | transform_order) _WS
+
 retreat: (retreat_order
        | disband_order
-	| non_retreat_order) WS
+	| non_retreat_order) _WS
 
 build: ( build_unit
        | disband_unit
@@ -20,45 +20,45 @@ build: ( build_unit
        | monarchy_order
        | disown_order
        | defect_order
-       | non_build_order) WS
+       | non_build_order) _WS
 
-move_order: unit WS MOVE WS province
+move_order: unit _WS MOVE _WS province
 
-hold_order: unit WS HOLD
+hold_order: unit _WS HOLD
 
-l_move_order: l_unit WS MOVE WS province
+l_move_order: l_unit _WS MOVE _WS province
 
-l_hold_order: l_unit WS HOLD
+l_hold_order: l_unit _WS HOLD
 
-support_order: unit WS ((SUPPORT WS (l_move_order | l_hold_order)) | ((SUPPORT_HOLD | SUPPORT) WS l_unit))
+support_order: unit _WS ((SUPPORT _WS (l_move_order | l_hold_order)) | ((SUPPORT_HOLD | SUPPORT) _WS l_unit))
 
-convoy_order: unit WS CONVOY WS l_move_order
+convoy_order: unit _WS CONVOY _WS l_move_order
 
-core_order: unit WS CORE
+core_order: unit _WS CORE
 
-transform_order: unit WS TRANSFORM (WS COAST)?
+transform_order: unit _WS TRANSFORM (_WS COAST)?
 
-retreat_order: retreat_unit WS RETREAT WS province
+retreat_order: retreat_unit _WS RETREAT _WS province
 
-disband_order: ( retreat_unit WS DISBAND ) | ( DISBAND WS retreat_unit )
+disband_order: ( retreat_unit _WS DISBAND ) | ( DISBAND _WS retreat_unit )
 
 non_retreat_order: (support_order | convoy_order | core_order | transform_order | build_unit | waive_order | vassal_order | liege_order | monarchy_order | disown_order | defect_order)
 
-disband_unit: ( unit WS DISBAND ) | ( DISBAND WS unit )
+disband_unit: ( unit _WS DISBAND ) | ( DISBAND _WS unit )
 
-build_unit: ( BUILD WS DESCRIPTOR province ) | ( BUILD WS province DESCRIPTOR )
+build_unit: ( BUILD _WS DESCRIPTOR province ) | ( BUILD _WS province _WS DESCRIPTOR )
 
-transform_unit: (unit WS TRANSFORM (WS COAST)?) | (TRANSFORM WS unit (WS COAST)?)
+transform_unit: (unit _WS TRANSFORM (_WS COAST)?) | (TRANSFORM _WS unit (_WS COAST)?)
 
-waive_order: ( WAIVE WS NUMBER )
+waive_order: ( WAIVE _WS NUMBER )
 
-vassal_order: ( VASSALIZE WS province ) | (province WS VASSALIZE)
+vassal_order: ( VASSALIZE _WS province ) | (province _WS VASSALIZE)
 
-liege_order: (ALLEGIANCE WS province) | (province WS ALLEGIANCE)
+liege_order: (ALLEGIANCE _WS province) | (province _WS ALLEGIANCE)
 
-monarchy_order: (MONARCHY WS province) | (province WS MONARCHY)
+monarchy_order: (MONARCHY _WS province) | (province _WS MONARCHY)
 
-disown_order: (DISOWN WS province) | (province WS DISOWN)
+disown_order: (DISOWN _WS province) | (province _WS DISOWN)
 
 defect_order: DEFECT
 
@@ -145,9 +145,9 @@ l_unit : (DESCRIPTOR)? province
 
 retreat_unit : (DESCRIPTOR)? province
 
-DESCRIPTOR.2 : /a|army|cannon|f|fleet|boat|ship/i WS
+DESCRIPTOR.2 : /a|army|cannon|f|fleet|boat|ship/i _WS
 
-province : PROVINCE (WS PROVINCE) ~ 0..3
+province : PROVINCE (_WS PROVINCE) ~ 0..3
 
 PROVINCE : /(?![fFaA]\s)[a-zA-Z0-9\._‘’`´′‛'-]+(?=\s)/
 

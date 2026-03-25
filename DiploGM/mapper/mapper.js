@@ -293,7 +293,7 @@ function draw_support(order) {
             endcoord = pull_coordinate(supportcoord, endcoord);
         }
     }
-    
+
     startcoord = pull_coordinate(supportcoord, startcoord, svg_config["unit_radius"]);
 
     path = [make_elem("path",
@@ -377,7 +377,7 @@ function leftclick(porigin) {
 }
 
 function rightclick(porigin) {
-    
+
     if (porigin in order_array) {
         // Reset
         if (order_array[porigin]["type"] == "Core" || order_array[porigin]["type"] == "Convoy") {

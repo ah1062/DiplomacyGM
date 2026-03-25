@@ -1,14 +1,14 @@
+"""Module to parse commands to edit the game state."""
 import copy
 import logging
 import string
 
 from DiploGM.config import ERROR_COLOUR, PARTIAL_ERROR_COLOUR
 from DiploGM.utils import get_unit_type, get_keywords, parse_season
-from DiploGM.adjudicator.mapper import Mapper
+from DiploGM.mapper.mapper import Mapper
 from DiploGM.models.board import Board
 from DiploGM.db.database import get_connection
 from DiploGM.manager import Manager
-from DiploGM.models.player import Player
 from DiploGM.models.province import Province
 from DiploGM.models.unit import Unit, UnitType
 
@@ -17,6 +17,8 @@ manager = Manager()
 
 
 def parse_edit_state(message: str, board: Board) -> tuple[str, str, bytes | None, str | None, str | None]:
+    """Parses a message containing commands to edit the game state,
+    executes those commands, and returns a response message and an updated map if applicable."""
     invalid: list[tuple[str, Exception]] = []
     commands = str.splitlines(message)
     for command in commands:
@@ -76,7 +78,7 @@ def _set_phase(keywords: list[str], board: Board) -> None:
 def _set_province_core(keywords: list[str], board: Board) -> None:
     province = board.get_province(keywords[0])
     player = board.get_player(keywords[1])
-    province.core = player
+    province.core_data.core = player
     get_connection().execute_arbitrary_sql(
         "UPDATE provinces SET core=? WHERE board_id=? and phase=? and province_name=?",
         (
@@ -91,7 +93,7 @@ def _set_province_core(keywords: list[str], board: Board) -> None:
 def _set_province_half_core(keywords: list[str], board: Board) -> None:
     province = board.get_province(keywords[0])
     player = board.get_player(keywords[1])
-    province.half_core = player
+    province.core_data.half_core = player
     get_connection().execute_arbitrary_sql(
         "UPDATE provinces SET half_core=? WHERE board_id=? and phase=? and province_name=?",
         (
@@ -137,7 +139,7 @@ def _set_total_owner(keywords: list[str], board: Board) -> None:
     province = board.get_province(keywords[0])
     player = board.get_player(keywords[1])
     board.change_owner(province, player)
-    province.core = player
+    province.core_data.core = player
     get_connection().execute_arbitrary_sql(
         "UPDATE provinces SET owner=?, core=? WHERE board_id=? and phase=? and province_name=?",
         (
@@ -285,7 +287,7 @@ def _move_unit(keywords: list[str], board: Board) -> None:
             board.turn.get_indexed_name(),
             new_province.get_name(new_coast),
             False,
-            unit.player.name,
+            unit.player.name if unit.player is not None else None,
             unit.unit_type == UnitType.ARMY,
         ),
     )
@@ -294,10 +296,10 @@ def _move_unit(keywords: list[str], board: Board) -> None:
 def _dislodge_unit(keywords: list[str], board: Board) -> None:
     if board.turn.is_retreats():
         province = board.get_province(keywords[0])
-        if province.dislodged_unit != None:
+        if province.dislodged_unit is not None:
             raise RuntimeError("Dislodged unit already exists in province")
         unit = province.unit
-        if unit == None:
+        if unit is None:
             raise RuntimeError("No unit to dislodge in province")
         retreat_options = {board.get_province_and_coast(province_name) for province_name in keywords[1:]}
         if not all(retreat_options):
@@ -326,7 +328,7 @@ def _make_units_claim_provinces(keywords: list[str], board: Board) -> None:
             get_connection().execute_arbitrary_sql(
                 "UPDATE provinces SET owner=? WHERE board_id=? and phase=? and province_name=?",
                 (
-                    unit.player.name,
+                    unit.player.name if unit.player is not None else None,
                     board.board_id,
                     board.turn.get_indexed_name(),
                     unit.province.name,
@@ -491,8 +493,8 @@ def _apocalypse(keywords: list[str], board: Board) -> None:
 
     if all or "core" in keywords:
         for province in board.provinces:
-            province.core = None
-            province.half_core = None
+            province.core_data.core = None
+            province.core_data.half_core = None
 
         get_connection().execute_arbitrary_sql(
             "UPDATE provinces SET core=?, half_core=? WHERE board_id=? AND phase=?",
@@ -524,10 +526,10 @@ def _delete_player(keywords: list[str], board: Board) -> None:
     player.centers = set()
     for p in provinces:
         p.owner = None
-        if p.core == player:
-            p.core = None
-        if p.half_core == player:
-            p.half_core = None
+        if p.core_data.core == player:
+            p.core_data.core = None
+        if p.core_data.half_core == player:
+            p.core_data.half_core = None
     get_connection().execute_arbitrary_sql(
         "UPDATE provinces SET owner=? WHERE board_id=? and phase=?",
         (None, board.board_id, board.turn.get_indexed_name()),

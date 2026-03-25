@@ -1,9 +1,9 @@
 import unittest
 
-from DiploGM.models.unit import UnitType
 from test.utils import BoardBuilder
+from DiploGM.models.unit import UnitType
 
-# These tests are based off https://webdiplomacy.net/doc/DATC_v3_0.html, with 
+# These tests are based off https://webdiplomacy.net/doc/DATC_v3_0.html, with
 # https://github.com/diplomacy/diplomacy/blob/master/diplomacy/tests/test_datc.py being used as a reference as well.
 
 # 6.I. TEST CASES, BUILDING
@@ -21,12 +21,12 @@ class TestDATC_I(unittest.TestCase):
             to this preference, the build in Berlin fails, the build in Kiel succeeds and the build in Munich fails.
         """
         b = BoardBuilder()
-        b.army("Silesia", b.germany)
-        b.army("Prussia", b.germany)
-        b.build(b.germany, (UnitType.ARMY, "Berlin"), (UnitType.ARMY, "Kiel"), (UnitType.ARMY, "Munich"))
-        b.assertBuildCount(1)
+        b.army("Silesia", b.players["Germany"])
+        b.army("Prussia", b.players["Germany"])
+        b.build(b.players["Germany"], (UnitType.ARMY, "Berlin"), (UnitType.ARMY, "Kiel"), (UnitType.ARMY, "Munich"))
+        b.assert_build_count(1)
         b.builds_adjudicate(self)
-        
+
     def test_6_i_2(self):
         """ 6.I.2. TEST CASE, FLEETS CAN NOT BE BUILD IN LAND AREAS
             Physical this is possible, but it is still not allowed.
@@ -36,9 +36,9 @@ class TestDATC_I(unittest.TestCase):
             I prefer that the build fails.
         """
         b = BoardBuilder()
-        b.player_core(b.russia, "Moscow")
-        b.build(b.russia, (UnitType.FLEET, "Moscow"))
-        b.assertBuildCount(0)
+        b.player_core(b.players["Russia"], "Moscow")
+        b.build(b.players["Russia"], (UnitType.FLEET, "Moscow"))
+        b.assert_build_count(0)
         b.builds_adjudicate(self)
 
     def test_6_i_3(self):
@@ -49,10 +49,10 @@ class TestDATC_I(unittest.TestCase):
             Build fails.
         """
         b = BoardBuilder()
-        b.player_core(b.germany, "Berlin")
-        b.army("Berlin", b.germany)
-        b.build(b.germany, (UnitType.ARMY, "Berlin"))
-        b.assertBuildCount(0)
+        b.player_core(b.players["Germany"], "Berlin")
+        b.army("Berlin", b.players["Germany"])
+        b.build(b.players["Germany"], (UnitType.ARMY, "Berlin"))
+        b.assert_build_count(0)
         b.builds_adjudicate(self)
 
     def test_6_i_4(self):
@@ -63,10 +63,10 @@ class TestDATC_I(unittest.TestCase):
             Build fails.
         """
         b = BoardBuilder()
-        b.fleet("St. Petersburg sc", b.russia)
-        b.player_core(b.russia, "St. Petersburg")
-        b.build(b.russia, (UnitType.FLEET, "St. Petersburg nc"))
-        b.assertBuildCount(1)
+        b.fleet("St. Petersburg sc", b.players["Russia"])
+        b.player_core(b.players["Russia"], "St. Petersburg")
+        b.build(b.players["Russia"], (UnitType.FLEET, "St. Petersburg nc"))
+        b.assert_build_count(1)
         b.builds_adjudicate(self)
 
     def test_6_i_5(self):
@@ -79,10 +79,10 @@ class TestDATC_I(unittest.TestCase):
         """
         b = BoardBuilder()
         p_berlin = b.board.get_province("Berlin")
-        p_berlin.owner = b.russia
-        p_berlin.core = b.germany
-        b.build(b.germany, (UnitType.ARMY, "Berlin"))
-        b.assertBuildCount(0)
+        p_berlin.owner = b.players["Russia"]
+        p_berlin.core_data.core = b.players["Germany"]
+        b.build(b.players["Germany"], (UnitType.ARMY, "Berlin"))
+        b.assert_build_count(0)
         b.builds_adjudicate(self)
 
     def test_6_i_6(self):
@@ -96,10 +96,10 @@ class TestDATC_I(unittest.TestCase):
         """
         b = BoardBuilder()
         p_warsaw = b.board.get_province("Warsaw")
-        p_warsaw.owner = b.germany
-        p_warsaw.core = b.russia
-        b.build(b.germany, (UnitType.ARMY, "Warsaw"))
-        b.assertBuildCount(0)
+        p_warsaw.owner = b.players["Germany"]
+        p_warsaw.core_data.core = b.players["Russia"]
+        b.build(b.players["Germany"], (UnitType.ARMY, "Warsaw"))
+        b.assert_build_count(0)
         b.builds_adjudicate(self)
 
     def test_6_i_7(self):
@@ -111,8 +111,8 @@ class TestDATC_I(unittest.TestCase):
             The second build should fail.
         """
         b = BoardBuilder()
-        b.player_core(b.russia, "Moscow")
-        b.board.get_province("Moscow").core = b.russia
-        b.build(b.russia, (UnitType.ARMY, "Moscow"), (UnitType.ARMY, "Moscow"))
-        b.assertBuildCount(1)
+        b.player_core(b.players["Russia"], "Moscow")
+        b.board.get_province("Moscow").core_data.core = b.players["Russia"]
+        b.build(b.players["Russia"], (UnitType.ARMY, "Moscow"), (UnitType.ARMY, "Moscow"))
+        b.assert_build_count(1)
         b.builds_adjudicate(self)

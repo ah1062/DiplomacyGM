@@ -1,13 +1,12 @@
+import logging
 import re
 import numpy as np
+from typing import Callable
 
+from shapely.geometry import Point
 from xml.etree.ElementTree import Element, ElementTree
 
 from DiploGM.map_parser.vector.transform import TransGL3
-import logging
-
-from shapely.geometry import Point
-from typing import Callable
 from DiploGM.models.province import Province
 
 logger = logging.getLogger(__name__)
@@ -19,11 +18,13 @@ def get_svg_element(svg_root: Element | ElementTree, element_id: str) -> Element
         logger.error(f"{element_id} isn't contained in svg_root")
 
 def clear_svg_element(svg_root: Element | ElementTree, element_id: str) -> None:
+    """Clears an element from the SVG. Tends to run much quicker than deleting it entirely."""
     element = get_svg_element(svg_root, element_id)
     if element is not None:
         element.clear()
 
 def get_element_color(element: Element, prefix="fill:") -> str | None:
+    """Gets the color of an element, or None if it has none."""
     style_string = element.get("style")
     if style_string is None:
         return None
@@ -32,21 +33,21 @@ def get_element_color(element: Element, prefix="fill:") -> str | None:
         if value.startswith(prefix):
             if value == "none" and prefix == "fill:":
                 return get_element_color(element, "stroke:")
-            else:
-                value = value[len(prefix):]
-                if value.startswith("#"):
-                    value = value[1:]
-                return value
+            value = value[len(prefix):]
+            if value.startswith("#"):
+                value = value[1:]
+            return value
 
 def get_unit_coordinates(
     unit_data: Element,
 ) -> tuple[float, float]:
+    """Gets the x, y coordinates of a unit."""
     path = unit_data.find("{http://www.w3.org/2000/svg}path")
     assert path is not None
 
     x = path.get("{http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd}cx")
     y = path.get("{http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd}cy")
-    if x == None or y == None:
+    if x is None or y is None:
         # find all the points the objects are at
         # take the center of the bounding box
         path = unit_data.findall("{http://www.w3.org/2000/svg}path")[0]
@@ -58,16 +59,16 @@ def get_unit_coordinates(
         maxp = np.max(coordinates, axis=0)
         return ((minp + maxp) / 2).tolist()
 
-    else:
-        x = float(x)
-        y = float(y)
-        return TransGL3(path).transform((x, y))
+    x = float(x)
+    y = float(y)
+    return TransGL3(path).transform((x, y))
 
 
 def move_coordinate(
     former_coordinate: tuple[float, float],
     coordinate: tuple[float, float],
 ) -> tuple[float, float]:
+    """Moves a coordinate by a given offset."""
     return (former_coordinate[0] + coordinate[0], former_coordinate[1] + coordinate[1])
 
 
@@ -84,20 +85,18 @@ def _parse_path_command(
     command = command.lower()
 
     if command in ["m", "c", "l", "t", "s", "q", "a"]:
-        if is_absolute:
-            return args
-        return move_coordinate(coordinate, args)  # Ignore all args except the last
-    elif command in ["h", "v"]:
+        return args if is_absolute else move_coordinate(coordinate, args)  # Ignore all args except the last
+    if command in ["h", "v"]:
         coordlist = list(coordinate)
         index = 0 if command == "h" else 1
         if is_absolute:
             coordlist[index] = 0
         coordlist[index] += args[0]
         return (coordlist[0], coordlist[1])
-    else:
-        raise RuntimeError(f"Unknown SVG path command: {command}")
+    raise RuntimeError(f"Unknown SVG path command: {command}")
 
-def parse_path(path_string: str, translation: TransGL3):
+def parse_path(path_string: str, translation: TransGL3) -> list[list[tuple[float, float]]]:
+    """Parses an SVG path string into a list of coordinates."""
     province_coordinates = [[]]
     command = None
     arguments_by_command = {"a": 7, "c": 6, "h": 1, "l": 2, "m": 2, "q": 4, "s": 4, "t": 2, "v": 1}
@@ -116,7 +115,7 @@ def parse_path(path_string: str, translation: TransGL3):
 
             command = path[current_index]
             if command.lower() == "z":
-                if start == None:
+                if start is None:
                     raise Exception("Invalid geometry: got 'z' on first element in a subgeometry")
                 province_coordinates[-1].append(translation.transform(start))
                 start = None
@@ -153,7 +152,7 @@ def parse_path(path_string: str, translation: TransGL3):
             command, args, coordinate
         )
 
-        if start == None:
+        if start is None:
             start = coordinate
 
         province_coordinates[-1].append(translation.transform(coordinate))
@@ -175,7 +174,7 @@ def initialize_province_resident_data(
     for province in provinces:
         remove = set()
 
-        found = False
+        # found = False
         for resident_data in resident_dataset:
             x, y = get_coordinates(resident_data)
 
@@ -185,7 +184,7 @@ def initialize_province_resident_data(
 
             point = Point((x, y))
             if province.geometry.contains(point):
-                found = True
+                # found = True
                 resident_data_callback(province, resident_data, None)
                 remove.add(resident_data)
 

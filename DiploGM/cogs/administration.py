@@ -1,5 +1,5 @@
+"""Bot administration commands, to be used by superusers only."""
 import logging
-import os
 import re
 
 from discord import HTTPException, NotFound, TextChannel
@@ -17,21 +17,26 @@ manager = Manager()
 
 
 class AdminCog(commands.Cog):
-    def __init__(self, bot):
+    """Bot administration commands, to be used by superusers only."""
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     @commands.command(hidden=True)
     @perms.superuser_only("send a GM announcement")
     async def announce(self, ctx: commands.Context) -> None:
+        """Sends an annouuncement to all servers."""
+        bot: commands.Bot = ctx.bot
         guilds_with_games = manager.list_servers()
         content = ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")
         content = re.sub(r"<@&[0-9]{16,20}>", r"{}", content)
         roles = list(map(lambda role: role.name, ctx.message.role_mentions))
         message = ""
-        for server in ctx.bot.guilds:
+        for server in bot.guilds:
             if server is None:
                 continue
-            admin_chat_channels: list[TextChannel] = [channel for channel in server.channels if config.is_gm_channel(channel.name)]
+            admin_chat_channels: list[TextChannel] = [channel for channel in server.channels
+                                                      if isinstance(channel, TextChannel)
+                                                      and config.is_gm_channel(channel)]
 
             if len(admin_chat_channels) == 0:
                 message += f"\n- ~~{server.name}~~ Couldn't find admin channel"
@@ -44,7 +49,7 @@ class AdminCog(commands.Cog):
                 board = manager.get_board(server.id)
                 message += f" - {board.turn}"
             else:
-                message += f" - no active game"
+                message += " - no active game"
 
             server_roles = []
             for role_name in roles:
@@ -65,17 +70,18 @@ class AdminCog(commands.Cog):
                 message=content.format(*server_roles),
             )
         log_command(
-            logger, ctx, f"Sent Announcement into {len(ctx.bot.guilds)} servers"
+            logger, ctx, f"Sent Announcement into {len(bot.guilds)} servers"
         )
         await send_message_and_file(
             channel=ctx.channel,
-            title=f"Announcement sent to {len(ctx.bot.guilds)} servers:",
+            title=f"Announcement sent to {len(bot.guilds)} servers:",
             message=message,
         )
 
     @commands.command(hidden=True)
     @perms.superuser_only("list servers")
     async def servers(self, ctx: commands.Context) -> None:
+        """Lists all servers the bot is in."""
         servers_with_games = manager.list_servers()
         message = ""
         args = ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}").split(
@@ -100,7 +106,7 @@ class AdminCog(commands.Cog):
                 board = manager.get_board(server.id)
                 board_state = f" - {board.turn}"
             else:
-                board_state = f" - no active game"
+                board_state = " - no active game"
 
             if send_invite:
                 try:
@@ -128,13 +134,14 @@ class AdminCog(commands.Cog):
     @commands.command(hidden=True)
     @perms.superuser_only("leave server")
     async def leave_server(self, ctx: commands.Context) -> None:
+        """Leaves a server with a given ID."""
         leave_id = ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")
         try:
             leave_id = int(leave_id)
         except ValueError:
             await send_message_and_file(
                 channel=ctx.channel,
-                title=f"Failed to parse server ID",
+                title="Failed to parse server ID",
                 embed_colour=config.ERROR_COLOUR,
             )
             return
@@ -156,16 +163,16 @@ class AdminCog(commands.Cog):
                         channel=ctx.channel, title=f"Left Server {name}"
                     )
                 return
-        else:
-            await send_message_and_file(
-                channel=ctx.channel,
-                title=f"Failed to find server",
-                embed_colour=config.ERROR_COLOUR,
-            )
+        await send_message_and_file(
+            channel=ctx.channel,
+            title="Failed to find server",
+            embed_colour=config.ERROR_COLOUR,
+        )
 
     @commands.command(hidden=True)
     @perms.superuser_only("allocate roles to user(s)")
     async def bulk_allocate_role(self, ctx: commands.Context) -> None:
+        """Allocates roles to multiple users in bulk."""
         guild = ctx.guild
         if guild is None:
             return
@@ -180,7 +187,7 @@ class AdminCog(commands.Cog):
                 await send_message_and_file(
                     channel=ctx.channel,
                     title="Error!",
-                    embed_color=config.ERROR_COLOUR,
+                    embed_colour=config.ERROR_COLOUR,
                     message=f"Not allowed to allocate this role using DiploGM: {role.mention}",
                 )
                 roles.remove(role)
@@ -255,14 +262,15 @@ class AdminCog(commands.Cog):
         await send_message_and_file(
             channel=ctx.channel, title="Wave Allocation Info", message=out
         )
-    
+
     @commands.command(hidden=True)
     @perms.superuser_only("Uploads map to archive")
     async def archive_upload(self, ctx: commands.Context) -> None:
+        """Uploads a map from a server to the map archive."""
         if not MAP_ARCHIVE_SAS_TOKEN:
             await send_message_and_file(
                 channel=ctx.channel,
-                title=f"maps_sas_token is not defined in environment variables",
+                title="maps_sas_token is not defined in environment variables",
                 embed_colour=config.ERROR_COLOUR,
             )
             return
@@ -281,10 +289,11 @@ class AdminCog(commands.Cog):
             turn=season,
         )
         await upload_map_to_archive(ctx, server_id, board, file, season)
-    
+
     @commands.command(hidden=True)
     @perms.superuser_only("Checks the adjacencies of a variant to find potential issues")
     async def verify_adjacencies(self, ctx: commands.Context, arg) -> None:
+        """Checks the adjacencies of a variant to find potential issues."""
         assert ctx.guild is not None
         gametype = arg if arg else "classic"
 
@@ -295,6 +304,7 @@ class AdminCog(commands.Cog):
     @commands.command(hidden=True)
     @perms.superuser_only("Reloads the map parser for a given variant. Useful if a map has been updated.")
     async def reload_variant(self, ctx: commands.Context, arg) -> None:
+        """Reloads the map parser for a given variant. Useful if a map has been updated."""
         assert ctx.guild is not None
         message = manager.reload_variant(arg)
         log_command(logger, ctx, message=message)
@@ -302,7 +312,8 @@ class AdminCog(commands.Cog):
 
     @commands.command(
         brief="Execute Arbitrary Python",
-        description="Execute a python snippet on the current board state.\nWARNING: Changes made to the board state are saved to the database.",
+        description="Execute a python snippet on the current board state.\n" + \
+            "WARNING: Changes made to the board state are saved to the database.",
         help="""Example:
         ```python
         for player in board.players:
@@ -312,6 +323,7 @@ class AdminCog(commands.Cog):
     )
     @perms.superuser_only("Execute arbitrary python code")
     async def exec_py(self, ctx: commands.Context) -> None:
+        """Executes arbitrary python code."""
         assert ctx.guild is not None
         class ContainedPrinter:
             def __init__(self):
