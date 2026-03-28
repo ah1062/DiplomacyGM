@@ -1,8 +1,9 @@
 """Player information and methods."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Sequence
-from enum import Enum
+from enum import Enum, auto
 import discord
 
 from DiploGM.models import order
@@ -149,3 +150,23 @@ class Player:
         elif scs >= 3:
             return PlayerClass.KINGDOM
         return PlayerClass.DUCHY
+
+class OrdersSubsetOption(Enum):
+    FULL = auto()
+    MISSING = auto()
+    SUBMITTED = auto()
+
+class ForcedDisbandOption(Enum):
+    UNMARKED = auto()
+    MARK_FORCED = auto()
+    ONLY_FREE = auto()
+
+@dataclass
+class ViewOrdersTags:
+    subset: OrdersSubsetOption
+    blind: bool
+    forced: ForcedDisbandOption
+
+    @classmethod
+    def get_default(cls):
+        return ViewOrdersTags(subset=OrdersSubsetOption.FULL, blind=False, forced=ForcedDisbandOption.UNMARKED)
