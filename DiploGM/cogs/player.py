@@ -230,10 +230,11 @@ class PlayerCog(commands.Cog):
         convert_svg = (player is not None) or not (
             {"true", "t", "svg", "s"} & set(arguments)
         )
-        color_arguments = list(config.color_options & set(arguments))
+        board = manager.get_board(ctx.guild.id)
+        color_options = board.data.get("color_options", config.color_options)
+        color_arguments = list(set(color_options) & set(arguments))
         color_mode = color_arguments[0] if color_arguments else None
         movement_only = "movement" in arguments
-        board = manager.get_board(ctx.guild.id)
         turn = parse_season(arguments, board.turn)
 
         if player and not board.orders_enabled:
@@ -317,9 +318,10 @@ class PlayerCog(commands.Cog):
             .split()
         )
         convert_svg = not ({"true", "t", "svg", "s"} & set(arguments))
-        color_arguments = list(config.color_options & set(arguments))
-        color_mode = color_arguments[0] if color_arguments else None
         board = manager.get_board(ctx.guild.id)
+        color_options = board.data["svg config"].get("color_options", config.color_options)
+        color_arguments = list(set(color_options) & set(arguments))
+        color_mode = color_arguments[0] if color_arguments else None
         turn = parse_season(arguments, board.turn)
 
         try:
@@ -385,9 +387,10 @@ class PlayerCog(commands.Cog):
             .lower()
             .split()
         )
-        color_arguments = list(config.color_options & set(arguments))
-        color_mode = color_arguments[0] if color_arguments else None
         board = manager.get_board(ctx.guild.id)
+        color_options = board.data.get("color_options", config.color_options)
+        color_arguments = list(set(color_options) & set(arguments))
+        color_mode = color_arguments[0] if color_arguments else None
 
         if player and not board.orders_enabled:
             log_command(logger, ctx, "Orders locked - not processing")
