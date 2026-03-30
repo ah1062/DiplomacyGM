@@ -157,6 +157,7 @@ class Parser:
                 if isinstance(color, dict):
                     color = color["standard"]
                 self.color_to_player[color] = player
+                player.is_active = data.get("active", "true").lower() == "true"
 
             neutral_colors = self.data[SVG_CONFIG_KEY]["neutral"]
             if isinstance(neutral_colors, dict):
