@@ -8,6 +8,7 @@ import numpy as np
 from xml.etree.ElementTree import Element, tostring
 
 import shapely
+from deepmerge import Merger
 from lxml import etree
 
 from DiploGM.map_parser.vector.transform import TransGL3
@@ -39,8 +40,27 @@ class Parser:
     def __init__(self, data: str):
         self.datafile = data
 
+        config_merger = Merger(
+            [
+                (list, ["override"]),
+                (dict, ["merge"]),
+                (set, ["union"]),
+            ],
+            ["override"],
+            ["override"]
+        )
+
         with open(f"{parse_variant_path(data)}/config.json", "r", encoding="utf-8") as f:
-            self.data = json.load(f)
+            variant_data = json.load(f)
+        try:
+            with open(f"{parse_variant_path(data, return_parent=True)}/config.json", "r", encoding="utf-8") as f:
+                self.data = json.load(f)
+                self.data = config_merger.merge(self.data, variant_data)
+        except FileNotFoundError:
+            self.data = variant_data
+        keys_to_delete = [p[0] for p in self.data["players"].items() if p[1].get("disabled", "False").lower() == "true"]
+        for key in keys_to_delete:
+            del self.data["players"][key]
 
         self.data["file"] = f"{parse_variant_path(data)}/{self.data['file']}"
 

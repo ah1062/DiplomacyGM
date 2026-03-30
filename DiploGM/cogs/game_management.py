@@ -856,7 +856,7 @@ class GameManagementCog(commands.Cog):
         assert guild is not None
 
         board = manager.get_board(guild.id)
-        color_options: list[str] = board.data.get("color_options", config.color_options)
+        color_options = board.data["svg config"].get("color_options", config.color_options)
 
         arguments = (
             ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")

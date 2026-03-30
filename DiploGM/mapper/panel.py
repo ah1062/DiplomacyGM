@@ -34,8 +34,8 @@ class PanelDrawer:
         )
         self.scoreboard_power_locations: list[tuple[float, float]] = []
         for power_element in all_power_banners_element or []:
-            destination_pretransform_coordinates = (float(power_element[0].get("x", 0)),
-                                                    float(power_element[0].get("y", 0)))
+            destination_pretransform_coordinates = TransGL3(power_element[0]).transform((float(power_element[0].get("x", 0)),
+                                                                                         float(power_element[0].get("y", 0))))
             destination_coordinates = TransGL3(power_element).transform(destination_pretransform_coordinates)
             self.scoreboard_power_locations.append(destination_coordinates)
 
@@ -53,7 +53,8 @@ class PanelDrawer:
                            banner_index: int, high_player_count: bool) -> bool:
         if len(power_element) == 0:
             return False
-        initial_pretransform_coordinates = (float(power_element[0].get("x", 0)), float(power_element[0].get("y", 0)))
+        initial_pretransform_coordinates = TransGL3(power_element[0]).transform((float(power_element[0].get("x", 0)),
+                                                                                 float(power_element[0].get("y", 0))))
         banner_coordinates = TransGL3(power_element).transform(initial_pretransform_coordinates)
         if high_player_count and banner_coordinates != self.scoreboard_power_locations[banner_index]:
             return False
