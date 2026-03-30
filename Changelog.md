@@ -20,7 +20,6 @@ Contributors
 - Added support for each variant to have a config.json that each version can see and overwrite
 - Added support for per-variant color palettes
 - Upon loading a variant, the Parser now checks to see if there are any mismatching SVG labels before continuing
-- Added an option to `.view_orders` to see which retreat orders are forced disbands
 
 # Developer Changes
 - Added a `.get_distance` method for Provinces, which is to be used for future development
