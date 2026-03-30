@@ -50,7 +50,6 @@
     "build_options": "classic",
 	"victory_conditions": "classic",
 	"victory_count": 18,
-    "dp": "enabled",
 	"abbreviations": {
 		"bot": "Gulf of Bothnia",
 		"ems": "Eastern Mediterranean Sea",
@@ -120,8 +119,7 @@
     "players": {
         "Austria": {
             "color": "cd5c5c",
-			"iscc": 3,
-            "affiliates": ["Munich"]
+			"iscc": 3
         },
         "England": {
             "color": "7b68ee",
