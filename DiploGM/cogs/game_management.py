@@ -994,7 +994,7 @@ class GameManagementCog(commands.Cog):
         if (new_board.turn.is_builds()
             and (guild.id != config.BOT_DEV_SERVER_ID and guild.name.startswith("Imperial Diplomacy"))
             and not test_adjudicate):
-            channel = self.bot.get_channel(config.IMPDIP_SERVER_WINTER_SCOREBOARD_OUTPUT_CHANNEL_ID)
+            channel = self.bot.get_channel(config.HUB_SERVER_WINTER_SCOREBOARD_OUTPUT_CHANNEL_ID)
             if not channel:
                 await send_message_and_file(channel=ctx.channel,
                                             message="Couldn't automatically send off the Winter Scoreboard data",

@@ -16,8 +16,8 @@ from DiploGM.config import (
     BOT_DEV_UNHANDLED_ERRORS_CHANNEL_ID,
     EMBED_STANDARD_COLOUR,
     ERROR_COLOUR,
-    IMPDIP_SERVER_ID,
-    IMPDIP_SERVER_BOT_STATUS_CHANNEL_ID,
+    HUB_SERVER_ID,
+    HUB_SERVER_BOT_STATUS_CHANNEL_ID,
     EXTENSIONS_TO_LOAD_ON_STARTUP,
 )
 from DiploGM.events.eventbus import EventBus
@@ -194,17 +194,17 @@ class DiploGM(commands.Bot):
         logger.info(f"Logged in as {self.user}")
 
         # Ensure bot is connected to the correct server
-        guild = self.get_guild(IMPDIP_SERVER_ID)
+        guild = self.get_guild(HUB_SERVER_ID)
         if not guild:
             logger.warning(
-                f"Cannot find Imperial Diplomacy Server [id={IMPDIP_SERVER_ID}]"
+                f"Cannot find Hub Server [id={HUB_SERVER_ID}]"
             )
 
         # Get the specific channel
-        channel = self.get_channel(IMPDIP_SERVER_BOT_STATUS_CHANNEL_ID)
+        channel = self.get_channel(HUB_SERVER_BOT_STATUS_CHANNEL_ID)
         if not channel or not isinstance(channel, discord.TextChannel):
             logger.warning(
-                f"Cannot find Bot Status Channel [id={IMPDIP_SERVER_BOT_STATUS_CHANNEL_ID}]"
+                f"Cannot find Bot Status Channel [id={HUB_SERVER_BOT_STATUS_CHANNEL_ID}]"
             )
         else:
             message = random.choice(WELCOME_MESSAGES)

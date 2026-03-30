@@ -15,7 +15,7 @@ from scipy.integrate import odeint
 from discord.ext import commands
 
 from DiploGM import perms
-from DiploGM.config import ERROR_COLOUR, is_bumble, temporary_bumbles, IMPDIP_SERVER_ID
+from DiploGM.config import ERROR_COLOUR, is_bumble, temporary_bumbles, HUB_SERVER_ID
 from DiploGM.utils import log_command, send_message_and_file
 
 from DiploGM.db.database import get_connection
@@ -613,7 +613,7 @@ class PartyCog(commands.Cog):
 
         assert ctx.guild is not None
         if ctx.author.id == 1352388421003251833:
-            if (ctx.guild.id != IMPDIP_SERVER_ID
+            if (ctx.guild.id != HUB_SERVER_ID
                 and is_gm(ctx.author)
                 and (ctx.guild.id not in self.eolhc_ed_members or ctx.me.id not in self.eolhc_ed_members[ctx.guild.id])):
                 self.eolhc_ed_members.setdefault(ctx.guild.id, []).append(ctx.me.id)
