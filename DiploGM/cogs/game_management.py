@@ -955,6 +955,7 @@ class GameManagementCog(commands.Cog):
         assert guild is not None
 
         board = manager.get_board(guild.id)
+        color_options: list[str] = board.data.get("color_options", config.color_options)
 
         arguments = (
             ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")
@@ -963,7 +964,7 @@ class GameManagementCog(commands.Cog):
             .split()
         )
         return_svg = not ({"true", "t", "svg", "s"} & set(arguments))
-        color_arguments = list(config.color_options & set(arguments))
+        color_arguments = list(set(color_options) & set(arguments))
         color_mode = color_arguments[0] if color_arguments else None
         test_adjudicate = "test" in arguments
         full_adjudicate = "full" in arguments and not test_adjudicate

@@ -1,3 +1,10 @@
+1.7.1
+=====
+Contributors
+- notnot
+# New Features
+- Added 'forced-disband' and 'free-retreat' arguments to view_orders; view which orders are forced retreats, or hide all forced retreats.
+
 1.7.0
 =====
 
