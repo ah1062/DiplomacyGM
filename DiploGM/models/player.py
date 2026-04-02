@@ -1,8 +1,9 @@
 """Player information and methods."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Sequence
-from enum import Enum
+from enum import Enum, auto
 import discord
 
 from DiploGM.models import order
@@ -38,6 +39,7 @@ class Player:
         color: str | dict[str, str],
         centers: set[province.Province],
         units: set[unit.Unit],
+        is_active: bool = True
     ):
         self.name: str = name
         self.color_dict: dict | None = None
@@ -62,6 +64,8 @@ class Player:
         self.points: int = 0
         self.liege: Player | None = None
         self.vassals: list[Player] = []
+
+        self.is_active: bool = is_active
 
         # Must be initialised when the board is made
         self.board: Optional[Board] = None
@@ -146,6 +150,26 @@ class Player:
         scs = len(self.centers)
         if scs >= 6:
             return PlayerClass.EMPIRE
-        elif scs >= 3:
+        if scs >= 3:
             return PlayerClass.KINGDOM
         return PlayerClass.DUCHY
+
+class OrdersSubsetOption(Enum):
+    FULL = auto()
+    MISSING = auto()
+    SUBMITTED = auto()
+
+class ForcedDisbandOption(Enum):
+    UNMARKED = auto()
+    MARK_FORCED = auto()
+    ONLY_FREE = auto()
+
+@dataclass
+class ViewOrdersTags:
+    subset: OrdersSubsetOption
+    blind: bool
+    forced: ForcedDisbandOption
+
+    @classmethod
+    def get_default(cls):
+        return ViewOrdersTags(subset=OrdersSubsetOption.FULL, blind=False, forced=ForcedDisbandOption.UNMARKED)

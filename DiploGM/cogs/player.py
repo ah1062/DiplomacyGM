@@ -1,4 +1,5 @@
 import logging
+from typing import Callable, Iterable
 
 import discord
 from discord.ext import commands
@@ -9,11 +10,16 @@ from DiploGM.db.database import get_connection
 from DiploGM.parse_order import parse_order, parse_remove_order
 from DiploGM.utils import get_orders, log_command, parse_season, send_message_and_file
 from DiploGM.manager import Manager, SEVERENCE_A_ID, SEVERENCE_B_ID
-from DiploGM.models.player import Player
+from DiploGM.models.player import ForcedDisbandOption, Player, ViewOrdersTags, OrdersSubsetOption
 
 logger = logging.getLogger(__name__)
 manager = Manager()
 
+MISSING_ALIASES = ["missing", "miss", "m"]
+SUBMITTED_ALIASES = ["submitted", "submit", "sub", "s"]
+BLIND_ALIASES = ["blind", "b"]
+FORCED_RETREAT_ALIASES = ["forced-disband", "forced", "force", "disband", "pop", "f"]
+FREE_RETREAT_ALIASES = ["free-retreats", "free-retreat", "free", "retreats", "retreat", "r"]
 
 class PlayerCog(commands.Cog):
     def __init__(self, bot):
@@ -133,10 +139,16 @@ class PlayerCog(commands.Cog):
 
     @commands.command(
         brief="Outputs your current submitted orders.",
-        description="Outputs your current submitted orders. "
-        "Use .view_map to view a sample moves map of your orders. "
-        "Use the 'missing' or 'submitted' argument to view only units without orders or only submitted orders. "
-        "Use the 'blind' argument to view only the number of orders submitted.",
+        description=f"""Outputs your current submitted orders. 
+        Use .view_map to view a sample moves map of your orders. 
+        Use the 'missing' or 'submitted' argument to view only units without orders or only submitted orders. 
+        \tAliases: {MISSING_ALIASES}; {SUBMITTED_ALIASES}
+        Use the 'blind' argument to view only the number of orders submitted.
+        \tAliases: {BLIND_ALIASES}
+        Use the 'forced-disband' argument to view how many dislodged units have no valid retreat locations and must disband. (Only in retreat phases)
+        \t Aliases: {FORCED_RETREAT_ALIASES}
+        Alternatively, use the 'free-retreat' argument to view only dislodged units which are able to retreat. (Only in retreat phases)
+        \tAliases: {FREE_RETREAT_ALIASES}""",
         aliases=["v", "view", "vieworders", "view-orders"],
     )
     @perms.player("view orders")
@@ -149,18 +161,22 @@ class PlayerCog(commands.Cog):
             .lower()
             .split()
         )
-        subset = "missing" if {"missing", "miss", "m"} & set(arguments) else None
-        subset = (
-            "submitted"
-            if {"submitted", "submit", "sub", "s"} & set(arguments)
-            else subset
+
+        any_alias_in_args: Callable[[Iterable[str]], bool] = lambda aliases: 0 < len(set(arguments).intersection(set(aliases)))
+
+        tags = ViewOrdersTags(
+            subset=OrdersSubsetOption.MISSING if any_alias_in_args(MISSING_ALIASES) 
+                else OrdersSubsetOption.SUBMITTED if any_alias_in_args(SUBMITTED_ALIASES)
+                else OrdersSubsetOption.FULL,
+            blind=any_alias_in_args(BLIND_ALIASES),
+            forced=ForcedDisbandOption.MARK_FORCED if any_alias_in_args(FORCED_RETREAT_ALIASES)
+                else ForcedDisbandOption.ONLY_FREE if any_alias_in_args(FREE_RETREAT_ALIASES)
+                else ForcedDisbandOption.UNMARKED,
         )
 
         try:
             board = manager.get_board(ctx.guild.id)
-
-            blind = "blind" in arguments
-            order_text = get_orders(board, player, ctx, subset=subset, blind=blind)
+            order_text = get_orders(board, player, ctx, tags=tags)
 
         except RuntimeError as err:
             logger.error(err, exc_info=True)
@@ -214,10 +230,11 @@ class PlayerCog(commands.Cog):
         convert_svg = (player is not None) or not (
             {"true", "t", "svg", "s"} & set(arguments)
         )
-        color_arguments = list(config.color_options & set(arguments))
+        board = manager.get_board(ctx.guild.id)
+        color_options = board.data["svg config"].get("color_options", config.color_options)
+        color_arguments = list(set(color_options) & set(arguments))
         color_mode = color_arguments[0] if color_arguments else None
         movement_only = "movement" in arguments
-        board = manager.get_board(ctx.guild.id)
         turn = parse_season(arguments, board.turn)
 
         if player and not board.orders_enabled:
@@ -301,9 +318,10 @@ class PlayerCog(commands.Cog):
             .split()
         )
         convert_svg = not ({"true", "t", "svg", "s"} & set(arguments))
-        color_arguments = list(config.color_options & set(arguments))
-        color_mode = color_arguments[0] if color_arguments else None
         board = manager.get_board(ctx.guild.id)
+        color_options = board.data["svg config"].get("color_options", config.color_options)
+        color_arguments = list(set(color_options) & set(arguments))
+        color_mode = color_arguments[0] if color_arguments else None
         turn = parse_season(arguments, board.turn)
 
         try:
@@ -369,9 +387,10 @@ class PlayerCog(commands.Cog):
             .lower()
             .split()
         )
-        color_arguments = list(config.color_options & set(arguments))
-        color_mode = color_arguments[0] if color_arguments else None
         board = manager.get_board(ctx.guild.id)
+        color_options = board.data["svg config"].get("color_options", config.color_options)
+        color_arguments = list(set(color_options) & set(arguments))
+        color_mode = color_arguments[0] if color_arguments else None
 
         if player and not board.orders_enabled:
             log_command(logger, ctx, "Orders locked - not processing")
@@ -549,6 +568,7 @@ class PlayerCog(commands.Cog):
     async def press_directory(self, ctx: commands.Context, player: Player | None) -> None:
         """Outputs a list of press channels."""
         assert ctx.guild is not None
+        guild = ctx.guild
         gm_arguments = {"global"}
         arguments = (
             ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")
@@ -562,11 +582,11 @@ class PlayerCog(commands.Cog):
             perms.assert_gm_only(ctx, "use a gm argument for .press_directory")
 
         board = manager.get_board(ctx.guild.id)
-        power_roles = set(map(lambda p: p.find_discord_role(ctx.guild.roles), board.players))
+        power_roles = set(map(lambda p: p.find_discord_role(guild.roles), board.get_players()))
 
         if player is None:
             if "global" in arguments:
-                for player in board.players:
+                for player in board.get_players():
                     order_channel_name = player.get_name().lower().replace(" ", "-") + "-orders"
 
                     order_channel = discord.utils.find(lambda c: c.name == order_channel_name, ctx.guild.text_channels)
