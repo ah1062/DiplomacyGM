@@ -35,13 +35,15 @@ def get_build_orders(player: Player,
     else:
         player_name = player.get_name()
 
+    build_count = len(player.centers) - len(player.units)
+    order_count = len(player.build_orders) + player.waived_orders
 
     title = f"**{player_name}**: ({len(player.centers)}) " + \
-            f"({'+' if len(player.centers) - len(player.units) >= 0 else ''}" + \
-            f"{len(player.centers) - len(player.units)})"
+            f"({'+' if build_count >= 0 else ''}" + \
+            f"{build_count})" + f" ({order_count})"
     body = ""
     if tags.blind:
-        return title, f" ({len(player.build_orders) + player.waived_orders})"
+        return title, ""
 
     for unit in player.build_orders | set(
         player.vassal_orders.values()
