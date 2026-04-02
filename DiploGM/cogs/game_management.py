@@ -3,6 +3,7 @@ import logging
 import random
 import re
 from datetime import timedelta
+from pathlib import Path
 from time import time
 from typing import Optional
 
@@ -147,7 +148,25 @@ class GameManagementCog(commands.Cog):
         log_command(logger, ctx, message=message)
         await send_message_and_file(channel=ctx.channel, title="Currently loaded variants", message=message)
 
-    @commands.command(brief="Archives a comms category")
+    @commands.command(brief="populate a new server with template messages. (should be used only once)")
+    @perms.gm_only("fill server with template messages")
+    async def open_server(self, ctx: commands.Context) -> None:
+        assert ctx.guild is not None
+        template_assets = Path("assets/template/")
+       
+        for group in template_assets.glob("*"):
+            out_channel = discord.utils.find(lambda c: c.name == group.name, ctx.guild.text_channels)
+            if not out_channel:
+                await send_message_and_file(channel=ctx.channel, message=f"Could not find channel '{group.name}' to put template messages!", embed_colour=ERROR_COLOUR)
+                continue
+
+            for file in group.glob("*"):
+                with open(file) as f:
+                    content = f.read()
+                    await out_channel.send(content)
+        
+
+    @commands.command(brief="")
     @perms.gm_only("archive the category")
     async def archive(self, ctx: commands.Context) -> None:
         """Set all channels within a category to read-only, during game close

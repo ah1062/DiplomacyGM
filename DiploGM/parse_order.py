@@ -502,6 +502,9 @@ def _parse_remove_order(command: str, player_restriction: Player | None, board: 
     if components[0] in ["a", "f", "army", "fleet"]:
         command = " ".join(components[1:])
 
+    if components[-1] in {"nc", "sc", "ec", "wc"}:
+        command = " ".join(command.split(" ")[:-1])
+
     province, _ = board.get_province_and_coast(command)
     if command.startswith("relationship"):
         if player_restriction is None:

@@ -1,3 +1,29 @@
+1.7.3
+=====
+
+Contributors
+- aahoughton
+
+# New Features
+- `.open_server` to populate standardised channels in the Imperial Diplomacy Template with required messages
+
+# Quality of Life
+- Changed order parsing to strip coastal signifiers when identifying units
+- Added aliases for schedule commands to support easier usage
+  - `.s|.sched` for `.schedule`
+  - `.us|.unsched` for `.unschedule`
+  - `.vs|.vsched|.viewsched` for `.view_schedule`
+- Added multi-line support for `.schedule` to create multiple tasks at once
+  - Similarly, allowed unscheduling multiple tasks at once by providing many ids
+- Switched to using 8-byte UUID hex strings for scheduling task ids for easier interactions
+
+# Moderation Changes
+- Have `on_guild_join` event trigger results output to game servers where possible
+  - Defaults to hub server when no `#mod-log` channel is present
+
+# Bugfixes
+- Fixed a logical operation that *required* GM arguments for `.press_directory`
+
 1.7.2
 =====
 

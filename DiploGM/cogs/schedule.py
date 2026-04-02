@@ -77,6 +77,7 @@ class ScheduleCog(commands.Cog):
     .schedule <timestamp> view_map dark
     .schedule <timestamp> ping_players <timestamp>
         """,
+        aliases=["sched", "s"]
     )
     @perms.gm_only("schedule a command")
     async def schedule(
@@ -216,6 +217,7 @@ class ScheduleCog(commands.Cog):
     .unschedule <task_id>
     .unschedule all - remove all scheduled tasks
         """,
+        aliases=["unsched", "us"]
     )
     @perms.gm_only("unschedule a command")
     async def unschedule(self, ctx: commands.Context, task_id: str):
@@ -240,9 +242,14 @@ class ScheduleCog(commands.Cog):
         """
 
         assert ctx.guild is not None
-        task_id = task_id.strip()
+        task_ids = (
+            ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")
+            .strip()
+            .lower()
+            .split()
+        )
 
-        if task_id == "all":
+        if "all" in task_ids:
             gid = ctx.guild.id
             ids = [
                 id
@@ -258,26 +265,28 @@ class ScheduleCog(commands.Cog):
                 message=f"Deleted all {len(ids)} scheduled tasks for this guild.",
             )
             return
-
-        try:
-            task = self.scheduled_tasks[task_id]
-            del self.scheduled_tasks[task_id]
-            await self.save_scheduled_tasks()
-            await send_message_and_file(
-                channel=ctx.channel,
-                message=f"Deleted scheduled task: {task['command']} for {task['execute_at']}",
-            )
-        except KeyError:
-            await send_message_and_file(
-                channel=ctx.channel,
-                title="Error!",
-                message=f"No scheduled task correlates with the ID: {task_id}",
-                embed_colour=ERROR_COLOUR,
-            )
+    
+        for task_id in task_ids:
+            try:
+                task = self.scheduled_tasks[task_id]
+                del self.scheduled_tasks[task_id]
+                await self.save_scheduled_tasks()
+                await send_message_and_file(
+                    channel=ctx.channel,
+                    message=f"Deleted scheduled task: {task['command']} for {task['execute_at']}",
+                )
+            except KeyError:
+                await send_message_and_file(
+                    channel=ctx.channel,
+                    title="Error!",
+                    message=f"No scheduled task correlates with the ID: {task_id}",
+                    embed_colour=ERROR_COLOUR,
+                )
 
     @commands.command(
         name="view_schedule",
         brief="View scheduled commands.",
+        aliases=["view_sched", "vsched", "vs"]
     )
     @perms.gm_only("view command schedule")
     async def view_schedule(self, ctx: commands.Context):
@@ -316,7 +325,7 @@ class ScheduleCog(commands.Cog):
         out = ["(sorted by soonest)"]
         for id, task in guild_tasks.items():
             user = self.bot.get_user(task["invoking_user_id"])
-            s = f"Task ID = `{id}`:\n- [{user.mention if user else task['invoking_user_name']}] -> `{task['command']}` at {task['execute_at']}"
+            s = f"Task ID = `{id}`:\n- [{user.mention if user else task['invoking_user_name']}] -> `{task['command']}` at <t:{int(task['execute_at'].timestamp())}:f>"
             if len(task["args"]) != 0:
                 s += f"\n  - Arguments: {task['args']}"
 

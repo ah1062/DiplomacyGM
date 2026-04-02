@@ -71,7 +71,6 @@ class ModerationCog(commands.Cog):
         if len(problems) == 0:
             return
 
-        modchannel = discord.utils.find(lambda c: c.name == "mod-log", hub.text_channels)
         msg = (
             f"Somebody to watch/interrogate:\n"
             f"User: {member} (ID: {member.id})\n"
@@ -80,6 +79,16 @@ class ModerationCog(commands.Cog):
         )
         for p in problems:
             msg += f"- {p}\n"
+
+        modchannel = discord.utils.find(lambda c: c.name == "mod-log", guild.text_channels)
+        if modchannel is None:
+            modchannel = discord.utils.find(lambda c: c.name == "mod-log", guild.text_channels)
+            msg += "## There is no #mod-log to output this within the game server!"
+
+        if modchannel is None:
+            logger.warning("%s joined %s: Could not find a channel to output results.",
+                           member.name, member.guild.name)
+            return
 
         await modchannel.send(msg)
 

@@ -578,7 +578,7 @@ class PlayerCog(commands.Cog):
         )
 
 
-        if len(set(arguments).intersection(gm_arguments)) == 0:
+        if len(set(arguments).intersection(gm_arguments)) != 0:
             perms.assert_gm_only(ctx, "use a gm argument for .press_directory")
 
         board = manager.get_board(ctx.guild.id)
