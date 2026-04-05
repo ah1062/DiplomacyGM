@@ -448,7 +448,7 @@ class Mapper:
                 continue
 
             visited_provinces.add(province.name)
-            color = self.impassable_color if province.type == ProvinceType.IMPASSABLE else self.neutral_color
+            color = self.impassable_color if province.is_impassable else self.neutral_color
             if province.name not in self.adjacent_provinces:
                 color = self.board_svg_data["unknown"]
             elif province.owner:
@@ -476,7 +476,7 @@ class Mapper:
                 print(f"Error during recoloring provinces: {ex}", file=sys.stderr)
                 continue
 
-            color = self.neutral_color
+            color = self.impassable_color if province.is_impassable else self.neutral_color
             if province.name not in self.adjacent_provinces:
                 color = self.board_svg_data["unknown"]
             elif province.owner:

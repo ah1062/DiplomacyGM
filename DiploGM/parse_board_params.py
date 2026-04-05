@@ -82,6 +82,16 @@ def _set_transformation(keywords: list[str], board: Board) -> tuple[str | None, 
     board.data[key_name] = new_value
     return key_name, new_value
 
+def _set_dp(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
+    key_name = "dp"
+    valid_options = "true", "false", "enabled", "disabled"
+    new_value = keywords[0].lower()
+    if new_value not in valid_options:
+        raise ValueError(f"{new_value} is not a valid DP option")
+    new_value = "enabled" if new_value in ["true", "enabled"] else "disabled"
+    board.data[key_name] = new_value
+    return key_name, new_value
+
 def _set_victory_conditions(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
     key_name = "victory_conditions"
     valid_options = "classic", "vscc"
@@ -159,6 +169,7 @@ function_list = {
     "convoyable islands": _set_convoyable_islands,
     "supportable cores": _set_supportable_cores,
     "transformation": _set_transformation,
+    "dp": _set_dp,
     "victory conditions": _set_victory_conditions,
     "victory count": _set_victory_count,
     "iscc": _set_iscc,

@@ -430,6 +430,11 @@ def parse_order(message: str, player_restriction: Player | None, board: Board) -
     else:
         database.save_order_for_units(board, movement)
 
+    if board.turn.is_moves() and player_restriction is not None:
+        if (spent_dp := board.get_dp_spent(player_restriction)) > player_restriction.dp_max:
+            errors.append(f"You have allocated {spent_dp} DP but only have {player_restriction.dp_max} DP. " +
+                          "Please reduce a unit's DP allocation or set it to zero.")
+
     if board.turn.is_builds() and player_restriction is not None:
         expected_builds = len(player_restriction.centers) - len(player_restriction.units)
         build_difference = player_restriction.get_number_of_builds() - expected_builds

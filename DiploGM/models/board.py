@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from DiploGM.models.player import Player
     from DiploGM.models.province import Province
     from DiploGM.models.order import UnitOrder
+    from DiploGM.models.unit import DPAllocation
 
 
 logger = logging.getLogger(__name__)
@@ -381,6 +382,21 @@ class Board:
         if isinstance(winning_order, Move):
             winning_order.is_sortie = True
         return winning_order
+
+    def get_player_dp_orders(self, player: Player) -> dict[Unit, DPAllocation]:
+        """Gets the units a player has allocated DP to, as well as their orders and allocation amounts."""
+        dp_orders: dict[Unit, DPAllocation] = {}
+        for unit in self.units:
+            if unit.dp_allocations and player.name in unit.dp_allocations:
+                dp_orders[unit] = unit.dp_allocations[player.name]
+        return dp_orders
+
+    def get_dp_spent(self, player: Player) -> int:
+        """Gets the total points a player has allocated across all their DP orders."""
+        points_allocated = 0
+        for allocation in self.get_player_dp_orders(player).values():
+            points_allocated += allocation.points
+        return points_allocated
 
     def has_affiliation(self, player1: Player, player2: Player | None) -> bool:
         """Checks to see if two powers are affilited, used for determining DP multipliers."""

@@ -1303,6 +1303,7 @@ class GameManagementCog(commands.Cog):
         * convoyable_islands ['disabled', 'enabled']
         * supportable_cores ['disabled', 'enabled']
         * transformation ['disabled', 'moves', 'builds', 'all']
+        * dp ['disabled', 'enabled']
         * victory_conditions ['classic', 'vscc']
         * victory_count [number] (only used with classic victory conditions)
         * iscc [player] [starting scs]

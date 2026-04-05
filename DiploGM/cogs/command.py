@@ -351,7 +351,7 @@ class CommandCog(commands.Cog):
                     if province.unit else 'None')
         out = f"Type: {province.type.name}\n" + \
             f"{coast_info}" + \
-            f"Owner: {province.owner.name if province.owner else 'None'}\n" + \
+            f"Owner: {province.get_owner_name()}\n" + \
             f"Unit: {unit_text}\n" + \
             f"Center: {province.has_supply_center}\n" + \
             f"Core: {province.core_data.core.name if province.core_data.core else 'None'}\n" + \

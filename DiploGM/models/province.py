@@ -22,7 +22,6 @@ class ProvinceType(Enum):
     LAND = 1
     ISLAND = 2
     SEA = 3
-    IMPASSABLE = 4
 
 @dataclass
 class ProvinceCore:
@@ -60,6 +59,7 @@ class Province():
         self.geometry: Polygon | MultiPolygon = coordinates
         self.unit_coordinates: dict[str, UnitLocation] = {}
         self.type: ProvinceType = province_type
+        self.is_impassable: bool = False
         self.can_convoy: bool = province_type == ProvinceType.SEA
         self.has_supply_center: bool = False
         self.owner: player.Player | None = None
@@ -84,6 +84,14 @@ class Province():
         if coast in self.adjacency_data.fleet_adjacent:
             return f"{self.name} {coast}"
         return self.name
+
+    def get_owner_name(self) -> str | None:
+        """Gets the name of the province's owner, 'Impassable' if it is impassable, or None if it has no owner."""
+        if self.is_impassable:
+            return "Impassable"
+        if self.owner is None:
+            return None
+        return self.owner.name
 
     def get_unit_coordinates(self,
                              unit_type: UnitType,
@@ -126,7 +134,9 @@ class Province():
             return True
         if build_options == "control":
             for adj in self.adjacency_data.adjacent:
-                if adj.type in (ProvinceType.LAND, ProvinceType.ISLAND) and adj.owner != self.owner:
+                if (not adj.is_impassable
+                    and adj.type in (ProvinceType.LAND, ProvinceType.ISLAND)
+                    and adj.owner != self.owner):
                     return False
             return True
         return False

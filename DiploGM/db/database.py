@@ -184,7 +184,11 @@ class _DatabaseConnection:
 
         owner, core, half_core = province_info_by_name[province.name]
 
-        if owner is not None:
+        if province.name == "Switzerland":
+            logger.warning(f"{province.name} owner: {owner}, core: {core}, half_core: {half_core}")
+        if owner == "Impassable" or owner is None:
+            province.owner = None
+        else:
             owner_player = board.get_player(owner)
             if owner_player is None:
                 logger.warning(
@@ -195,8 +199,8 @@ class _DatabaseConnection:
 
                 if province.has_supply_center:
                     owner_player.centers.add(province)
-        else:
-            province.owner = None
+
+        province.is_impassable = owner == "Impassable"
 
         core_player = None
         if core is not None:
@@ -439,7 +443,7 @@ class _DatabaseConnection:
                     board_id,
                     board.turn.get_indexed_name(),
                     province.name,
-                    province.owner.name if province.owner else None,
+                    province.get_owner_name(),
                     province.core_data.core.name if province.core_data.core else None,
                     province.core_data.half_core.name if province.core_data.half_core else None,
                 )

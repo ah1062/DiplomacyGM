@@ -80,15 +80,13 @@ def get_move_orders(board: Board,
     ordered = [unit for unit in moving_units if unit.order is not None]
     missing = [unit for unit in moving_units if unit.order is None]
 
-    dp_units = []
-    if not is_retreats:
-        dp_units = [unit for unit in board.units if unit.player is None and player.name in unit.dp_allocations]
+    dp_orders = board.get_player_dp_orders(player)
     match tags.subset:
         case OrdersSubsetOption.MISSING:
             if not missing:
                 return (None, None)
         case OrdersSubsetOption.SUBMITTED:
-            if not ordered and not dp_units:
+            if not ordered and not dp_orders:
                 return (None, None)
 
     if (player_role := player.find_discord_role(ctx.guild.roles)) is not None:
@@ -123,12 +121,11 @@ def get_move_orders(board: Board,
             if unit_is_forced and tags.forced == ForcedDisbandOption.MARK_FORCED:
                 body += r" \*"
             body += "\n"
-    if (ordered or dp_units) and tags.subset != OrdersSubsetOption.MISSING:
+    if (ordered or dp_orders) and tags.subset != OrdersSubsetOption.MISSING:
         body += "__Submitted Orders:__\n"
         for unit in sorted(ordered, key=lambda _unit: _unit.province.name):
             body += f"{unit} {unit.order}\n"
-        for unit in dp_units:
-            allocation = unit.dp_allocations[player.name]
+        for unit, allocation in dp_orders.items():
             body += f"DP {allocation.points}: {unit} {allocation.order}\n"
     return title, body
 

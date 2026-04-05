@@ -92,7 +92,7 @@ def _validate_move_order(province: Province, order: Move | RetreatMove,
     unit = province.unit
     assert unit is not None
     destination_province = order.destination
-    if destination_province.type == ProvinceType.IMPASSABLE:
+    if destination_province.is_impassable:
         return OrderValidity.INVALID, "Cannot move to an impassable province"
     if unit.unit_type == UnitType.ARMY:
         valid, reason = _validate_move_army(province, destination_province)

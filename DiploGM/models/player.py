@@ -66,14 +66,23 @@ class Player:
         self.liege: Player | None = None
         self.vassals: list[Player] = []
 
-        # Currently defaults to 1 DP per SC, but can be overwritten
-        self.dp_max: int = min(len(self.centers), 3)
+        self._dp_max: int | None = None
 
         self.is_active: bool = is_active
 
         # Must be initialised when the board is made
         self.board: Board | None = None
 
+    @property
+    def dp_max(self) -> int:
+        """Currently defaults to 1 DP per SC with a max of 3, but can be overwritten"""
+        if self._dp_max is not None:
+            return self._dp_max
+        return min(len(self.centers), 3)
+
+    @dp_max.setter
+    def dp_max(self, value: int):
+        self._dp_max = value
 
     def find_discord_role(self, roles: Sequence[discord.Role], get_order_role: bool = False) -> Optional[discord.Role]:
         """Gets the Discord role associated with this player, if it exists."""

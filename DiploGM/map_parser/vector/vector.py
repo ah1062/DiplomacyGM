@@ -403,6 +403,9 @@ class Parser:
         if provinces_layer is None:
             return set()
         provinces = set()
+        impassable_color = self.data[SVG_CONFIG_KEY].get("impassable", "000000")
+        if isinstance(impassable_color, dict):
+            impassable_color = impassable_color.get("standard", "000000")
         for province_data in list(provinces_layer):
             path_string = province_data.get("d")
             if not path_string:
@@ -434,14 +437,11 @@ class Parser:
                 if name == "":
                     raise RuntimeError(f"Province name not found in province with data {province_data}")
 
-            color = get_element_color(province_data)
-            impassable_color = self.data[SVG_CONFIG_KEY].get("impassable", "000000")
-            if isinstance(impassable_color, dict):
-                impassable_color = impassable_color.get("standard", "000000")
-            if color == impassable_color:
-                province_type = ProvinceType.IMPASSABLE
-
             province = Province(name, poly, province_type)
+
+            color = get_element_color(province_data)
+            if color == impassable_color:
+                province.is_impassable = True
 
             provinces.add(province)
         return provinces
@@ -451,7 +451,7 @@ class Parser:
             return
         for province_data in provinces_layer:
             name = self.get_province_name(province_data)
-            if self.name_to_province[name].type == ProvinceType.IMPASSABLE:
+            if self.name_to_province[name].is_impassable:
                 continue
             self.name_to_province[name].owner = self.get_element_player(province_data, province_name=name)
 
