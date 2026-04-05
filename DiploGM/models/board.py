@@ -94,7 +94,7 @@ class Board:
         if os.path.isfile(scripts_path):
             with open(scripts_path, "r", encoding="utf-8") as f:
                 script_code = f.read()
-            allowed_globals = {"__builtins__": {}, "board": self}
+            allowed_globals = {"__builtins__": __builtins__, "board": self}
             exec(compile(script_code, scripts_path, "exec"), allowed_globals)
 
     def update_players(self):

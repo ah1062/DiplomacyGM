@@ -184,8 +184,6 @@ class _DatabaseConnection:
 
         owner, core, half_core = province_info_by_name[province.name]
 
-        if province.name == "Switzerland":
-            logger.warning(f"{province.name} owner: {owner}, core: {core}, half_core: {half_core}")
         if owner == "Impassable" or owner is None:
             province.owner = None
         else:
