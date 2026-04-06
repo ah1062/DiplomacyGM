@@ -58,7 +58,7 @@ def get_build_orders(player: Player,
         body += f"\nWaive {player.waived_orders}"
     return title, body
 
-def get_move_orders(board: Board,
+def _get_move_orders(board: Board,
                     player: Player,
                     player_restriction: Player | None,
                     ctx: Context,
@@ -103,6 +103,8 @@ def get_move_orders(board: Board,
             return None, None
 
     title = f"**{player_name}** ({len(ordered)}/{total_unit_count})"
+    if board.data.get("dp", "False").lower() in ("true", "enabled"):
+        title += f" ({board.get_dp_spent(player)}/{player.dp_max} DP)"
 
     if is_retreats and tags.forced == ForcedDisbandOption.MARK_FORCED and forced_disband_count > 0:
         title += rf" ({forced_disband_count} \*)"
@@ -157,7 +159,7 @@ def get_orders(
         if board.turn.is_builds():
             title, body = get_build_orders(player, player_restriction, ctx, tags)
         else:
-            title, body = get_move_orders(board, player, player_restriction, ctx, tags,
+            title, body = _get_move_orders(board, player, player_restriction, ctx, tags,
                                           board.turn.is_retreats())
         if title is None:
             continue

@@ -457,16 +457,25 @@ class GameManagementCog(commands.Cog):
                         if unit.order is None and
                             (board.turn.is_moves() or (unit == unit.province.dislodged_unit and unit.retreat_options))
                     ]
-                    unit_text = f"unit{'s' if len(missing) != 1 else ''}"
-                    if not missing:
+                    missing_dp = 0
+                    if board.data.get("dp", "False").lower() in ("true", "enabled"):
+                        missing_dp = player.dp_max - board.get_dp_spent(player)
+
+                    if not missing and missing_dp == 0:
                         continue
 
-                    response = f"Hey **{''.join([u.mention for u in users])}**, " + \
-                        f"you are missing moves for the following {len(missing)} {unit_text}:"
-                    for unit in sorted(
-                        missing, key=lambda _unit: _unit.province.name
-                    ):
-                        response += f"\n{unit}"
+                    unit_text = f"unit{'s' if len(missing) != 1 else ''}"
+                    response = f"Hey **{''.join([u.mention for u in users])}**, "
+                    if missing:
+                        response += f"you are missing moves for the following {len(missing)} {unit_text}:"
+                        for unit in sorted(
+                            missing, key=lambda _unit: _unit.province.name
+                        ):
+                            response += f"\n{unit}"
+                    if missing_dp > 0:
+                        response += f"{'\nY' if missing else 'y'}ou have {missing_dp} unspent DP."
+                    elif missing_dp < 0:
+                        response += f"{'\nY' if missing else 'y'}ou have spent {-missing_dp} too much DP."
 
                 if response:
                     pinged_players += 1
