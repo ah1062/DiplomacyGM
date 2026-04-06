@@ -48,19 +48,19 @@ class Manager(metaclass=SingletonMeta):
         """Gets a list of server ids that have games."""
         return set(self._boards.keys())
 
-    def create_game(self, server_id: int, gametype: str = "classic") -> str:
+    def create_game(self, server_id: int, gametype: str = "classic") -> tuple[bool, str]:
         """Creates a new game in the specified server and of the specified variant."""
         if self._boards.get(server_id):
-            return "A game already exists in this server."
+            return False, "A game already exists in this server."
         if not os.path.isdir(parse_variant_path(gametype)):
-            return f"Game {gametype} does not exist."
+            return False, f"Game {gametype} does not exist."
 
         logger.info(f"Creating new game in server {server_id}")
         self._boards[server_id] = get_parser(gametype).parse()
         self._boards[server_id].board_id = server_id
         self._database.save_board(server_id, self._boards[server_id])
 
-        return f"{self._boards[server_id].data['name']} game created"
+        return True, f"{self._boards[server_id].data['name']} game created"
 
     # Gets adjacent provinces, but with High Seas combined into one for the purpose of finding adjacency issues
     def _get_adjacent_geom(self, province: Province) -> set[Province]:

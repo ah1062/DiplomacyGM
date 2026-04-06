@@ -17,6 +17,7 @@ from DiploGM.map_parser.vector.utils import (
     parse_path, initialize_province_resident_data,
     LAYER_DICTIONARY, NAMESPACE, SVG_CONFIG_KEY
 )
+from DiploGM.models import province
 from DiploGM.models.turn import PhaseName, Turn
 from DiploGM.models.board import Board
 from DiploGM.models.player import Player
@@ -85,6 +86,10 @@ class Parser:
         self.fow = self.layers.get("fow", False)
         # TODO: Move this out of SVG layers and update configs accordingly
         self.year_offset = self.layers.get("year", 1901)
+
+        self.impassable_color = self.data[SVG_CONFIG_KEY].get("impassable", "000000")
+        if isinstance(self.impassable_color, dict):
+            self.impassable_color = self.impassable_color.get("standard", "000000")
 
         self.color_to_player: dict[str, Player | None] = {}
         self.name_to_province: dict[str, Province] = {}
@@ -403,9 +408,6 @@ class Parser:
         if provinces_layer is None:
             return set()
         provinces = set()
-        impassable_color = self.data[SVG_CONFIG_KEY].get("impassable", "000000")
-        if isinstance(impassable_color, dict):
-            impassable_color = impassable_color.get("standard", "000000")
         for province_data in list(provinces_layer):
             path_string = province_data.get("d")
             if not path_string:
@@ -440,7 +442,7 @@ class Parser:
             province = Province(name, poly, province_type)
 
             color = get_element_color(province_data)
-            if color == impassable_color:
+            if color == self.impassable_color:
                 province.is_impassable = True
 
             provinces.add(province)
@@ -642,7 +644,7 @@ class Parser:
             neutral_color = neutral_color["standard"]
         #FIXME: only works if there's one person per province
         if self.autodetect_players:
-            if color is None or color == neutral_color:
+            if color is None or color == neutral_color or color == self.impassable_color:
                 return None
             player = Player(province_name, color, set(), set())
             self.players.add(player)
