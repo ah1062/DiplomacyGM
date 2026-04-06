@@ -19,6 +19,7 @@ __pycache__
 test.py
 gamelist.tsv
 
+.vscode
 .env
 venv
 
