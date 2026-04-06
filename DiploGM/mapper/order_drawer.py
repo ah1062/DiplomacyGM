@@ -400,6 +400,8 @@ class OrderDrawer:
             {
                 "points": " ".join(map(lambda a: ",".join(map(str, a)), points)),
                 "fill": "red",
+                "stroke": "black",
+                "stroke-width": self.board_svg_data["order_stroke_width"] / 4,
             },
         )
 
