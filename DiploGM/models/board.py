@@ -51,6 +51,7 @@ class Board:
         }
         self.orders_enabled: bool = True
         self.data: dict = data
+        self.custom_data: dict = {}
         self.datafile = datafile
         self.name: str | None = None
         self.fow = fow
@@ -568,6 +569,7 @@ class Board:
         if "parameters" in data:
             for key, value in data["parameters"].items():
                 self.data[key] = value
+            self.custom_data = data["parameters"]
 
         return "Successfully imported board."
 
@@ -630,7 +632,7 @@ class Board:
             provinces.append(prov_data)
 
         params = {}
-        for key, value in self.data.items():
+        for key, value in self.custom_data.items():
             try:
                 json.dumps(value)
                 params[key] = value

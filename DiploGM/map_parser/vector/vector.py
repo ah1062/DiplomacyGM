@@ -85,7 +85,7 @@ class Parser:
 
         self.fow = self.layers.get("fow", False)
         # TODO: Move this out of SVG layers and update configs accordingly
-        self.year_offset = self.layers.get("year", 1901)
+        self.year_offset = self.data.get("year", 1901)
 
         self.impassable_color = self.data[SVG_CONFIG_KEY].get("impassable", "000000")
         if isinstance(self.impassable_color, dict):

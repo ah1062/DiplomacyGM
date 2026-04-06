@@ -112,11 +112,11 @@ class GameManagementCog(commands.Cog):
                     player = board.get_player_by_channel(ch)
                     if not player:
                         continue
-                await send_message_and_file(
-                    channel=ch,
-                    title="Welcome!",
-                    message=welcome_message,
-                )
+                    await send_message_and_file(
+                        channel=ch,
+                        title="Welcome!",
+                        message=welcome_message,
+                    )
         log_command(logger, ctx, message=message)
         await send_message_and_file(channel=ctx.channel, message=message)
 

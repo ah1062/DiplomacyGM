@@ -309,13 +309,18 @@ class _DatabaseConnection:
         # Turning a key deliniated with slashes into a nested dict
         for key, value in board_params:
             cur_dict = board.data
+            cur_custom_dict = board.custom_data
             split_key = key.split("/", 1)
             while len(split_key) > 1:
                 if split_key[0] not in cur_dict:
                     cur_dict[split_key[0]] = {}
+                if split_key[0] not in cur_custom_dict:
+                    cur_custom_dict[split_key[0]] = {}
                 cur_dict = cur_dict[split_key[0]]
+                cur_custom_dict = cur_custom_dict[split_key[0]]
                 split_key = split_key[1].split("/", 1)
             cur_dict[split_key[0]] = value
+            cur_custom_dict[split_key[0]] = value
         if board.data["players"] != "chaos":
             board.update_players()
 
@@ -387,8 +392,27 @@ class _DatabaseConnection:
 
     def save_board(self, board_id: int, board: Board):
         """Saves a board to the database."""
+        def flatten_dict(d: dict, parent_key: str = "", sep: str = "/") -> dict:
+            items = {}
+            for k, v in d.items():
+                new_key = f"{parent_key}{sep}{k}" if parent_key else k
+                if isinstance(v, dict):
+                    items.update(flatten_dict(v, new_key, sep=sep))
+                else:
+                    items[new_key] = v
+            return items
+
         # TODO: Check if board already exists
         cursor = self._connection.cursor()
+
+        cursor.executemany(
+            "INSERT OR REPLACE INTO board_parameters (board_id, parameter_key, parameter_value) VALUES (?, ?, ?)",
+            [
+                (board_id, key, str(value))
+                for key, value in flatten_dict(board.custom_data).items()
+            ],
+        )
+
         cursor.execute(
             "INSERT INTO boards (board_id, phase, data_file, fish, name) VALUES (?, ?, ?, ?, ?)",
             (board_id, board.turn.get_indexed_name(), board.datafile, board.fish, board.name),
