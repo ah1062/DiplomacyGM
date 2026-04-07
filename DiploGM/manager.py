@@ -212,7 +212,7 @@ class Manager(metaclass=SingletonMeta):
             raise RuntimeError(f"There is no {turn} board for this server")
         return board
 
-    def apply_test_adjudication_results(self, server_id: int, board: Board) -> None:
+    def apply_adjudication_results(self, server_id: int, board: Board) -> None:
         """Applies stored failed orders and DP orders to a fresh board for test drawing."""
         dp_orders = self.last_dp_orders.get(server_id, {})
         for province_name, (order_type, dest_str, source_str) in dp_orders.items():

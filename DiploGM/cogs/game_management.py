@@ -938,12 +938,10 @@ class GameManagementCog(commands.Cog):
             ctx,
             message=f"Adjudication Successful for {board.turn}",
         )
-        if test_adjudicate:
-            # Load a fresh board so we don't mutate the Manager's in-memory board
-            draw_board = manager.get_board_from_db(guild.id, old_turn)
-            manager.apply_test_adjudication_results(guild.id, draw_board)
-        else:
-            draw_board = board
+
+        # We draw the board from the DB to apply failed and DP orders that we want to hide from players
+        draw_board = manager.get_board_from_db(guild.id, old_turn)
+        manager.apply_adjudication_results(guild.id, draw_board)
         file, file_name = manager.draw_map_for_board(
             draw_board,
             draw_moves=True,
