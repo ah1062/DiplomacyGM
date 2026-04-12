@@ -532,8 +532,12 @@ class Manager(metaclass=SingletonMeta):
         """Gets the player object associated with a Discord member, if it exists."""
         if isinstance(member, User):
             return None
+        try:
+            players = self.get_board(member.guild.id).players
+        except RuntimeError:
+            return None
         for role in member.roles:
-            for player in self.get_board(member.guild.id).players:
+            for player in players:
                 if (simple_player_name(player.name) == simple_player_name(role.name)
                     or simple_player_name(player.get_name()) == simple_player_name(role.name)):
                     return player

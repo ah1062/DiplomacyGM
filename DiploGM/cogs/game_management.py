@@ -1240,7 +1240,7 @@ class GameManagementCog(commands.Cog):
         last_message_dict = manager.last_activity.get(ctx.guild.id, {})
         last_message_times: list[tuple[str, float]] = []
         for player in manager.get_board(ctx.guild.id).get_players():
-            last_message_times.append((player.get_name(), last_message_dict.get(player.get_name(), 0.0)))
+            last_message_times.append((player.get_name(), last_message_dict.get(player.name, 0.0)))
         last_message_times.sort(key=lambda x: x[1], reverse=True)
         message = "\n".join([f"{player}: <t:{int(last)}:R>"
                              if last != 0.0

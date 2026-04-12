@@ -32,6 +32,9 @@ Contributors
 - Moved parsing order strings from database to board
 - Used a significantly faster function for adjacency searching
 
+# Bugfixes
+`.last_message` now properly works for renamed players
+
 1.7.2
 =====
 

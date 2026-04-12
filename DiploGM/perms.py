@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 manager = Manager()
 
 
-def get_player_by_context(ctx: commands.Context):
+def get_player_by_context(ctx: commands.Context) -> Player | None:
     """Gets the player associated with the command context, if it exists."""
     assert ctx.guild is not None
     # FIXME cleaner way of doing this
@@ -43,7 +43,7 @@ def is_player_channel(player_role: Player, channel: Messageable) -> bool:
              or simple_player_name(nickname_channel) == simple_player_name(channel.name))
             and config.is_player_category(channel.category))
 
-def require_player_by_context(ctx: commands.Context, description: str):
+def require_player_by_context(ctx: commands.Context, description: str) -> Player | None:
     """Gets the player associated with the command context, if it exists,
     but requires that the command is run by a player in their orders channel
     or by a GM in a GM channel or a player's orders channel."""
