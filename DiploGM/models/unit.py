@@ -53,10 +53,12 @@ class Unit:
             self.retreat_options = set()
         if self.unit_type == UnitType.ARMY:
             for province in self.province.adjacency_data.adjacent:
-                if province.type in (ProvinceType.LAND, ProvinceType.ISLAND):
+                if province.type in (ProvinceType.LAND, ProvinceType.ISLAND) and not province.is_impassable:
                     self.retreat_options.add((province, None))
         else:
             for province in self.province.get_coastal_adjacent(self.coast):
+                if province[0].is_impassable:
+                    continue
                 if isinstance(province, tuple):
                     self.retreat_options.add(province)
                 else:

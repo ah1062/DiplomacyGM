@@ -83,10 +83,13 @@ class Board:
         self.name_to_player[simple_player_name(name)] = new_player
         if name not in self.data["players"]:
             self.data["players"][name] = {"color": color}
+            self.custom_data.setdefault("players", {})[name] = {"color": color}
         if "iscc" not in self.data["players"][name]:
             self.data["players"][name]["iscc"] = 1
+            self.custom_data["players"][name]["iscc"] = 1
         if "vscc" not in self.data["players"][name]:
             self.data["players"][name]["vscc"] = self.data["victory_count"]
+            self.custom_data["players"][name]["vscc"] = self.data["victory_count"]
 
     def run_variant_scripts(self):
         """Runs the variant's scripts.py if it exists, in a sandboxed environment."""
@@ -138,6 +141,7 @@ class Board:
                 self.name_to_player.pop(sanitise_name(old_nick.lower()), None)
                 self.name_to_player.pop(simple_player_name(old_nick), None)
             self.data["players"][player.name].pop("nickname", None)
+            self.custom_data.get("players", {}).get(player.name, {}).pop("nickname", None)
             return True
 
         if (nickname.lower() in self.name_to_player
@@ -151,6 +155,7 @@ class Board:
             self.name_to_player.pop(simple_player_name(old_nick), None)
 
         self.data["players"][player.name]["nickname"] = nickname
+        self.custom_data.setdefault("players", {}).setdefault(player.name, {})["nickname"] = nickname
         self.name_to_player[nickname.lower()] = player
         self.name_to_player[cleaned_name] = player
         self.name_to_player[simple_name] = player

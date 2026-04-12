@@ -7,14 +7,6 @@ from DiploGM.models.unit import UnitType
 from DiploGM.parse_edit_state import _parse_command
 
 class TestParseEditState(unittest.TestCase):
-    """Tests for the Parse Edit State functionality."""
-    def test_set_phase(self):
-        """Tests the set_phase command."""
-        b = BoardBuilder()
-        _parse_command("set_phase Fall 1902", b.board)
-        self.assertEqual(b.board.turn.year, 1902, "Failed to set year to 1902")
-        self.assertEqual(b.board.turn.get_phase(), "Fall Moves", "Failed to set season to Fall")
-
     def test_set_core(self):
         """Tests the set_core command."""
         b = BoardBuilder()

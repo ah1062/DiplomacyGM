@@ -196,7 +196,7 @@ class Province():
                 continue
             visited.add(current)
             for neighbor in current.adjacency_data.adjacent:
-                if neighbor not in visited:
+                if neighbor not in visited and not neighbor.is_impassable:
                     queue.append((neighbor, distance + 1))
         return max_distance + 1
 
