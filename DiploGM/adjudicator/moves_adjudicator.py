@@ -32,7 +32,17 @@ class MovesAdjudicator(Adjudicator):
         self.orders: set[AdjudicableOrder] = set()
         self.dp_order_strings: dict[str, tuple[str, str | None, str | None]] = {}
 
-        # run supports after everything else since illegal cores / moves should be treated as holds
+        # Check to make sure people don't over-allocate DP, and remove over-allocated DP orders
+        for player in board.get_players():
+            points_available = player.dp_max
+            for unit, allocation in board.get_player_dp_orders(player).items():
+                if allocation.points > points_available:
+                    logger.info(f"Player {player} allocated more DP than they have. Skipping this DP orders")
+                    unit.dp_allocations.pop(player.name)
+                    break
+                points_available -= allocation.points
+
+        # For each unit, assign a DP order if appropriate
         for unit in board.units:
             if unit.order is None and (best_order := board.get_winning_dp_order(unit)) is not None:
                 unit.order = best_order
@@ -41,6 +51,8 @@ class MovesAdjudicator(Adjudicator):
                     unit.order.get_destination_str(),
                     unit.order.get_source_str()
                 )
+
+        # run supports after everything else since illegal cores / moves should be treated as holds
         units = sorted(board.units, key=lambda unit: isinstance(unit.order, Support))
         for unit in units:
             self._validate_unit(unit)
@@ -62,48 +74,6 @@ class MovesAdjudicator(Adjudicator):
         self._dependencies: list[AdjudicableOrder] = []
 
         self._find_convoy_kidnappings()
-
-    def _assign_dp_orders(self, unit: Unit):
-        # We find which orders got the highest bid, and assign that to the unit.
-        # If a player is ordering an attack or support against that unit, they lose their bid.
-        # If there is a tie, then the unit holds.
-        if not unit.dp_allocations:
-            return
-        dp_allocations: dict[str, int] = {}
-        str_to_order: dict[str, UnitOrder] = {}
-        for player_name, allocation in unit.dp_allocations.items():
-            player = self._board.get_player(player_name)
-            if player is None:
-                continue
-            order = allocation.order
-            # First, let's check to see if the player isn't attacking the unit
-            destinations = [u.order.destination for u in player.units if u.order is not None]
-            if unit.province in destinations:
-                continue
-
-            if str(order) in dp_allocations:
-                dp_allocations[str(order)] += allocation.points
-            else:
-                str_to_order[str(order)] = order
-                dp_allocations[str(order)] = allocation.points
-        # Now let's see which order got the highest bid
-        has_tie = False
-        max_points = 0
-        best_order_str = ""
-        for order_str, points in dp_allocations.items():
-            if points > max_points:
-                max_points = points
-                best_order_str = order_str
-                has_tie = False
-            elif points == max_points:
-                has_tie = True
-        if not has_tie:
-            unit.order = str_to_order[best_order_str]
-            self.dp_order_strings[str(unit.province)] = (
-                type(unit.order).__name__,
-                unit.order.get_destination_str(),
-                unit.order.get_source_str()
-            )
 
     def _validate_unit(self, unit: Unit):
         # Replace invalid orders with holds
@@ -336,9 +306,12 @@ class MovesAdjudicator(Adjudicator):
 
     def _count_strength(self, order: AdjudicableOrder, attacked_country: Player | None = None) -> int:
         # Your own unit counts, unless it's a difficult adjacency
-        strength = 0 if order.destination_province.name in order.base_unit.province.adjacency_data.difficult_adjacencies else 1
+        strength = 0
+        if order.destination_province.name not in order.base_unit.province.adjacency_data.difficult_adjacencies:
+            strength += 1
         for support in order.supports:
-            if self._resolve_order(support) == Resolution.SUCCEEDS and (support.country is None or attacked_country != support.country):
+            if (self._resolve_order(support) == Resolution.SUCCEEDS
+                and (support.country is None or attacked_country != support.country)):
                 strength += 1
         return strength
 

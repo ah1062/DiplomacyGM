@@ -8,14 +8,16 @@ import numpy as np
 from xml.etree.ElementTree import Element, tostring
 
 import shapely
-from deepmerge import Merger
+from deepmerge.merger import Merger
 from lxml import etree
 
 from DiploGM.map_parser.vector.transform import TransGL3
 from DiploGM.map_parser.vector.utils import (
-    get_element_color, get_unit_coordinates, get_svg_element,
-    parse_path, initialize_province_resident_data
+    find_svg_element, get_element_color, get_unit_coordinates,
+    parse_path, initialize_province_resident_data,
+    LAYER_DICTIONARY, NAMESPACE, SVG_CONFIG_KEY
 )
+from DiploGM.models import province
 from DiploGM.models.turn import PhaseName, Turn
 from DiploGM.models.board import Board
 from DiploGM.models.player import Player
@@ -25,21 +27,17 @@ from DiploGM.utils.sanitise import parse_variant_path
 
 # TODO: (BETA) all attribute getting should be in utils which we import and call utils.my_unit()
 # TODO: (BETA) consistent in bracket formatting
-NAMESPACE: dict[str, str] = {
-    "inkscape": "{http://www.inkscape.org/namespaces/inkscape}",
-    "sodipodi": "http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd",
-    "svg": "http://www.w3.org/2000/svg",
-}
 HIGH_PROVINCES_KEY = "high provinces"
-SVG_CONFIG_KEY = "svg config"
+LAYER_NAMES = set(LAYER_DICTIONARY.keys())
 
 logger = logging.getLogger(__name__)
-
 
 class Parser:
     def __init__(self, data: str):
         self.datafile = data
 
+        # Loads the config files for the variant
+        # We get the variant-wide config, and then apply any version-specific changes, if applicible
         config_merger = Merger(
             [
                 (list, ["override"]),
@@ -49,7 +47,6 @@ class Parser:
             ["override"],
             ["override"]
         )
-
         with open(f"{parse_variant_path(data)}/config.json", "r", encoding="utf-8") as f:
             variant_data = json.load(f)
         try:
@@ -69,28 +66,30 @@ class Parser:
         self.layers = self.data[SVG_CONFIG_KEY]
         self.layer_data: dict[str, Element] = {}
 
-        for layer in ["land_layer", "island_borders", "island_fill_layer",
-                       "sea_borders", "province_names", "supply_center_icons",
-                       "army", "retreat_army", "fleet", "retreat_fleet"]:
-            l = get_svg_element(svg_root, self.layers[layer])
+        # Gets the SVG elements for each layer, and stores them in the Parser
+        for layer in LAYER_NAMES:
+            l = find_svg_element(svg_root, layer, self.layers)
             if l is None:
+                if layer in {"island_borders", "island_fill_layer"}:
+                    logger.warning(f"Layer {layer} not found in SVG, but it might not be necessary")
+                    continue
                 raise ValueError(f"Layer {layer} not found in SVG")
             self.layer_data[layer] = l
 
+        # If there are starting units in the map, get that layer as well
         if self.layers["detect_starting_units"]:
-            starting_units = get_svg_element(svg_root, self.layers["starting_units"])
+            starting_units = find_svg_element(svg_root, "starting_units", self.layers)
             if starting_units is None:
                 raise ValueError("Starting_units layer expected but not found in SVG")
             self.layer_data["starting_units"] = starting_units
 
-        if "impassibles_layer" in self.layers:
-            impassibles_layer = get_svg_element(svg_root, self.layers["impassibles_layer"])
-            if impassibles_layer is None:
-                raise ValueError("Layer impassibles_layer not found in SVG")
-            self.layer_data["impassibles_layer"] = impassibles_layer
-
         self.fow = self.layers.get("fow", False)
-        self.year_offset = self.layers.get("year", 1642)
+        # TODO: Move this out of SVG layers and update configs accordingly
+        self.year_offset = self.data.get("year", 1901)
+
+        self.impassable_color = self.data[SVG_CONFIG_KEY].get("impassable", "000000")
+        if isinstance(self.impassable_color, dict):
+            self.impassable_color = self.impassable_color.get("standard", "000000")
 
         self.color_to_player: dict[str, Player | None] = {}
         self.name_to_province: dict[str, Province] = {}
@@ -108,38 +107,47 @@ class Parser:
 
         # All provinces should have unique names
         for layer_name in ["land_layer", "island_borders", "sea_borders"]:
-            layer = self.layer_data[layer_name]
+            layer = self.layer_data.get(layer_name)
+            if layer is None:
+                continue
             for element in layer:
                 name = element.get(f"{NAMESPACE.get('inkscape')}label")
                 if not name:
-                    logger.error(f"[{layer_name}] Element has no name: {etree.tostring(element, encoding='unicode')[:120]}")
+                    logger.error("[%s] Element has no name: %s",
+                                 layer_name, etree.tostring(element, encoding='unicode')[:120])
                     is_valid = False
                     continue
 
                 if name in seen_names:
-                    logger.error(f"[{layer_name}] Duplicate name: '{name}'")
+                    logger.error("[%s] Duplicate name: '%s'", layer_name, name)
                     is_valid = False
                 else:
                     seen_names.add(name)
 
         # All elements in these layers should have names that reference known provinces
-        for layer_name in ["island_fill_layer", "supply_center_icons", "army", "retreat_army", "fleet", "retreat_fleet"]:
-            layer = self.layer_data[layer_name]
+        for layer_name in ["island_fill_layer", "supply_center_icons",
+                           "army", "retreat_army", "fleet", "retreat_fleet"]:
+            layer = self.layer_data.get(layer_name)
+            if layer is None:
+                continue
             for element in layer:
                 name = element.get(f"{NAMESPACE.get('inkscape')}label")
                 if not name:
-                    logger.error(f"[{layer_name}] Element has no name: {etree.tostring(element, encoding='unicode')[:120]}")
+                    logger.error("[%s] Element has no name: %s",
+                                 layer_name, etree.tostring(element, encoding='unicode')[:120])
                     is_valid = False
                     continue
 
                 name = re.sub(r" \(?[ensw]c\)?$", "", name)  # Remove coast names
                 if name not in seen_names:
-                    logger.error(f"[{layer_name}] Name '{name}' not found in any province layer")
+                    logger.error("[%s] Name '%s' not found in any province layer",
+                                 layer_name, name)
                     is_valid = False
 
         return is_valid
 
     def parse(self) -> Board:
+        """Parses the SVG and config data to create a Board with the initial state."""
         logger.debug("map_parser.vector.parse.start")
         start = time.time()
 
@@ -147,8 +155,8 @@ class Parser:
         self.color_to_player = {}
         self.name_to_province = {}
 
+        # Get the players and their colors from the config, provided it's not a chaos game.
         self.autodetect_players = self.data["players"] == "chaos"
-
         if not self.autodetect_players:
             for name, data in self.data["players"].items():
                 color = data["color"]
@@ -193,6 +201,7 @@ class Parser:
         if "victory_count" not in self.data:
             self.data["victory_count"] = int((len([1 for p in provinces if p.has_supply_center]) + 1) / 2)
 
+        # Creates a deepcopy of the game data, and then loads player names and ISCC/VSCC values if needed
         game_data = copy.deepcopy(self.data)
         if (is_chaos := self.data["players"] == "chaos"):
             game_data["players"] = {}
@@ -230,6 +239,7 @@ class Parser:
                     province.set_unit_coordinate(None, unit_type, is_retreat, coast)
 
     def read_map(self) -> tuple[set[Province], set[tuple[str, str]]]:
+        """Reads the SVG and returns a set of Provinces and a set of adjacencies between province names."""
         if self.cache_provinces is None:
             # set coordinates and names
             raw_provinces: set[Province] = self._get_province_coordinates()
@@ -246,6 +256,7 @@ class Parser:
                 self._initialize_province_names(self.cache_provinces)
 
         provinces = copy.deepcopy(self.cache_provinces)
+        # Stores the Provinces in the Parser, and applies Convoyable Islands if applicable
         for province in provinces:
             self.name_to_province[province.name] = province
             if self.data.get("convoyable_islands") == "enabled" and province.type == ProvinceType.ISLAND:
@@ -338,12 +349,15 @@ class Parser:
 
     def _get_provinces(self) -> set[Province]:
         provinces, adjacencies = self.read_map()
+
+        # Sets adjacencies for each province based on the adjacencies file
         for name1, name2 in adjacencies:
             province1 = self.name_to_province[name1]
             province2 = self.name_to_province[name2]
             province1.set_adjacent(province2)
             province2.set_adjacent(province1)
 
+        # Apply any manual overrides from the config file (e.g. adding adjacencies, multiple coasts, etc.)
         provinces = self.json_cheats(provinces)
 
         # set coasts
@@ -353,12 +367,8 @@ class Parser:
         for province in provinces:
             province.set_adjacent_coasts()
 
-        # impassible provinces aren't in the list; they're "ghost" and only show up
-        # when explicitly asked for in costal topology algorithms
-        provinces = {p for p in provinces if p.type != ProvinceType.IMPASSIBLE}
-
-        self._initialize_province_owners(self.layer_data["land_layer"])
-        self._initialize_province_owners(self.layer_data["island_fill_layer"])
+        self._initialize_province_owners(self.layer_data.get("land_layer"))
+        self._initialize_province_owners(self.layer_data.get("island_fill_layer"))
 
         # set supply centers
         if self.layers["center_labels"]:
@@ -384,24 +394,19 @@ class Parser:
 
     def _get_province_coordinates(self) -> set[Province]:
         # TODO: (BETA) don't hardcode translation
-        land_provinces = self._create_provinces_type(self.layer_data["land_layer"], ProvinceType.LAND)
-        island_provinces = self._create_provinces_type(self.layer_data["island_borders"], ProvinceType.ISLAND)
-        sea_provinces = self._create_provinces_type(self.layer_data["sea_borders"], ProvinceType.SEA)
-        # detect impassible to allow for better understanding
-        # of coastlines
-        # they don't go in board.provinces
-        impassible_provinces = set()
-        if self.layer_data.get("impassibles_layer") is not None:
-            impassible_provinces = self._create_provinces_type(
-                self.layer_data["impassibles_layer"], ProvinceType.IMPASSIBLE)
-        return land_provinces | island_provinces | sea_provinces | impassible_provinces
+        land_provinces = self._create_provinces_type(self.layer_data.get("land_layer"), ProvinceType.LAND)
+        island_provinces = self._create_provinces_type(self.layer_data.get("island_borders"), ProvinceType.ISLAND)
+        sea_provinces = self._create_provinces_type(self.layer_data.get("sea_borders"), ProvinceType.SEA)
+        return land_provinces | island_provinces | sea_provinces
 
     # TODO: (BETA) can a library do all of this for us? more safety from needing to support wild SVG legal syntax
     def _create_provinces_type(
         self,
-        provinces_layer: Element,
+        provinces_layer: Element | None,
         province_type: ProvinceType,
     ) -> set[Province]:
+        if provinces_layer is None:
+            return set()
         provinces = set()
         for province_data in list(provinces_layer):
             path_string = province_data.get("d")
@@ -436,12 +441,20 @@ class Parser:
 
             province = Province(name, poly, province_type)
 
+            color = get_element_color(province_data)
+            if color == self.impassable_color:
+                province.is_impassable = True
+
             provinces.add(province)
         return provinces
 
-    def _initialize_province_owners(self, provinces_layer: Element) -> None:
+    def _initialize_province_owners(self, provinces_layer: Element | None) -> None:
+        if provinces_layer is None:
+            return
         for province_data in provinces_layer:
             name = self.get_province_name(province_data)
+            if self.name_to_province[name].is_impassable:
+                continue
             self.name_to_province[name].owner = self.get_element_player(province_data, province_name=name)
 
     # Sets province names given the names layer
@@ -614,7 +627,7 @@ class Parser:
             f = open(f"assets/{self.datafile}_adjacencies.txt", "w", encoding="utf-8")
             # Combinations so that we only have (A, B) and not (B, A) or (A, A)
             for province1, province2 in itertools.combinations(provinces, 2):
-                if shapely.distance(province1.geometry, province2.geometry) < self.layers["border_margin_hint"]:
+                if shapely.dwithin(province1.geometry, province2.geometry, self.layers["border_margin_hint"]):
                     adjacencies.add((province1.name, province2.name))
                     f.write(f"{province1.name},{province2.name}\n")
         else:
@@ -631,7 +644,7 @@ class Parser:
             neutral_color = neutral_color["standard"]
         #FIXME: only works if there's one person per province
         if self.autodetect_players:
-            if color is None or color == neutral_color:
+            if color is None or color == neutral_color or color == self.impassable_color:
                 return None
             player = Player(province_name, color, set(), set())
             self.players.add(player)

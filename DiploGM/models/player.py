@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Optional, Sequence
 from enum import Enum, auto
 import discord
 
+from DiploGM import config
 from DiploGM.models import order
 from DiploGM.models.order import Disband, Build
 from DiploGM.utils import simple_player_name
@@ -65,19 +66,32 @@ class Player:
         self.liege: Player | None = None
         self.vassals: list[Player] = []
 
+        self._dp_max: int | None = None
+
         self.is_active: bool = is_active
 
         # Must be initialised when the board is made
-        self.board: Optional[Board] = None
+        self.board: Board | None = None
 
+    @property
+    def dp_max(self) -> int:
+        """Currently defaults to 1 DP per SC with a max of 3, but can be overwritten"""
+        if self._dp_max is not None:
+            return self._dp_max
+        return min(len(self.centers), 3)
 
-    def find_discord_role(self, roles: Sequence[discord.Role]) -> Optional[discord.Role]:
+    @dp_max.setter
+    def dp_max(self, value: int):
+        self._dp_max = value
+
+    def find_discord_role(self, roles: Sequence[discord.Role], get_order_role: bool = False) -> Optional[discord.Role]:
         """Gets the Discord role associated with this player, if it exists."""
+        suffix = config.PLAYER_CHANNEL_SUFFIX if get_order_role else ""
         for role in roles:
-            if simple_player_name(role.name) == simple_player_name(self.get_name()):
+            if simple_player_name(role.name) == simple_player_name(self.get_name()) + suffix:
                 return role
         for role in roles:
-            if simple_player_name(role.name) == simple_player_name(self.name):
+            if simple_player_name(role.name) == simple_player_name(self.name) + suffix:
                 return role
         return None
 
@@ -99,13 +113,17 @@ class Player:
         centers = sorted(self.centers, key=lambda c: c.name)
 
         if board.data["players"] == "chaos":
+            units = ((bullet + bullet.join([unit.province.get_name(unit.coast) for unit in units]))
+                    if len(units) > 0 else 'None')
+            centers = ((bullet + bullet.join([center.name for center in centers]))
+                      if len(centers) > 0 else 'None')
             out = (
                 f"Color: #{self.render_color}\n"
                 + f"Points: {self.points}\n"
                 + f"Vassals: {', '.join(map(str,self.vassals))}\n"
                 + f"Liege: {self.liege if self.liege else 'None'}\n"
-                + f"Units ({len(units)}): {(bullet + bullet.join([unit.province.get_name(unit.coast) for unit in units])) if len(units) > 0 else 'None'}\n"
-                + f"Centers ({len(centers)}): {(bullet + bullet.join([center.name for center in centers])) if len(centers) > 0 else 'None'}\n"
+                + f"Units ({len(units)}): {units}\n"
+                + f"Centers ({len(centers)}): {centers}\n"
             )
             return out
 
@@ -123,9 +141,11 @@ class Player:
         for unit in units:
             unit_str += f"{bullet}({unit.unit_type.value}) {unit.province.get_name(unit.coast)}"
 
+        color = (bullet + bullet.join([k + ': ' + v for k, v in self.color_dict.items()])
+                if self.color_dict is not None else self.render_color)
         out = (
             ""
-            + f"Color: {(bullet + bullet.join([k + ': ' + v for k, v in self.color_dict.items()]) if self.color_dict is not None else self.render_color)}\n"
+            + f"Color: {color}\n"
             + f"Score: [{len(self.centers)}/{int(board.data['players'][self.name]['vscc'])}] "
                 + f"{round(board.get_score(self) * 100, 2)}%\n"
             + f"{center_str}\n"

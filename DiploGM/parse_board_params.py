@@ -8,12 +8,12 @@ from DiploGM.db.database import get_connection
 def parse_board_params(message: str, board: Board) -> tuple[str, str, bytes | None, str | None, str | None]:
     """Parses a message containing commands to edit the board parameters,
     executes those commands, and returns a response message and an updated map if applicable."""
-    invalid: list[tuple[str, Exception]] = []
+    invalid: list[tuple[str, RuntimeError | ValueError]] = []
     commands = str.splitlines(message)
     for command in commands:
         try:
             _parse_command(command, board)
-        except Exception as error:
+        except (RuntimeError, ValueError) as error:
             invalid.append((command, error))
 
     embed_colour: str | None = None
@@ -51,6 +51,7 @@ def _set_build_options(keywords: list[str], board: Board) -> tuple[str | None, s
     if new_value not in valid_options:
         raise ValueError(f"{new_value} is not a valid build option")
     board.data[key_name] = new_value
+    board.custom_data[key_name] = new_value
     return key_name, new_value
 
 def _set_convoyable_islands(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
@@ -61,6 +62,7 @@ def _set_convoyable_islands(keywords: list[str], board: Board) -> tuple[str | No
         raise ValueError(f"{new_value} is not a valid convoyable islands option")
     new_value = "enabled" if new_value in ["true", "enabled"] else "disabled"
     board.data[key_name] = new_value
+    board.custom_data[key_name] = new_value
     return key_name, new_value
 
 def _set_supportable_cores(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
@@ -71,6 +73,7 @@ def _set_supportable_cores(keywords: list[str], board: Board) -> tuple[str | Non
         raise ValueError(f"{new_value} is not a valid supportable cores option")
     new_value = "enabled" if new_value in ["true", "enabled"] else "disabled"
     board.data[key_name] = new_value
+    board.custom_data[key_name] = new_value
     return key_name, new_value
 
 def _set_transformation(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
@@ -80,6 +83,18 @@ def _set_transformation(keywords: list[str], board: Board) -> tuple[str | None, 
     if new_value not in valid_options:
         raise ValueError(f"{new_value} is not a valid transformation option")
     board.data[key_name] = new_value
+    board.custom_data[key_name] = new_value
+    return key_name, new_value
+
+def _set_dp(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
+    key_name = "dp"
+    valid_options = "true", "false", "enabled", "disabled"
+    new_value = keywords[0].lower()
+    if new_value not in valid_options:
+        raise ValueError(f"{new_value} is not a valid DP option")
+    new_value = "enabled" if new_value in ["true", "enabled"] else "disabled"
+    board.data[key_name] = new_value
+    board.custom_data[key_name] = new_value
     return key_name, new_value
 
 def _set_victory_conditions(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
@@ -89,6 +104,7 @@ def _set_victory_conditions(keywords: list[str], board: Board) -> tuple[str | No
     if new_value not in valid_options:
         raise ValueError(f"{new_value} is not a valid victory condition option")
     board.data[key_name] = new_value
+    board.custom_data[key_name] = new_value
     return key_name, new_value
 
 def _set_victory_count(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
@@ -97,6 +113,7 @@ def _set_victory_count(keywords: list[str], board: Board) -> tuple[str | None, s
     if not new_value.isdigit():
         raise ValueError(f"{new_value} is not a whole number of victory SCs")
     board.data[key_name] = new_value
+    board.custom_data[key_name] = new_value
     return key_name, new_value
 
 def _set_iscc(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
@@ -107,6 +124,7 @@ def _set_iscc(keywords: list[str], board: Board) -> tuple[str | None, str | None
     if not new_iscc.isdigit():
         raise ValueError(f"{new_iscc} is not a whole number of starting SCs")
     board.data["players"][player.name]["iscc"] = new_iscc
+    board.custom_data["players"][player.name]["iscc"] = new_iscc
     return key_name, new_iscc
 
 def _set_vscc(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
@@ -117,6 +135,7 @@ def _set_vscc(keywords: list[str], board: Board) -> tuple[str | None, str | None
     if not new_vscc.isdigit():
         raise ValueError(f"{new_vscc} is not a whole number of starting SCs")
     board.data["players"][player.name]["vscc"] = new_vscc
+    board.custom_data.setdefault("players", {}).setdefault(player.name, {})["vscc"] = new_vscc
     return key_name, new_vscc
 
 def _set_player_name(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
@@ -135,6 +154,7 @@ def _hide_player(keywords: list[str], board: Board) -> tuple[str | None, str | N
     if is_hidden not in ["true", "false"]:
         raise ValueError(f"{is_hidden} needs to be true or false")
     board.data["players"][player.name]["hidden"] = is_hidden
+    board.custom_data.setdefault("players", {}).setdefault(player.name, {})["hidden"] = is_hidden
     return key_name, is_hidden
 
 def _add_player(keywords: list[str], board: Board) -> tuple[str | None, str | None]:
@@ -142,11 +162,13 @@ def _add_player(keywords: list[str], board: Board) -> tuple[str | None, str | No
     if player_name in board.name_to_player:
         raise ValueError(f"{player_name} is already a player")
     key_name = f"players/{player_name}/color"
-    board.data["players"][player_name] = {
+    player_data = {
         "color": player_color,
         "iscc" : 1,
         "vscc" : board.data["victory_count"]
     }
+    board.data["players"][player_name] = player_data
+    board.custom_data.setdefault("players", {})[player_name] = dict(player_data)
     board.add_new_player(player_name, player_color)
     get_connection().execute_arbitrary_sql(
         "INSERT INTO players (board_id, player_name, color, liege, points) VALUES (?, ?, ?, ?, ?)",
@@ -159,6 +181,7 @@ function_list = {
     "convoyable islands": _set_convoyable_islands,
     "supportable cores": _set_supportable_cores,
     "transformation": _set_transformation,
+    "dp": _set_dp,
     "victory conditions": _set_victory_conditions,
     "victory count": _set_victory_count,
     "iscc": _set_iscc,

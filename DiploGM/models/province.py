@@ -22,7 +22,6 @@ class ProvinceType(Enum):
     LAND = 1
     ISLAND = 2
     SEA = 3
-    IMPASSIBLE = 4
 
 @dataclass
 class ProvinceCore:
@@ -36,8 +35,8 @@ class ProvinceAdjacency:
     """Contains adjacency information about a province.
     At some point this should be moved into a ProvinceGeom class or something."""
     adjacent: set[Province] = field(default_factory=set)
-    fleet_adjacent: set[tuple[Province, str | None]] | dict[str, set[tuple[Province, str | None]]] = field(default_factory=set)
-    impassible_adjacent: set[Province] = field(default_factory=set)
+    fleet_adjacent: set[tuple[Province, str | None]] | dict[str, set[tuple[Province, str | None]]] \
+                  = field(default_factory=set)
     nonadjacent_coasts: set[str] = field(default_factory=set)
     difficult_adjacencies: set[str] = field(default_factory=set)
 
@@ -60,6 +59,7 @@ class Province():
         self.geometry: Polygon | MultiPolygon = coordinates
         self.unit_coordinates: dict[str, UnitLocation] = {}
         self.type: ProvinceType = province_type
+        self.is_impassable: bool = False
         self.can_convoy: bool = province_type == ProvinceType.SEA
         self.has_supply_center: bool = False
         self.owner: player.Player | None = None
@@ -84,6 +84,14 @@ class Province():
         if coast in self.adjacency_data.fleet_adjacent:
             return f"{self.name} {coast}"
         return self.name
+
+    def get_owner_name(self) -> str | None:
+        """Gets the name of the province's owner, 'Impassable' if it is impassable, or None if it has no owner."""
+        if self.is_impassable:
+            return "Impassable"
+        if self.owner is None:
+            return None
+        return self.owner.name
 
     def get_unit_coordinates(self,
                              unit_type: UnitType,
@@ -126,7 +134,9 @@ class Province():
             return True
         if build_options == "control":
             for adj in self.adjacency_data.adjacent:
-                if adj.type in (ProvinceType.LAND, ProvinceType.ISLAND) and adj.owner != self.owner:
+                if (not adj.is_impassable
+                    and adj.type in (ProvinceType.LAND, ProvinceType.ISLAND)
+                    and adj.owner != self.owner):
                     return False
             return True
         return False
@@ -171,10 +181,7 @@ class Province():
         """Manually sets two provinces as adjacent."""
         if isinstance(other, tuple):
             other = other[0]
-        if other.type == ProvinceType.IMPASSIBLE:
-            self.adjacency_data.impassible_adjacent.add(other)
-        else:
-            self.adjacency_data.adjacent.add(other)
+        self.adjacency_data.adjacent.add(other)
 
     def get_distance(self, other: Province, max_distance: int = 100) -> int:
         """Gets the distance between two provinces in number of moves.
@@ -189,7 +196,7 @@ class Province():
                 continue
             visited.add(current)
             for neighbor in current.adjacency_data.adjacent:
-                if neighbor not in visited:
+                if neighbor not in visited and not neighbor.is_impassable:
                     queue.append((neighbor, distance + 1))
         return max_distance + 1
 
@@ -270,9 +277,7 @@ class Province():
             procqueue: list[Province] = []
             connected_sets: set[frozenset[Province]] = set()
 
-            for adjacent in p1.adjacency_data.adjacent | p1.adjacency_data.impassible_adjacent | \
-                            p2.adjacency_data.adjacent | p2.adjacency_data.impassible_adjacent | \
-                            possible_tripoint.adjacency_data.adjacent | possible_tripoint.adjacency_data.impassible_adjacent:
+            for adjacent in p1.adjacency_data.adjacent | p2.adjacency_data.adjacent | possible_tripoint.adjacency_data.adjacent:
                 if adjacent not in (p1, p2, possible_tripoint):
                     procqueue.append(adjacent)
                     connected_sets.add(frozenset({adjacent}))

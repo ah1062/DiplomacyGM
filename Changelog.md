@@ -1,3 +1,40 @@
+1.8.0
+=====
+
+Contributors
+- Golden Kumuqat
+
+# New Features
+- If a player did not order enough disbands, units will automatically be removed via civil disorder rules
+- More DP updates:
+  - Each power has a designated maximum number of DP that they can allocate per turn, set by default to 1/SC with a max of 3
+  - If a player tries to allocate more DP than available, some DP allocations will be redered invalid
+  - `.ping_players` now alerts when someone has unspent or overspent DP
+  - Added `.edit_game dp <disabled|enabled>`
+- Added `.export_game` which outputs a JSON file of the current board state
+- Added `.import_game` which creates a new game based on an exported JSON file
+- Added `.rename_player` which changes a player's name and attempts to edit their role and channel names
+- Variants can have custom scripts that can be loaded to give per-variant special rules
+
+# Quality of Life
+- More support for impassable provinces
+  - Impassable provinces can now be included in the land/island/sea layers of the SVG and be parsed
+  - Units can be ordered to impassable provinces, but they will automatically fail
+  - `.edit set_province_owner <province> Impassable` now turns a province impassable
+- `.adjudicate full` no longer converts the SVG to PNG twice for adjudication, saving up to 30 seconds per adjudication
+- When parsing an SVG, the parser will now look for common layer names in addition to values supplied in the config.json's svg_config
+- If there are multiple possible convoys for a unit, all will be displayed on the map
+- Supports for a convoy will now point to the final fleet instead of all the way at the starting army
+
+# Developer Changes
+- Created some helper functions for common usage
+- Combined logic with the nearly-identical `.view_map` and `.view_current`
+- Moved parsing order strings from database to board
+- Used a significantly faster function for adjacency searching
+
+# Bugfixes
+`.last_message` now properly works for renamed players
+
 1.7.2
 =====
 

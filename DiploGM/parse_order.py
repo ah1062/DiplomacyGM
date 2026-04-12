@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from discord.ext.commands import Paginator
 from lark import Lark, Transformer, UnexpectedEOF, UnexpectedCharacters, v_args
@@ -269,7 +270,9 @@ class TreeToOrder(Transformer):
         """Hold order, of the form [Province] Hold."""
         return province, order.Hold()
 
-    def l_move_order(self, province: Province, _, destination: tuple[Province, str | None]) -> tuple[Province, order.Move]:
+    def l_move_order(self,
+                     province: Province, _,
+                     destination: tuple[Province, str | None]) -> tuple[Province, order.Move]:
         """Move order, of the form [Province] Move [Destination]."""
         return province, order.Move(destination[0], destination[1])
 
@@ -360,7 +363,7 @@ def _check_for_warnings(unit: Unit) -> str | None:
             return "This support is is between two non-adjacent provinces, and will fail unless there is a convoy."
     return None
 
-def parse_order(message: str, player_restriction: Player | None, board: Board) -> dict[str, ...]:
+def parse_order(message: str, player_restriction: Player | None, board: Board) -> dict[str, Any]:
     """Parses the order commands, adds the orders as necessary, and returns a message of the results."""
     ordertext = message.split(maxsplit=1)
     if len(ordertext) == 1:
@@ -406,7 +409,8 @@ def parse_order(message: str, player_restriction: Player | None, board: Board) -
                     color = "\u001b[0;33m"
                 else:
                     color = "\u001b[0;32m"
-                if (ordered_unit.player is None or not ordered_unit.player.is_active) and player_restriction is not None:
+                if ((ordered_unit.player is None or not ordered_unit.player.is_active)
+                    and player_restriction is not None):
                     if (dp_order := ordered_unit.dp_allocations.get(player_restriction.name)) is not None:
                         orderoutput.append(f"{color}DP {dp_order.points}: {ordered_unit} {dp_order.order}")
                     else:
@@ -425,6 +429,11 @@ def parse_order(message: str, player_restriction: Player | None, board: Board) -
         database.save_build_orders_for_players(board, player_restriction)
     else:
         database.save_order_for_units(board, movement)
+
+    if board.turn.is_moves() and player_restriction is not None:
+        if (spent_dp := board.get_dp_spent(player_restriction)) > player_restriction.dp_max:
+            errors.append(f"You have allocated {spent_dp} DP but only have {player_restriction.dp_max} DP. " +
+                          "Please reduce a unit's DP allocation or set it to zero.")
 
     if board.turn.is_builds() and player_restriction is not None:
         expected_builds = len(player_restriction.centers) - len(player_restriction.units)
@@ -456,7 +465,7 @@ def parse_order(message: str, player_restriction: Player | None, board: Board) -
                 "messages": output,
         }
 
-def parse_remove_order(message: str, player_restriction: Player | None, board: Board) -> dict[str, ...]:
+def parse_remove_order(message: str, player_restriction: Player | None, board: Board) -> dict[str, Any]:
     """Parses the .remove_order command and removes the specified orders."""
     invalid: list[tuple[str, Exception]] = []
     commands = message.splitlines()
