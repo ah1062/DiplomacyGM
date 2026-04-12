@@ -1,3 +1,23 @@
+1.8.1
+=====
+
+Contributors:
+- aahoughton
+
+# Quality of Life
+- No longer considers "dead" players when running the `.ping_players` command
+- Added aliases for the scheduling commands
+  - ["s", "sched"] == `.schedule`
+  - ["us", "unsched"] == `.unschedule`
+  - ["vs", "vsched", "viewsched"] == `.view_schedule`
+- Defaulted `.view_map` behaviour to use the "standard" colour mode, 
+
+# GM Changes
+- GMs can provide power roles to `.press_directory` to generate local copies in a GM channel
+
+# Bugfixes
+- Resolved error with requiring gm arguments when calling `.press_directory`
+
 1.8.0
 =====
 

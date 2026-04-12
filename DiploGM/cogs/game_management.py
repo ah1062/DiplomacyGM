@@ -424,7 +424,10 @@ class GameManagementCog(commands.Cog):
             for channel in category.text_channels:
                 player = board.get_player_by_channel(channel)
                 if player is None:
-                    await ctx.send(f"No Player for {channel.name}")
+                    continue
+
+                # player is completely dead, not worth pinging
+                if len(player.centers) + len(player.units) == 0:
                     continue
 
                 role = player.find_discord_role(guild.roles)

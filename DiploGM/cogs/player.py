@@ -194,8 +194,9 @@ class PlayerCog(commands.Cog):
             {"true", "t", "svg", "s"} & set(arguments)
         )
         board = manager.get_board(ctx.guild.id)
-        color_options = board.data["svg config"].get("color_options", {"standard"})
-        color_arguments = list(set(color_options) & set(arguments))
+        color_options = set(board.data["svg config"].get("color_options", {"standard"}))
+        color_options.add("custom")
+        color_arguments = list(color_options & set(arguments))
         color_mode = color_arguments[0] if color_arguments else None
         movement_only = "movement" in arguments
         turn = parse_season(arguments, board.turn)
@@ -263,7 +264,7 @@ class PlayerCog(commands.Cog):
         * view_map {arguments}
         Arguments: 
         * pass true|t|svg|s to return an svg
-        * pass standard, dark, blue, or pink for different color modes if present
+        * pass standard, dark, blue, or pink for different color modes if present, or custom for manually configured colours
         * pass season and optionally year for older maps
         """,
         aliases=["viewmap", "vm"],
@@ -449,7 +450,7 @@ class PlayerCog(commands.Cog):
         arguments = remove_prefix(ctx).lower().split()
 
 
-        if len(set(arguments).intersection(gm_arguments)) == 0:
+        if len(set(arguments).intersection(gm_arguments)) != 0:
             perms.assert_gm_only(ctx, "use a gm argument for .press_directory")
 
         board = manager.get_board(ctx.guild.id)
@@ -469,6 +470,21 @@ class PlayerCog(commands.Cog):
 
                 await send_message_and_file(channel=ctx.channel, message="Created press directories for all players")
                 return
+            elif len(ctx.message.role_mentions) > 0:
+                for player in board.get_players():
+                    role = player.find_discord_role(guild.roles)
+                    if role is None or role not in ctx.message.role_mentions:
+                        continue
+
+                    await self._player_press_directory(ctx,
+                                                       channel=ctx.channel,
+                                                       player=player,
+                                                       power_roles=power_roles)
+
+                out = " ".join(map(lambda r: r.mention, ctx.message.role_mentions))
+                await send_message_and_file(channel=ctx.channel, message=f"Created press directories for players: {out}")
+                return
+
             await send_message_and_file(channel=ctx.channel,
                                         message=f"Please provide a GM argument: {gm_arguments}",
                                         embed_colour=config.PARTIAL_ERROR_COLOUR)

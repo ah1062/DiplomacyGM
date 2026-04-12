@@ -72,6 +72,7 @@ class ScheduleCog(commands.Cog):
     @commands.command(
         name="schedule",
         brief="Schedule a time for command execution",
+        aliases=["s", "sched"],
         help="""
     Usage:
     .schedule <timestamp> <command> <args>
@@ -202,6 +203,7 @@ class ScheduleCog(commands.Cog):
         name="unschedule",
         brief="Unschedule a scheduled command",
         description="Task IDs can be found from calling .view_schedule",
+        aliases=["us", "unsched"],
         help="""
     Usage:
     .unschedule <task_id>
@@ -256,7 +258,7 @@ class ScheduleCog(commands.Cog):
             await self.save_scheduled_tasks()
             await send_message_and_file(
                 channel=ctx.channel,
-                message=f"Deleted scheduled task: {task['command']} for {task['execute_at']}",
+                message=f"Deleted scheduled task: {task['command']} for {int(task['execute_at'].timestamp)}",
             )
         except KeyError:
             await send_message_and_file(
@@ -269,6 +271,7 @@ class ScheduleCog(commands.Cog):
     @commands.command(
         name="view_schedule",
         brief="View scheduled commands.",
+        aliases=["vs", "vsched", "viewsched"]
     )
     @perms.gm_only("view command schedule")
     async def view_schedule(self, ctx: commands.Context):
@@ -307,7 +310,7 @@ class ScheduleCog(commands.Cog):
         out = ["(sorted by soonest)"]
         for task_id, task in guild_tasks.items():
             user = self.bot.get_user(task["invoking_user_id"])
-            s = f"Task ID = `{task_id}`:\n- [{user.mention if user else task['invoking_user_name']}] -> `{task['command']}` at {task['execute_at']}"
+            s = f"Task ID = `{task_id}`:\n- [{user.mention if user else task['invoking_user_name']}] -> `{task['command']}` at <t:{int(task['execute_at'].timestamp)}:f>"
             if len(task["args"]) != 0:
                 s += f"\n  - Arguments: {task['args']}"
 
@@ -371,7 +374,7 @@ class ScheduleCog(commands.Cog):
                 await send_message_and_file(
                     channel=channel,
                     message=f"Skipping stale task {task_id}: Could not handle on time " +
-                            f"(Expected: {task['execute_at']})\nTask: {task['full_command']}",
+                            f"(Expected: <t:{int(task['created_at'].timestamp)}:f>)\nTask: {task['full_command']}",
                     embed_colour=ERROR_COLOUR,
                 )
                 del self.scheduled_tasks[task_id]
@@ -393,7 +396,7 @@ class ScheduleCog(commands.Cog):
                 f"Command: {task['command']}\n"
                 f"Invoking: {task['full_command']}\n"
                 f"Scheduled by: {user.mention}\n"
-                f"Scheduled at: {task['created_at']}"
+                f"Scheduled at: <t:{int(task['created_at'].timestamp)}:f>"
             )
             await send_message_and_file(
                 channel=channel, title="Executing scheduled command!", message=out
@@ -437,13 +440,13 @@ class ScheduleCog(commands.Cog):
                     channel.guild.name,
                     channel.name,
                     user.name,
-                    f"Executing command scheduled by '{task['invoking_user_name']}' at {task['created_at']}",
+                    f"Executing command scheduled by '{task['invoking_user_name']}' at <t:{int(task['created_at'].timestamp)}:f>",
                 )
 
                 await self.bot.process_commands(message)
             except Exception as e:
                 await channel.send(
-                    f"Failure to invoke scheduled command.\nCommand: `{task['full_command']}`\nScheduled at: {task['created_at']}"
+                    f"Failure to invoke scheduled command.\nCommand: `{task['full_command']}`\nScheduled at: <t:{int(task['created_at'].timestamp)}:f>"
                 )
 
                 user = self.bot.get_user(task["invoking_user_id"])
