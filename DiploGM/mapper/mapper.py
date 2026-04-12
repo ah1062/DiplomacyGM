@@ -336,8 +336,10 @@ class Mapper:
         for player in self.board.players:
             if color_mode is not None and player.color_dict and color_mode in player.color_dict:
                 color = player.color_dict[color_mode]
-            else:
+            elif color_mode == "custom":
                 color = player.render_color
+            else:
+                color = player.default_color
             self.player_colors[player.name] = color
         neutral_color = self.board_svg_data.get("neutral", "ffffff")
         if isinstance(neutral_color, dict):
