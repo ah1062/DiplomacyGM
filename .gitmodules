@@ -1,20 +1,20 @@
 [submodule "variants/impdip"]
 	path = variants/impdip
-	url = git@github.com:Imperial-Diplomacy/ImpDip-variants.git
+	url = https://github.com/Imperial-Diplomacy/ImpDip-variants.git
 	branch = main
 [submodule "variants/southernimpdip"]
 	path = variants/southernimpdip
-	url = git@github.com:Imperial-Diplomacy/SouthernImpDip-variants.git
+	url = https://github.com/Imperial-Diplomacy/SouthernImpDip-variants.git
 	branch = main
 [submodule "variants/maddip"]
 	path = variants/maddip
-	url = git@github.com:Imperial-Diplomacy/MadDip-variants.git
+	url = https://github.com/Imperial-Diplomacy/MadDip-variants.git
 	branch = main
 [submodule "variants/pelopondip"]
 	path = variants/pelopondip
-	url = git@github.com:Imperial-Diplomacy/PeloponDip-variants.git
+	url = https://github.com/Imperial-Diplomacy/PeloponDip-variants.git
 	branch = main
 [submodule "variants/helladip"]
 	path = variants/helladip
-	url = git@github.com:Imperial-Diplomacy/HellaDip-variants.git
+	url = https://github.com/Imperial-Diplomacy/HellaDip-variants.git
 	branch = main
