@@ -122,12 +122,17 @@ def _set_player_color(keywords: list[str], board: Board) -> None:
 
 def _set_province_owner(keywords: list[str], board: Board) -> None:
     province = board.get_province(keywords[0])
-    player = board.get_player(keywords[1])
+    if keywords[1].lower() == "impassable":
+        province.is_impassable = True
+        player = None
+    else:
+        province.is_impassable = False
+        player = board.get_player(keywords[1])
     board.change_owner(province, player)
     get_connection().execute_arbitrary_sql(
         "UPDATE provinces SET owner=? WHERE board_id=? and phase=? and province_name=?",
         (
-            player.name if player is not None else None,
+            province.get_owner_name(),
             board.board_id,
             board.turn.get_indexed_name(),
             province.name,
@@ -137,13 +142,18 @@ def _set_province_owner(keywords: list[str], board: Board) -> None:
 
 def _set_total_owner(keywords: list[str], board: Board) -> None:
     province = board.get_province(keywords[0])
-    player = board.get_player(keywords[1])
+    if keywords[1].lower() == "impassable":
+        province.is_impassable = True
+        player = None
+    else:
+        province.is_impassable = False
+        player = board.get_player(keywords[1])
     board.change_owner(province, player)
     province.core_data.core = player
     get_connection().execute_arbitrary_sql(
         "UPDATE provinces SET owner=?, core=? WHERE board_id=? and phase=? and province_name=?",
         (
-            player.name if player is not None else None,
+            province.get_owner_name(),
             player.name if player is not None else None,
             board.board_id,
             board.turn.get_indexed_name(),
@@ -248,7 +258,7 @@ def _delete_unit(keywords: list[str], board: Board) -> None:
 
 def _delete_dislodged_unit(keywords: list[str], board: Board) -> None:
     province = board.get_province(keywords[0])
-    unit = board.delete_dislodged_unit(province)
+    unit = board.delete_unit(province, is_dislodged=True)
     if not unit:
         raise RuntimeError(f"No dislodged unit to delete in {province}")
     get_connection().execute_arbitrary_sql(

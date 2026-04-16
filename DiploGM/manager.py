@@ -1,6 +1,7 @@
 import logging
 import time
 import os
+from itertools import combinations
 from typing import Optional
 
 from discord import Member, User
@@ -47,19 +48,19 @@ class Manager(metaclass=SingletonMeta):
         """Gets a list of server ids that have games."""
         return set(self._boards.keys())
 
-    def create_game(self, server_id: int, gametype: str = "classic") -> str:
+    def create_game(self, server_id: int, gametype: str = "classic") -> tuple[bool, str]:
         """Creates a new game in the specified server and of the specified variant."""
         if self._boards.get(server_id):
-            return "A game already exists in this server."
+            return False, "A game already exists in this server."
         if not os.path.isdir(parse_variant_path(gametype)):
-            return f"Game {gametype} does not exist."
+            return False, f"Game {gametype} does not exist."
 
         logger.info(f"Creating new game in server {server_id}")
         self._boards[server_id] = get_parser(gametype).parse()
         self._boards[server_id].board_id = server_id
         self._database.save_board(server_id, self._boards[server_id])
 
-        return f"{self._boards[server_id].data['name']} game created"
+        return True, f"{self._boards[server_id].data['name']} game created"
 
     # Gets adjacent provinces, but with High Seas combined into one for the purpose of finding adjacency issues
     def _get_adjacent_geom(self, province: Province) -> set[Province]:
@@ -110,22 +111,19 @@ class Manager(metaclass=SingletonMeta):
         visited_provinces = set()
 
         # High Seas
-        for province in board.provinces:
-            if province.name[-1] not in "23456789":
-                continue
+        for province in [p for p in board.provinces if p.name[-1] in "23456789"]:
             try:
                 comp_province = board.get_province(province.name[:-1] + "1")
                 # Two high seas' adjacencies should differ by only each other
-                if comp_province.adjacency_data.adjacent ^ province.adjacency_data.adjacent != {province, comp_province}:
+                if (comp_province.adjacency_data.adjacent ^ province.adjacency_data.adjacent
+                    != {province, comp_province}):
                     warnings.append(f"Province {province.name} and {comp_province.name} have different adjacencies")
                 visited_provinces.add(province)
             except ValueError:
                 warnings.append(f"Province {province.name} is named like a high seas province " +
                                 f"but {province.name[:-1]}1 was not found")
 
-        for province in board.provinces:
-            if province in visited_provinces:
-                continue
+        for province in board.provinces - visited_provinces:
             if len(province.adjacency_data.adjacent) == 0:
                 warnings.append(f"Province {province.name} has no adjacencies")
             visited_adjacent = set()
@@ -141,23 +139,20 @@ class Manager(metaclass=SingletonMeta):
                     # Comparing names of the first and last provinces in the loop so we only report it once
                     if loop is not None and loop[1].name > loop[-1].name:
                         warnings.append(f"Found a loop of provinces {', '.join(p.name for p in loop)}. " +
-                                        "If they surround an impassible province or the board edge, this is expected")
+                                        "If they surround an impassable province or the board edge, this is expected")
 
                 # Searching for groups of four provinces that all share a border
-                visited_third = set()
-                for third_province in common_adj - visited_provinces - visited_adjacent:
-                    fourth_adjacent = (common_adj & self._get_adjacent_geom(third_province)
-                                       - visited_provinces - visited_adjacent - visited_third)
-                    for fourth_province in fourth_adjacent:
-                        if min(len(self._get_adjacent_geom(province)),
-                               len(self._get_adjacent_geom(adj)),
-                               len(self._get_adjacent_geom(third_province)),
-                               len(self._get_adjacent_geom(fourth_province))) == 3:
-                            # Skips provinces that only border the other three, as that's geometrically possible
-                            continue
-                        warnings.append(f"Provinces {province.name}, {adj.name}, {third_province.name}, " +
-                                        f"and {fourth_province.name} all border each other")
-                    visited_third.add(third_province)
+                for third, fourth in combinations(common_adj - visited_provinces - visited_adjacent, 2):
+                    if fourth not in self._get_adjacent_geom(third):
+                        continue
+                    if min(len(self._get_adjacent_geom(province)),
+                           len(self._get_adjacent_geom(adj)),
+                           len(self._get_adjacent_geom(third)),
+                           len(self._get_adjacent_geom(fourth))) == 3:
+                        # Skips provinces that only border the other three, as that's geometrically possible
+                        continue
+                    warnings.append(f"Provinces {province.name}, {adj.name}, {third.name}, " +
+                                    f"and {fourth.name} all border each other")
                 visited_adjacent.add(adj)
             visited_provinces.add(province)
         return "\n".join(warnings) if warnings else "No adjacency issues found"
@@ -192,7 +187,8 @@ class Manager(metaclass=SingletonMeta):
         return "Approved request Logged!"
 
     def get_board(self, server_id: int) -> Board:
-        """Gets the current board for a server."""
+        """Gets the current board for a server.
+        Raises a RuntimeError if there is no game in the server."""
         # NOTE: Temporary for Meme's Severence Diplomacy Event
         if server_id == SEVERENCE_B_ID:
             server_id = SEVERENCE_A_ID
@@ -216,13 +212,13 @@ class Manager(metaclass=SingletonMeta):
             raise RuntimeError(f"There is no {turn} board for this server")
         return board
 
-    def apply_test_adjudication_results(self, server_id: int, board: Board) -> None:
+    def apply_adjudication_results(self, server_id: int, board: Board) -> None:
         """Applies stored failed orders and DP orders to a fresh board for test drawing."""
         dp_orders = self.last_dp_orders.get(server_id, {})
         for province_name, (order_type, dest_str, source_str) in dp_orders.items():
             province = board.get_province(province_name)
             if province.unit and province.unit.order is None:
-                order = self._database._parse_order(board, order_type, dest_str, source_str)
+                order = board.parse_order(order_type, dest_str, source_str)
                 if order:
                     province.unit.order = order
 
@@ -349,6 +345,7 @@ class Manager(metaclass=SingletonMeta):
         }
         self.last_dp_orders[server_id] = getattr(adjudicator, 'dp_order_strings', {})
         new_board.turn = new_board.turn.get_next_turn()
+        new_board.run_variant_scripts()
         logger.info("Adjudicator ran successfully")
         if not test:
             self._boards[new_board.board_id] = new_board
@@ -453,7 +450,6 @@ class Manager(metaclass=SingletonMeta):
         """Rolls back the board to the previous turn."""
         logger.info(f"Rolling back in server {server_id}")
         board = self.get_board(server_id)
-        # TODO: what happens if we're on the first phase?
         last_turn = board.turn.get_previous_turn()
 
         old_board = self._database.get_board(
@@ -478,9 +474,8 @@ class Manager(metaclass=SingletonMeta):
         return message, file, file_name
 
     def get_previous_board(self, server_id: int) -> Board | None:
-        """Gets the previous board for a server."""
+        """Gets the previous board for a server. Returns None if it doesn't exist."""
         board = self.get_board(server_id)
-        # TODO: what happens if we're on the first phase?
         last_turn = board.turn.get_previous_turn()
         old_board = self._database.get_board(
             board.board_id,
@@ -537,8 +532,12 @@ class Manager(metaclass=SingletonMeta):
         """Gets the player object associated with a Discord member, if it exists."""
         if isinstance(member, User):
             return None
+        try:
+            players = self.get_board(member.guild.id).players
+        except RuntimeError:
+            return None
         for role in member.roles:
-            for player in self.get_board(member.guild.id).players:
+            for player in players:
                 if (simple_player_name(player.name) == simple_player_name(role.name)
                     or simple_player_name(player.get_name()) == simple_player_name(role.name)):
                     return player

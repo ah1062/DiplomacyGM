@@ -6,10 +6,11 @@ from discord.utils import find as discord_find
 
 from DiploGM import perms
 from DiploGM import utils
-from DiploGM.config import ERROR_COLOUR, HUB_SERVER_ID, PARTIAL_ERROR_COLOUR
+from DiploGM.config import ERROR_COLOUR, HUB_SERVER_ID, PARTIAL_ERROR_COLOUR, PLAYER_CHANNEL_SUFFIX
 from DiploGM.models.spec_request import SpectatorBan, SpectatorBanRepository
 from DiploGM.utils import send_message_and_file
 from DiploGM.manager import Manager
+from DiploGM.utils.send_message import ErrorMessage, send_error
 
 logger = logging.getLogger(__name__)
 manager = Manager()
@@ -66,7 +67,7 @@ class SpecView(discord.ui.View):
             await interaction.response.send_message(
                 f"Accept response sent to {self.member.mention}!", ephemeral=True
             )
-        except:
+        except discord.Forbidden:
             logger.warning(
                 "Unable to send a message to direct message. The user might have DMs blocked."
             )
@@ -96,7 +97,7 @@ class SpecView(discord.ui.View):
             await interaction.response.send_message(
                 f"Reject response sent to {self.member.mention}!", ephemeral=True
             )
-        except:
+        except discord.Forbidden:
             logger.warning(
                 "Unable to send a message to direct message. The user might have DMs blocked."
             )
@@ -175,7 +176,9 @@ class SpectatorCog(commands.Cog):
     @spec_ban_add.error
     async def spec_ban_add_error(self, ctx: commands.Context, exc):
         if isinstance(exc, commands.errors.UserNotFound):
-            await send_message_and_file(channel=ctx.channel, message="Could not find that user!", embed_colour=ERROR_COLOUR)
+            await send_message_and_file(channel=ctx.channel,
+                                        message="Could not find that user!",
+                                        embed_colour=ERROR_COLOUR)
             ctx.handled = True # type: ignore
             return
 
@@ -288,7 +291,7 @@ class SpectatorCog(commands.Cog):
                 "Please use the spectate command in a Game server!"
             )
             return
-        elif not interaction.channel:
+        if not interaction.channel:
             return
 
 
@@ -345,12 +348,12 @@ class SpectatorCog(commands.Cog):
 
             if end_ts is not None and now_ts < end_ts:
                 await interaction.response.send_message(
-                    f"You are currently banned from spectating with DiploGM until this time:\n\n{end_ts}\n\nContact the Imperial Diplomacy Moderation team if you are unsure why.",
+                    f"You are currently banned from spectating with DiploGM until this time:\n\n" +
+                    f"{end_ts}\n\nContact the Moderation team if you are unsure why.",
                     ephemeral=True,
                 )
                 return
-            else:
-                self.ban_repo.delete(requester.id)
+            self.ban_repo.delete(requester.id)
 
         # check for membership and verification on the hub Server
         hub = self.bot.get_guild(HUB_SERVER_ID)
@@ -448,7 +451,7 @@ class SpectatorCog(commands.Cog):
 
         # get power channel to send request
         role_channel = discord.utils.find(
-            lambda c: c.name == f"{power_role.name.lower()}-orders", guild.text_channels
+            lambda c: c.name == f"{power_role.name.lower()}{PLAYER_CHANNEL_SUFFIX}", guild.text_channels
         )
         role_void = discord.utils.find(
             lambda c: c.name == f"{power_role.name.lower()}-void", guild.text_channels
@@ -494,21 +497,11 @@ class SpectatorCog(commands.Cog):
             return
 
         if len(ctx.message.role_mentions) == 0:
-            await send_message_and_file(
-                channel=ctx.channel,
-                title="Error",
-                message="Did not mention a nation.",
-                embed_colour=ERROR_COLOUR,
-            )
+            await send_error(ctx.channel, ErrorMessage.POWER_NOT_MENTIONED)
             return
 
         if len(ctx.message.mentions) == 0:
-            await send_message_and_file(
-                channel=ctx.channel,
-                title="Error",
-                message="Did not mention a user.",
-                embed_colour=ERROR_COLOUR,
-            )
+            await send_error(ctx.channel, ErrorMessage.USER_NOT_MENTIONED)
             return
 
         user = ctx.message.mentions[0]

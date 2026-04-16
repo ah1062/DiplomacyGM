@@ -1,3 +1,4 @@
+"""Configuration methods for the bot."""
 from __future__ import annotations
 
 import logging
@@ -18,6 +19,7 @@ with open("config.toml", "rb") as toml_file:
 
 def merge_toml(main: dict[str, Any], default: dict[str, Any], current_path: str = "") -> Tuple[
     List[Tuple[int, str]], dict[str, Any]]:
+    """Merges the main config with the default config, returning a list of errors and the merged config."""
     output = {}
     errors = []
     for key in default:
@@ -50,19 +52,19 @@ MAP_ARCHIVE_URL = all_config["archive_website"]["url"]
 
 
 # DEVELOPMENT SERVER HUB
-BOT_DEV_SERVER_ID = all_config["dev_hub"]["id"]
-BOT_DEV_UNHANDLED_ERRORS_CHANNEL_ID = all_config["dev_hub"]["unhandled_errors_channel"]
+BOT_DEV_SERVER_ID: int = all_config["dev_hub"]["id"]
+BOT_DEV_UNHANDLED_ERRORS_CHANNEL_ID: int = all_config["dev_hub"]["unhandled_errors_channel"]
 
 # HUB SERVER
-HUB_SERVER_ID = all_config["hub"]["id"]
+HUB_SERVER_ID: int = all_config["hub"]["id"]
 ## Channels
-HUB_SERVER_BOT_STATUS_CHANNEL_ID = all_config["hub"]["status_channel"]
-HUB_SERVER_SUBSTITUTE_TICKET_CHANNEL_ID = all_config["hub"]["substitute_ticket_channel"]
-HUB_SERVER_SUBSTITUTE_ADVERTISE_CHANNEL_ID = all_config["hub"]["substitute_advertise_channel"]
-HUB_SERVER_SUBSTITUTE_LOG_CHANNEL_ID = all_config["hub"]["substitute_log_channel"]
-HUB_SERVER_WINTER_SCOREBOARD_OUTPUT_CHANNEL_ID = all_config["hub"]["winter_scoreboard_output_channel"]
+HUB_SERVER_BOT_STATUS_CHANNEL_ID: int = all_config["hub"]["status_channel"]
+HUB_SERVER_SUBSTITUTE_TICKET_CHANNEL_ID: int = all_config["hub"]["substitute_ticket_channel"]
+HUB_SERVER_SUBSTITUTE_ADVERTISE_CHANNEL_ID: int = all_config["hub"]["substitute_advertise_channel"]
+HUB_SERVER_SUBSTITUTE_LOG_CHANNEL_ID: int = all_config["hub"]["substitute_log_channel"]
+HUB_SERVER_WINTER_SCOREBOARD_OUTPUT_CHANNEL_ID: int = all_config["hub"]["winter_scoreboard_output_channel"]
 ## Roles
-HUB_BOT_WIZARD_ROLE = all_config["hub"]["bot_wizard"]
+HUB_BOT_WIZARD_ROLE: int = all_config["hub"]["bot_wizard"]
 
 # PERMISSIONS
 SUPERUSERS = all_config["permissions"]["superusers"]
@@ -74,9 +76,6 @@ EXTENSIONS_TO_LOAD_ON_STARTUP = all_config["extensions"]["load_on_startup"]
 EMBED_STANDARD_COLOUR = all_config["colours"]["embed_standard"]
 PARTIAL_ERROR_COLOUR = all_config["colours"]["embed_partial_success"]
 ERROR_COLOUR = all_config["colours"]["embed_error"]
-
-# TODO: move to config_defaults.toml if applicable or elsewhere
-color_options = {"standard", "dark", "pink", "blue", "kingdoms", "empires"}
 
 # INKSCAPE
 SIMULATRANEOUS_SVG_EXPORT_LIMIT = all_config["inkscape"]["simultaneous_svg_exports_limit"]
@@ -101,6 +100,7 @@ _mod_roles: set[str] = {
 
 
 def is_mod_role(role: Role) -> bool:
+    """Checks to see if a Discord role is a moderator role."""
     return _is_member(role.name, _mod_roles)
 
 
@@ -118,6 +118,7 @@ _gm_roles: set[str] = {
 
 
 def is_gm_role(role: Role) -> bool:
+    """Checks to see if a Discord role is a GM role."""
     return _is_member(role.name, _gm_roles)
 
 
@@ -128,6 +129,7 @@ _player_roles: set[str] = {
 
 
 def is_player_role(role: Role) -> bool:
+    """Checks to see if a Discord role is the Player role."""
     return _is_member(role.name, _player_roles)
 
 
@@ -139,6 +141,7 @@ _gm_categories: set[str] = {
 
 
 def is_gm_category(category: CategoryChannel | None) -> bool:
+    """Checks to see if a Discord category is the GM category."""
     return category is not None and _is_member(category.name, _gm_categories)
 
 
@@ -147,6 +150,7 @@ _gm_channels: set[str] = {"admin-chat", "admin-spam", "gm-bot-commands"}
 
 
 def is_gm_channel(channel: Messageable) -> bool:
+    """Checks to see if a Discord channel is a GM-only channel."""
     return isinstance(channel, TextChannel) and _is_member(channel.name, _gm_channels)
 
 
@@ -158,18 +162,20 @@ _player_categories: set[str] = {
 
 
 def is_player_category(category: CategoryChannel | None) -> bool:
+    """Checks to see if a Discord category is the Orders category."""
     return category is not None and _is_member(category.name, _player_categories)
 
 
 # Channel suffix for player orders channels.
 # E.g. if the player is "france" and the suffix is "-orders", the channel is "france-orders"
-player_channel_suffix: str = "-orders"
+PLAYER_CHANNEL_SUFFIX: str = "-orders"
 
 # Temporary bumbleship holds until the server restarts or until you fish too much
 temporary_bumbles: set[str] = set()
 
 
 def is_bumble(name: str) -> bool:
+    """Checks to see if a username is a bumble."""
     return name == "_bumble" or name in temporary_bumbles
 
 def output_config_logs(logger=None):

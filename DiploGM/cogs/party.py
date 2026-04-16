@@ -7,18 +7,17 @@ from itertools import permutations
 
 import discord
 from discord.ext.commands import Bot
-
-from DiploGM.perms import is_superuser, is_gm
-from DiploGM.manager import Manager
-from scipy.integrate import odeint
-
 from discord.ext import commands
 
-from DiploGM import perms
-from DiploGM.config import ERROR_COLOUR, is_bumble, temporary_bumbles, HUB_SERVER_ID
-from DiploGM.utils import log_command, send_message_and_file
+from scipy.integrate import odeint
 
+from DiploGM.manager import Manager
+from DiploGM import perms
+from DiploGM.config import is_bumble, temporary_bumbles, HUB_SERVER_ID
+from DiploGM.utils import log_command, send_message_and_file
+from DiploGM.utils.sanitise import remove_prefix
 from DiploGM.db.database import get_connection
+from DiploGM.utils.send_message import ErrorMessage, send_error
 
 logger = logging.getLogger(__name__)
 manager = Manager()
@@ -33,14 +32,13 @@ ping_text_choices = [
 # Intended use: to extend the possibilities within .advice
 WOC_ADVICE = ["Maybe the real friends were the dots we claimed along the way."]
 try:
-    with open("assets/advice.txt", "r") as f:
+    with open("assets/advice.txt", "r", encoding="utf-8") as f:
         WOC_ADVICE.extend(f.readlines())
 except FileNotFoundError:
     pass
 
-def fish_pop_model(Fish, t, growth_rate, carrying_capacity):
-    dFishdt = growth_rate * Fish * (1 - Fish / carrying_capacity)
-    return dFishdt
+def fish_pop_model(fish, _, growth_rate, carrying_capacity):
+    return growth_rate * fish * (1 - fish / carrying_capacity)
 
 
 class PartyCog(commands.Cog):
@@ -82,31 +80,16 @@ class PartyCog(commands.Cog):
         """
         # noinspection PyTypeChecker
         if len(ctx.message.channel_mentions) == 0:
-            await send_message_and_file(
-                channel=ctx.channel,
-                title="Error",
-                message="No Channel Given",
-                embed_colour=ERROR_COLOUR,
-            )
+            await send_error(ctx.channel, ErrorMessage.CHANNEL_NOT_GIVEN)
             return
         channel = ctx.message.channel_mentions[0]
         if not isinstance(channel, discord.abc.Messageable):
-            await send_message_and_file(
-                channel=ctx.channel,
-                title="Error",
-                message="Channel is not messageable",
-                embed_colour=ERROR_COLOUR,
-            )
+            await send_error(ctx.channel, ErrorMessage.NOT_MESSAGEABLE)
             return
-        content = ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")
+        content = remove_prefix(ctx)
         content = content.replace(channel.mention, "").strip()
         if len(content) == 0:
-            await send_message_and_file(
-                channel=ctx.channel,
-                title="Error",
-                message="No Message Given",
-                embed_colour=ERROR_COLOUR,
-            )
+            await send_error(ctx.channel, ErrorMessage.MESSAGE_NOT_GIVEN)
             return
 
         message = await send_message_and_file(channel=channel, message=content)
@@ -144,7 +127,7 @@ class PartyCog(commands.Cog):
         if random.random() < 0.1:
             author = ctx.message.author
             assert isinstance(author, discord.Member)
-            content = ctx.message.content.removeprefix(f"{ctx.prefix}{ctx.invoked_with}")
+            content = remove_prefix(ctx)
             if content == "":
                 content = " nothing"
             name = author.nick
@@ -525,7 +508,7 @@ class PartyCog(commands.Cog):
         raw_boards = tuple(map(lambda b: b[1], sorted_boards))
         try:
             this_board = manager.get_board(ctx.guild.id)
-        except Exception:
+        except RuntimeError:
             this_board = None
         sorted_boards = sorted_boards[:9]
         text = ""
@@ -572,7 +555,7 @@ class PartyCog(commands.Cog):
             Messages:
         """
 
-        if is_superuser(ctx.author):
+        if perms.is_superuser(ctx.author):
             await send_message_and_file(
                 channel=ctx.channel, title="Please don't shut me down", message=""
             )
@@ -614,11 +597,12 @@ class PartyCog(commands.Cog):
         assert ctx.guild is not None
         if ctx.author.id == 1352388421003251833:
             if (ctx.guild.id != HUB_SERVER_ID
-                and is_gm(ctx.author)
-                and (ctx.guild.id not in self.eolhc_ed_members or ctx.me.id not in self.eolhc_ed_members[ctx.guild.id])):
+                and perms.is_gm(ctx.author)
+                and (ctx.guild.id not in self.eolhc_ed_members
+                     or ctx.me.id not in self.eolhc_ed_members[ctx.guild.id])):
                 self.eolhc_ed_members.setdefault(ctx.guild.id, []).append(ctx.me.id)
                 await ctx.reply("*incoherent screaming*"[::-1])
-                await ctx.me.edit(nick=ctx.me.display_name[::-1])
+                await ctx.me.edit(nick = ctx.me.display_name[::-1])
             else:
                 await ctx.reply(random.choice(self.eolhc_gifs))
             return
@@ -627,7 +611,7 @@ class PartyCog(commands.Cog):
 
         try:
             if isinstance(ctx.author, discord.Member):
-                await ctx.author.edit(nick=ctx.author.display_name[::-1])
+                await ctx.author.edit(nick = ctx.author.display_name[::-1])
         except discord.Forbidden:
             await ctx.reply("Pesky Admin")
 
@@ -656,7 +640,7 @@ class PartyCog(commands.Cog):
             Messages:
         """
 
-        if ctx.author.id == 285108244714881024: # aahoughton
+        if ctx.author.id == 285108244714881024 and isinstance(ctx.author, discord.Member): # aahoughton
             try:
                 await ctx.reply("*eolhc")
                 await ctx.author.edit(nick="aahuoghton")
